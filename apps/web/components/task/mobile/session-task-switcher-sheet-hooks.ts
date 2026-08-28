@@ -223,6 +223,7 @@ type SheetNavOptions = {
   setActiveSession: (taskId: string, sessionId: string) => void;
   setActiveTask: (taskId: string) => void;
   onOpenChange: (open: boolean) => void;
+  onRequestNavigation?: (action: () => void | Promise<void>) => void;
 };
 
 export type WorkspaceTaskSession = {
@@ -489,20 +490,27 @@ function useWorkspaceAndTaskCreatedActions(opts: SheetNavOptions) {
     setActiveSession,
     setActiveTask,
     onOpenChange,
+    onRequestNavigation,
   } = opts;
 
   const handleWorkspaceChange = useCallback(
     async (newWorkspaceId: string) => {
       if (newWorkspaceId === workspaceId) return;
-      await switchWorkspace(newWorkspaceId, {
-        navigate,
-        workspaceId,
-        store,
-        loadTaskSessionsForTask,
-        setActiveSession,
-        setActiveTask,
-        onOpenChange,
-      });
+      const action = () =>
+        switchWorkspace(newWorkspaceId, {
+          navigate,
+          workspaceId,
+          store,
+          loadTaskSessionsForTask,
+          setActiveSession,
+          setActiveTask,
+          onOpenChange,
+        });
+      if (onRequestNavigation) {
+        onRequestNavigation(action);
+        return;
+      }
+      await action();
     },
     // Spread the individual fields rather than the `opts` object so callers
     // re-passing a fresh literal each render don't defeat memoization.
@@ -514,6 +522,7 @@ function useWorkspaceAndTaskCreatedActions(opts: SheetNavOptions) {
       setActiveTask,
       onOpenChange,
       navigate,
+      onRequestNavigation,
     ],
   );
 
@@ -695,6 +704,7 @@ export function useSheetActions(
   workspaceId: string | null,
   onOpenChange: (open: boolean) => void,
   selection: TaskSheetSelectionController,
+  onRequestNavigation?: (action: () => void | Promise<void>) => void,
   navigate?: (taskId: string, sessionId?: string) => void,
 ) {
   const router = useRouter();
@@ -723,26 +733,33 @@ export function useSheetActions(
   const handleNestTask = useSheetNestTask();
   const handleSelectTask = useCallback(
     (taskId: string) => {
-      const state = store.getState();
-      selectTaskFromSheet({
-        taskId,
-        selectionController: selection,
-        task: findSheetTask(state, taskId),
-        state: {
-          lastSessionByTaskId: state.tasks.lastSessionByTaskId,
-          environmentIdBySessionId: state.environmentIdBySessionId,
-          taskSessionsById: state.taskSessions.items,
-        },
-        setActiveTask,
-        setActiveSession,
-        loadTaskSessionsForTask,
-        getTaskPendingSnapshot: (selectedTaskId) => {
-          const selectedTask = findSheetTask(store.getState(), selectedTaskId);
-          return selectedTask ? taskPendingSelectionSnapshot(selectedTask) : undefined;
-        },
-        navigate: navigateTask,
-        onOpenChange,
-      });
+      const action = () => {
+        const state = store.getState();
+        selectTaskFromSheet({
+          taskId,
+          selectionController: selection,
+          task: findSheetTask(state, taskId),
+          state: {
+            lastSessionByTaskId: state.tasks.lastSessionByTaskId,
+            environmentIdBySessionId: state.environmentIdBySessionId,
+            taskSessionsById: state.taskSessions.items,
+          },
+          setActiveTask,
+          setActiveSession,
+          loadTaskSessionsForTask,
+          getTaskPendingSnapshot: (selectedTaskId) => {
+            const selectedTask = findSheetTask(store.getState(), selectedTaskId);
+            return selectedTask ? taskPendingSelectionSnapshot(selectedTask) : undefined;
+          },
+          navigate: navigateTask,
+          onOpenChange,
+        });
+      };
+      if (onRequestNavigation) {
+        onRequestNavigation(action);
+        return;
+      }
+      action();
     },
     [
       loadTaskSessionsForTask,
@@ -752,6 +769,7 @@ export function useSheetActions(
       onOpenChange,
       selection,
       navigateTask,
+      onRequestNavigation,
     ],
   );
 
@@ -763,6 +781,7 @@ export function useSheetActions(
     setActiveSession,
     setActiveTask,
     onOpenChange,
+    onRequestNavigation,
   });
 
   return {
