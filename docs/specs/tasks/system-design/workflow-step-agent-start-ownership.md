@@ -8,6 +8,7 @@ requirements:
   - REQ-TASKS-WORKFLOW-STEP-AGENT-START-OWNERSHIP-004
   - REQ-TASKS-WORKFLOW-STEP-AGENT-START-OWNERSHIP-005
   - REQ-TASKS-WORKFLOW-STEP-AGENT-START-OWNERSHIP-006
+  - REQ-TASKS-WORKFLOW-STEP-AGENT-START-OWNERSHIP-007
 ---
 
 # Workflow Step Agent Start Ownership System Design
@@ -30,6 +31,7 @@ The design preserves runtime configuration through the existing reset contract. 
 | `REQ-TASKS-WORKFLOW-STEP-AGENT-START-OWNERSHIP-004` | [Creation destination routing](#creation-destination-routing) |
 | `REQ-TASKS-WORKFLOW-STEP-AGENT-START-OWNERSHIP-005` | [Asynchronous launch prompt preservation](#asynchronous-launch-prompt-preservation) |
 | `REQ-TASKS-WORKFLOW-STEP-AGENT-START-OWNERSHIP-006` | [Initial creation prompt admission](#initial-creation-prompt-admission) |
+| `REQ-TASKS-WORKFLOW-STEP-AGENT-START-OWNERSHIP-007` | [Workflow editor guidance](#workflow-editor-guidance) |
 
 ## Components and responsibilities
 
@@ -420,6 +422,20 @@ Use controlled startup barriers to prove preservation after the launch call alre
 Cover duplicate callbacks, replacement execution, same-execution successor turn, terminal races, and dynamic fallback ownership.
 Exercise real queue persistence and the service recovery-to-boot-ready-to-dispatch path.
 Verify one transcript row, one delivered prompt, preserved metadata, paused queues, and restart after queue persistence.
+
+## Workflow editor guidance
+
+`StepPromptSection` compares the local prompt with the step entry actions. A
+non-empty prompt without `auto_start_agent` shows a non-blocking inline warning.
+The warning explains that step entry does not send the prompt automatically.
+
+The warning uses the existing amber settings-panel pattern. It contains no
+action, so desktop and mobile use the same component and state. Its text wraps
+inside the workflow step panel without a separate scroll region.
+
+The warning disappears immediately when the user clears the prompt or enables
+`auto_start_agent`. The prompt usage hint also states that a step prompt replaces
+the task description unless it contains `{{task_prompt}}`.
 
 ## Observability
 

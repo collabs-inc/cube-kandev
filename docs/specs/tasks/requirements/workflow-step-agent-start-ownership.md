@@ -147,6 +147,28 @@ This draft extension addresses [issue #3804](https://github.com/kdlbs/kandev/iss
 The extension covers immediate REST and MCP dispatch. Dependency-deferred creation, historical stuck tasks, and changes to workflow action semantics are excluded.
 The [initial creation prompt package](../../../plans/task-create-initial-turn-start/plan.md) owns implementation and regression evidence.
 
+### REQ-TASKS-WORKFLOW-STEP-AGENT-START-OWNERSHIP-007: Step prompt trigger guidance
+
+**Intent:** Make the difference between step prompt content and automatic step
+entry clear during workflow editing.
+
+#### Acceptance criteria
+
+- **AC-TASKS-WORKFLOW-STEP-AGENT-START-OWNERSHIP-007.1:** When a workflow step
+has a non-empty prompt and no `auto_start_agent` entry action, the workflow
+editor shall show a visible warning. The warning shall state that step entry
+does not send the prompt automatically.
+- **AC-TASKS-WORKFLOW-STEP-AGENT-START-OWNERSHIP-007.2:** The warning shall tell
+the user to start the agent manually or enable automatic start.
+- **AC-TASKS-WORKFLOW-STEP-AGENT-START-OWNERSHIP-007.3:** The warning shall not
+appear when the prompt is empty or the step has an `auto_start_agent` entry
+action.
+- **AC-TASKS-WORKFLOW-STEP-AGENT-START-OWNERSHIP-007.4:** The workflow editor
+shall state that a step prompt replaces the task description unless it contains
+`{{task_prompt}}`.
+- **AC-TASKS-WORKFLOW-STEP-AGENT-START-OWNERSHIP-007.5:** Desktop and mobile
+workflow editors shall show the same guidance without horizontal page overflow.
+
 ## Migrated source detail
 
 ## Why
