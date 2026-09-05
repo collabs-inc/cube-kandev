@@ -1,7 +1,7 @@
 ---
 id: "01-show-step-prompt-guidance"
 title: "Show step prompt guidance"
-status: done
+status: superseded
 wave: 1
 depends_on: []
 plan: "plan.md"
@@ -20,6 +20,10 @@ system_design:
 # Task 01: Show Step Prompt Guidance
 
 ## Summary
+
+This work order was superseded by Task 02 before the warning behavior shipped.
+The final implementation enables automatic start when a user authors a new
+step prompt and removes the warning.
 
 Show a warning when a step prompt has no automatic start trigger. Explain the
 task-description replacement rule in visible text.
