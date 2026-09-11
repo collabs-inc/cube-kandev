@@ -40,6 +40,16 @@ func (m *Manager) handleMessageChunkEvent(execution *AgentExecution, event agent
 		return
 	}
 	m.appendAssistantHistoryChunk(execution, event.Text)
+	if event.CanonicalProjection {
+		m.publishCanonicalStreamingContentNow(
+			execution,
+			"message_streaming",
+			event.CanonicalMessageID,
+			event.Text,
+			event.CanonicalMessageAppend,
+		)
+		return
+	}
 	if event.ProtocolMessageID != "" {
 		m.flushPendingLegacyMessage(execution, execution.promptGenerationSnapshot(), event.AttemptID)
 		m.publishProtocolMessage(execution, event.ProtocolMessageID, event.Text, event.ProviderDiagnosticCandidate, execution.promptGenerationSnapshot(), event.AttemptID)
@@ -107,6 +117,16 @@ func (m *Manager) flushMessageBufferOnDiagnosticChange(execution *AgentExecution
 // one value across the call.
 func (m *Manager) handleReasoningEvent(execution *AgentExecution, event agentctl.AgentEvent) {
 	if event.ReasoningText == "" {
+		return
+	}
+	if event.CanonicalProjection {
+		m.publishCanonicalStreamingContentNow(
+			execution,
+			thinkingStreamingEventType,
+			event.CanonicalMessageID,
+			event.ReasoningText,
+			event.CanonicalMessageAppend,
+		)
 		return
 	}
 	if event.ProtocolMessageID != "" {
