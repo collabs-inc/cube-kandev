@@ -1280,6 +1280,7 @@ func (sm *SessionManager) dispatchInitialPrompt(ctx context.Context, execution *
 		}
 		acpAttachments := convertAttachments(attachments)
 		beforeAdmission, onDispatched, onInitialPromptFailure := execution.takeInitialPromptDispatchCallbacks()
+		initialSubmissionID := initialPromptDeliverySubmissionID(execution)
 		var failureHandler func(InitialPromptFailure)
 		var admissionRejectedHandler func(InitialPromptFailure)
 		if onInitialPromptFailure != nil {
@@ -1307,10 +1308,11 @@ func (sm *SessionManager) dispatchInitialPrompt(ctx context.Context, execution *
 				acpAttachments,
 				false,
 				sendPromptCallbacks{
-					beforeAdmission:     beforeAdmission,
-					onAdmissionRejected: admissionRejectedHandler,
-					onDispatched:        onDispatched,
-					onFailure:           failureHandler,
+					beforeAdmission:      beforeAdmission,
+					onAdmissionRejected:  admissionRejectedHandler,
+					onDispatched:         onDispatched,
+					onFailure:            failureHandler,
+					deliverySubmissionID: initialSubmissionID,
 				},
 				false,
 			)
