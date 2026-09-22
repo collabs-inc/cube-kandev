@@ -160,6 +160,7 @@ export function ChangesPanelHeader(props: ChangesPanelHeaderProps) {
   const showDiffReview = hasChanges || hasCommits || !!hasPRFiles;
   return (
     <PanelHeaderBarSplit
+      className="[@media(max-width:47.999rem)]:px-1"
       left={
         <ChangesPanelHeaderLeft
           refreshStatus={props.refreshStatus}
