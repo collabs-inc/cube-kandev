@@ -42,6 +42,7 @@ func (m *Manager) handleMessageChunkEvent(execution *AgentExecution, event agent
 	}
 	m.appendAssistantHistoryChunk(execution, event.Text)
 	if event.CanonicalProjection {
+		trackCanonicalResponseAttemptMessage(execution, event.CanonicalMessageID, event.CanonicalMessageAppend)
 		m.publishCanonicalStreamingContent(
 			execution,
 			"message_streaming",
@@ -121,6 +122,7 @@ func (m *Manager) handleReasoningEvent(execution *AgentExecution, event agentctl
 		return
 	}
 	if event.CanonicalProjection {
+		trackCanonicalResponseAttemptMessage(execution, event.CanonicalMessageID, event.CanonicalMessageAppend)
 		m.publishCanonicalStreamingContent(
 			execution,
 			thinkingStreamingEventType,
@@ -908,11 +910,18 @@ func (m *Manager) handleStreamDisconnectWithAttempt(
 		defer execution.promptLifecycleMu.Unlock()
 
 		var claimed bool
+		var cancelEscalation bool
 		var updated *AgentExecution
 		uncertainSubmissionID := execution.deliverySubmissionIDSnapshot()
 		uncertain := uncertainSubmissionID != "" || errors.Is(err, ErrUncertainPromptDelivery)
 		statusErr := m.executionStore.WithLock(execution.ID, func(current *AgentExecution) {
 			if current != execution || current.promptGeneration != promptGeneration {
+				return
+			}
+			if current.cancelEscalatedPromptGeneration.Load() == promptGeneration {
+				cancelEscalation = true
+				updated = current
+				claimed = true
 				return
 			}
 			current.Status = v1.AgentStatusFailed
@@ -939,6 +948,12 @@ func (m *Manager) handleStreamDisconnectWithAttempt(
 		m.flushMessageBuffer(execution, promptGeneration, attemptID)
 		m.flushAssistantHistory(execution)
 		m.persistExecutorRunning(context.Background(), updated)
+		if cancelEscalation {
+			m.logger.Debug("preserving execution after expected cancel disconnect",
+				zap.String("execution_id", execution.ID),
+				zap.Uint64("prompt_generation", promptGeneration))
+			return
+		}
 		m.publishStreamDisconnectErrorWithAttempt(execution, err, attemptID)
 		return
 	}
