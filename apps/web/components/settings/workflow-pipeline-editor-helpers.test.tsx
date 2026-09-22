@@ -101,7 +101,7 @@ describe("workflow pipeline editor helpers", () => {
     expect(getChildrenCompletedTransitionType({ events: {} } as WorkflowStep)).toBe("none");
   });
 
-  // @covers AC-TASKS-WORKFLOW-STEP-AGENT-START-OWNERSHIP-005.1 through .5
+  // @covers AC-TASKS-WORKFLOW-STEP-AGENT-START-OWNERSHIP-007.1 through .5
   it("adds automatic start when a prompt first becomes non-empty", () => {
     const step = {
       events: {
