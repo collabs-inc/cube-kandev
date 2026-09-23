@@ -107,6 +107,12 @@ export async function chooseCapture(page: Page, name: string): Promise<void> {
     throw new Error(`capture choice is outside viewport: ${JSON.stringify({ box, viewport })}`);
   }
   await choice.click();
+  if (name === "Select screenshot region") {
+    const previewFrame = page.locator("iframe").first().contentFrame();
+    await expect(previewFrame.locator("html")).toHaveCSS("cursor", "crosshair", {
+      timeout: 5_000,
+    });
+  }
 }
 
 /** Wait until the iframe has applied screenshot mode before dispatching a drag. */
