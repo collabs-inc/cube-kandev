@@ -1,4 +1,4 @@
-import { type Locator, type Page } from "@playwright/test";
+import { type Locator, type Page, type Response } from "@playwright/test";
 import { expect } from "../../fixtures/test-base";
 import type { ApiClient } from "../../helpers/api-client";
 import type { WsWatcher } from "../../helpers/causal-waits";
@@ -145,6 +145,7 @@ export async function startQuickChatFromSetup(
   dialog: Locator,
   page: Page,
   openingPrompt = "Please get ready for my next question.",
+  startResponse?: Promise<Response>,
 ) {
   await selectAgentIfNeeded(dialog, page);
   const response = page.waitForResponse(
@@ -160,6 +161,8 @@ export async function startQuickChatFromSetup(
     session_id: string;
   };
 
+  if (startResponse) await startResponse;
+
   // The composer is intentionally editable during STARTING, so editability
   // alone is no longer a readiness signal. Wait for the submit gate to clear
   // before callers begin a turn; this keeps tests from typing into a draft that
@@ -169,9 +172,13 @@ export async function startQuickChatFromSetup(
   return started;
 }
 
-export async function openQuickChatWithAgent(page: Page, navigateHome = true): Promise<Locator> {
+export async function openQuickChatWithAgent(
+  page: Page,
+  navigateHome = true,
+  startResponse?: Promise<Response>,
+): Promise<Locator> {
   const dialog = await openQuickChatSetup(page, navigateHome);
-  await startQuickChatFromSetup(dialog, page);
+  await startQuickChatFromSetup(dialog, page, undefined, startResponse);
   // The composer becomes usable before the session model catalog is hydrated.
   // Wait for the model control as well so callers can immediately inspect or
   // change the session configuration without racing that second readiness gate.
