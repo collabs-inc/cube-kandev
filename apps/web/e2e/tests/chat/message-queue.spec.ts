@@ -6,6 +6,7 @@ import { typeWhileBusy, waitForComposerQueueMode } from "../../helpers/type-whil
 import { SessionPage } from "../../pages/session-page";
 import { seedRunningGeneratingSession } from "../../helpers/generating-session";
 import { waitForAgentMessage, waitForSessionDone } from "../../helpers/session";
+import { waitForSessionAgentctlReady } from "../../helpers/session-store";
 import { expectFullQueueScrolls, seedFullQueueTask } from "./message-queue-scroll-helpers";
 import { startQuickChatFromSetup } from "./quick-chat-helpers";
 import {
@@ -582,7 +583,7 @@ test.describe("Task session queue", () => {
     apiClient,
     seedData,
   }) => {
-    test.setTimeout(90_000);
+    test.setTimeout(120_000);
     const gateway = watchWs(testPage);
 
     const session = await seedTaskAndWaitForIdle(
@@ -591,6 +592,7 @@ test.describe("Task session queue", () => {
       seedData,
       "Queue edit lease ordering test",
     );
+    await waitForSessionAgentctlReady(testPage, session.sessionId);
     await session.sendMessage("/slow 10s");
     await expect(session.agentStatus()).toBeVisible({ timeout: 15_000 });
     await waitForComposerQueueMode(testPage);
