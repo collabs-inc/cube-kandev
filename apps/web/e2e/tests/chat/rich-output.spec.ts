@@ -75,7 +75,7 @@ test("renders and persists native rich output with an explicit file preview", as
   await expect(barChart).toBeVisible();
   await lineChart.scrollIntoViewIfNeeded();
   await expect(lineChart.locator(".recharts-xAxis text").first()).toBeVisible();
-  await expect(lineChart.locator(".recharts-line-curve")).toHaveAttribute("stroke-dasharray", /\d/);
+  await expect(lineChart.locator(".recharts-line-curve")).toHaveAttribute("d", /^M/);
   await expect(lineChart.locator(".recharts-yAxis text").first()).toBeVisible();
   await expect(lineChart.locator(".recharts-xAxis")).toContainText("Aug 12");
   // The chart plot is mounted by an IntersectionObserver. Re-issue the
