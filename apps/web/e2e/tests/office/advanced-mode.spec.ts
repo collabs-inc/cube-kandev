@@ -2,6 +2,7 @@ import { type Page } from "@playwright/test";
 import { test as base, expect } from "../../fixtures/test-base";
 import { OfficeApiClient } from "../../helpers/office-api-client";
 import { waitForOfficeTaskSessionLive } from "../../helpers/office-launch";
+import { SessionPage } from "../../pages/session-page";
 
 /**
  * E2E tests for the office advanced mode dockview layout.
@@ -138,7 +139,10 @@ test.describe("Office advanced mode", () => {
     await expect(filesPanel).toBeVisible({ timeout: 15_000 });
 
     // Quick-chat workspaces have a .gitkeep file — the tree should show it
-    await expect(filesPanel.getByText(".gitkeep")).toBeVisible({ timeout: 15_000 });
+    // The tree virtualizes rows, so a text locator can miss a file that is
+    // present but not mounted in the current viewport.
+    const session = new SessionPage(testPage);
+    await session.fileTree.waitForFileTreeNode(".gitkeep", 30_000);
   });
 
   test("terminal connects to agent execution workspace", async ({ testPage, advancedSeed }) => {
