@@ -95,9 +95,40 @@ async function recoverAdvancedWorkspace(testPage: Page, session: SessionPage): P
   if (!(await freshButton.isVisible({ timeout: 1_000 }).catch(() => false))) return;
 
   await freshButton.click();
+  const dialog = session.newSessionDialog();
   const preparing = testPage.getByPlaceholder("Preparing workspace...");
-  await expect(preparing).toBeVisible({ timeout: 30_000 });
-  await expect(preparing).not.toBeVisible({ timeout: 60_000 });
+  await expect
+    .poll(
+      async () => {
+        if (await dialog.isVisible().catch(() => false)) return "dialog";
+        if (await preparing.isVisible().catch(() => false)) return "preparing";
+        if (
+          await session
+            .idleInput()
+            .isVisible()
+            .catch(() => false)
+        )
+          return "idle";
+        return "waiting";
+      },
+      { timeout: 30_000, message: "advanced workspace recovery did not start" },
+    )
+    .not.toBe("waiting");
+
+  if (await dialog.isVisible().catch(() => false)) {
+    // A missing profile opens the same new-agent dialog that a user sees.
+    // Submit a small prompt so the replacement session owns the existing
+    // workspace before the Files panel is inspected.
+    await session.newSessionPromptInput().fill("/e2e:simple-message");
+    await session.newSessionStartButton().click();
+    await expect(dialog).not.toBeVisible({ timeout: 30_000 });
+    await expect(session.idleInput()).toBeVisible({ timeout: 60_000 });
+    return;
+  }
+
+  if (await preparing.isVisible().catch(() => false)) {
+    await expect(preparing).not.toBeVisible({ timeout: 60_000 });
+  }
   await session.waitForChatIdle({ timeout: 60_000 });
 }
 

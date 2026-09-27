@@ -87,8 +87,10 @@ test.describe.serial("Cancel turn availability", () => {
     });
     await cancelButton.click();
     await cancellationPending;
-    await waitForActiveSessionCancellationPending(testPage, true);
-    await expect(cancelButton).toBeDisabled();
+    // The websocket event is the backend-owned acknowledgement. The browser
+    // store can miss the short-lived true projection when the mock turn stops
+    // in the same event loop, so wait for the user-facing control instead.
+    await expect(cancelButton).toBeDisabled({ timeout: 20_000 });
     await expect(session.idleInput()).toBeVisible({ timeout: 15_000 });
     await cancellationSettled;
     await waitForActiveSessionForegroundActivity(testPage, null);

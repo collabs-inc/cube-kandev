@@ -419,6 +419,9 @@ test.describe("Transcript auto-scroll toggle", () => {
     await waitForStableActiveSession(testPage, secondSessionId);
     await refreshedSession.sessionTabBySessionId(firstSessionId).click();
     await waitForStableActiveSession(testPage, firstSessionId);
+    await expect(firstChat).toBeVisible({ timeout: 15_000 });
+    await expect(firstList).toBeVisible({ timeout: 15_000 });
+    await expect(toggle).toHaveAttribute("aria-pressed", "false");
     await expect
       .poll(
         async () =>
