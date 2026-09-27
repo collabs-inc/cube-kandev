@@ -87,6 +87,7 @@ test.describe.serial("Cancel turn availability", () => {
     });
     await cancelButton.click();
     await cancellationPending;
+    await waitForActiveSessionCancellationPending(testPage, true);
     await expect(cancelButton).toBeDisabled();
     await expect(session.idleInput()).toBeVisible({ timeout: 15_000 });
     await cancellationSettled;

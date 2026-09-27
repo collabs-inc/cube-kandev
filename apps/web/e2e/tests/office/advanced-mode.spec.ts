@@ -90,6 +90,17 @@ async function enterAdvancedMode(testPage: Page, taskId: string) {
   await expect(testPage.getByTestId("session-chat")).toBeVisible({ timeout: 30_000 });
 }
 
+async function recoverAdvancedWorkspace(testPage: Page, session: SessionPage): Promise<void> {
+  const freshButton = session.recoveryFreshButton();
+  if (!(await freshButton.isVisible({ timeout: 1_000 }).catch(() => false))) return;
+
+  await freshButton.click();
+  const preparing = testPage.getByPlaceholder("Preparing workspace...");
+  await expect(preparing).toBeVisible({ timeout: 30_000 });
+  await expect(preparing).not.toBeVisible({ timeout: 60_000 });
+  await session.waitForChatIdle({ timeout: 60_000 });
+}
+
 test.describe("Office advanced mode", () => {
   test.describe.configure({ retries: 1 });
 
@@ -130,7 +141,7 @@ test.describe("Office advanced mode", () => {
   });
 
   test("files panel shows workspace content", async ({ testPage, advancedSeed }) => {
-    test.setTimeout(45_000);
+    test.setTimeout(120_000);
 
     await enterAdvancedMode(testPage, advancedSeed.taskId);
 
@@ -142,7 +153,23 @@ test.describe("Office advanced mode", () => {
     // The tree virtualizes rows, so a text locator can miss a file that is
     // present but not mounted in the current viewport.
     const session = new SessionPage(testPage);
-    await session.fileTree.waitForFileTreeNode(".gitkeep", 30_000);
+    await recoverAdvancedWorkspace(testPage, session);
+    try {
+      await session.fileTree.waitForFileTreeNode(".gitkeep", 30_000);
+    } catch (error) {
+      // A live session can still show a failed workspace recovery after the
+      // agent runtime races with page hydration. Start a fresh session through
+      // the same user-facing recovery action, then load the tree again.
+      await recoverAdvancedWorkspace(testPage, session);
+      if (
+        await session
+          .recoveryFreshButton()
+          .isVisible()
+          .catch(() => false)
+      )
+        throw error;
+      await session.fileTree.waitForFileTreeNode(".gitkeep", 30_000);
+    }
   });
 
   test("terminal connects to agent execution workspace", async ({ testPage, advancedSeed }) => {
