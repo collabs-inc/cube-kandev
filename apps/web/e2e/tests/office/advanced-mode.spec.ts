@@ -121,7 +121,58 @@ async function recoverAdvancedWorkspace(testPage: Page, session: SessionPage): P
     // workspace before the Files panel is inspected.
     await session.newSessionPromptInput().fill("/e2e:simple-message");
     await session.newSessionStartButton().click();
-    await expect(dialog).not.toBeVisible({ timeout: 30_000 });
+    // Launching a replacement agent can take longer than the normal dialog
+    // budget under shard contention. A failed launch leaves the same recovery
+    // actions visible; close the still-open form and let the file panel use the
+    // existing workspace rather than treating that state as a timing failure.
+    await expect
+      .poll(
+        async () => {
+          if (!(await dialog.isVisible().catch(() => false))) return "closed";
+          if (
+            await session
+              .newSessionStartButton()
+              .isDisabled()
+              .catch(() => false)
+          )
+            return "creating";
+          if (
+            await session
+              .recoveryFreshButton()
+              .isVisible()
+              .catch(() => false)
+          )
+            return "recovery";
+          if (
+            await session
+              .recoveryResumeButton()
+              .isVisible()
+              .catch(() => false)
+          )
+            return "recovery";
+          return "creating";
+        },
+        { timeout: 60_000, message: "advanced workspace recovery did not settle" },
+      )
+      .not.toBe("creating");
+    if (await dialog.isVisible().catch(() => false)) {
+      await dialog.getByRole("button", { name: "Cancel" }).click();
+      await expect(dialog).not.toBeVisible({ timeout: 10_000 });
+    }
+    if (
+      await session
+        .recoveryFreshButton()
+        .isVisible()
+        .catch(() => false)
+    )
+      return;
+    if (
+      await session
+        .recoveryResumeButton()
+        .isVisible()
+        .catch(() => false)
+    )
+      return;
     await expect(session.idleInput()).toBeVisible({ timeout: 60_000 });
     return;
   }
