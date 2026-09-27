@@ -44,7 +44,6 @@ retains ownership of its values, validation, authority, and persistence.
 
 - [Task Status Summary Projection Contention](requirements/task-summary-contention.md)
 - [CI performance](requirements/ci-performance.md)
-- [Web TanStack Query lint rules](requirements/web-tanstack-query-eslint.md)
 
 - [Startup lifecycle](requirements/startup-lifecycle.md)
 - [Startup progress visibility](requirements/startup-progress-visibility.md)
@@ -99,7 +98,6 @@ retains ownership of its values, validation, authority, and persistence.
 
 - [Task Status Summary Projection Contention](system-design/task-summary-contention.md)
 - [CI performance](system-design/ci-performance.md)
-- [Web TanStack Query lint rules](system-design/web-tanstack-query-eslint.md)
 
 - [Startup lifecycle](system-design/startup-lifecycle.md)
 - [Startup progress visibility](system-design/startup-progress-visibility.md)
