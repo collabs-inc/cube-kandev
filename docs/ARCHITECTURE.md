@@ -21,12 +21,14 @@ flowchart LR
     Domains["Domain services and routes"]
     Store["SQLite by default<br/>PostgreSQL supported"]
     Bus["Memory event bus by default<br/>NATS when configured"]
+    MCPClient["External MCP client"]
     Executor["Selected task executor"]
     Agentctl["agentctl runtime"]
     Agent["Agent process"]
 
-    Client -->|"HTTP: app, REST, MCP"| Backend
+    Client -->|"HTTP: app and REST"| Backend
     Client -->|"WebSocket: actions and live updates"| Backend
+    MCPClient -->|"HTTP: external MCP routes"| Backend
     Backend --> Domains
     Domains --> Store
     Domains --> Bus
@@ -108,12 +110,13 @@ instructions belong to the [Docker](public/docker.md) and
 ## Credential boundary
 
 Credentials explicitly delivered to an executor are available to its agent
-processes. Kandev-managed task Git access uses repository-scoped leases through
-agentctl; provider operations use the workspace's integration connection. GitHub
-App installation tokens are minted for one repository. PAT and named CLI tokens
-retain their provider-granted scope after redemption, so the agent process is
-trusted with that grant. App registration private keys and personal OAuth
-tokens stay in the backend.
+processes. For GitHub, Kandev-managed task Git access uses repository-scoped
+leases through agentctl. For GitLab, tasks receive the active workspace token;
+SSH remotes require credentials configured in the executor. Provider operations
+use the workspace's integration connection. GitHub App installation tokens are
+minted for one repository. PAT and named CLI tokens retain their provider-granted
+scope after redemption, so the agent process is trusted with that grant. App
+registration private keys and personal OAuth tokens stay in the backend.
 
 GitHub App registrations are stored in a deployment catalog. Each workspace
 that uses App automation selects a registration and a verified installation; a
