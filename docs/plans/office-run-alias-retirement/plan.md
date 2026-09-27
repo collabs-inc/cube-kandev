@@ -1,6 +1,6 @@
 ---
 created: 2026-09-27
-status: in_progress
+status: complete
 requirements:
   - REQ-ARCHITECTURE-LINT-DEPRECATION-001
 system_design:
@@ -53,14 +53,19 @@ the corresponding canonical constants and their persisted string values in
 
 ## Work orders
 
-- [ ] [Task 01: Retire unused run-event-type aliases](task-01-retire-unused-event-type-aliases.md)
+- [x] [Task 01: Retire unused run-event-type aliases](task-01-retire-unused-event-type-aliases.md)
 
 ## Verification results
 
 Local Office and Runs tests passed with `TMPDIR=/var/tmp`. Architecture lint
 tests passed (99 tests), `make lint-architecture` passed, and the local PR
-documentation preflight accepted this work order. The work order remains
-in progress through current-head PR checks and review.
+documentation preflight accepted this work order. The race-enabled backend
+check first failed once in the unrelated task-service test
+`TestArchiveUnarchiveResumeReactivatesLocalOnlyBranch`; that test passed in 20
+local repetitions and the failed-only CI rerun passed. Current-head PR checks
+are terminal with 54 passed, 16 skipped, 1 neutral, 0 failed, and 0 pending.
+The review-thread list is empty. PR #4010 remains open against `main` at head
+`9d2574ad8fb03abd8eb3731f429f993d737c578e`.
 
 ## Risks
 

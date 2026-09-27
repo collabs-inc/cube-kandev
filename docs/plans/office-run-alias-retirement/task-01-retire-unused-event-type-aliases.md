@@ -1,7 +1,7 @@
 ---
 id: "01-retire-unused-event-type-aliases"
 title: "Retire unused run-event-type aliases"
-status: in_progress
+status: complete
 wave: 1
 depends_on: []
 plan: "plan.md"
@@ -90,4 +90,11 @@ check this boundary.
   passed (101 tests).
 - `python3 scripts/list-docs.py validate` and `python3 scripts/lint-spec-files.py --all`
   passed.
-- The work order remains in progress through current-head PR checks and review.
+- The race-enabled backend check first failed once in the unrelated task-service
+  test `TestArchiveUnarchiveResumeReactivatesLocalOnlyBranch`; that test passed
+  in 20 local repetitions and the failed-only CI rerun passed.
+- Current-head PR checks are terminal with 54 passed, 16 skipped, 1 neutral,
+  0 failed, and 0 pending. `scripts/pr-resolve list 4010` reported no unresolved
+  review threads.
+- PR #4010 is open against `main` at head
+  `9d2574ad8fb03abd8eb3731f429f993d737c578e`.
