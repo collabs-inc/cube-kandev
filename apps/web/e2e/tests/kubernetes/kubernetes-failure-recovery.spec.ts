@@ -83,7 +83,26 @@ for (const restart of [false, true]) {
       expect((await waitForKubernetesPVC(cluster, task.id, sessionId)).metadata.uid).toBe(
         claim.metadata.uid,
       );
-      if (restart) await backend.restart();
+      if (restart) {
+        await backend.restart();
+        await expect
+          .poll(
+            async () => {
+              const environment = await apiClient.getTaskEnvironment(task.id);
+              if (!environment) return "missing";
+              const hasInvalidRepository = (environment.repos ?? []).some(
+                (repo) => repo.status === "failed" || repo.status === "deleted",
+              );
+              if (environment.status === "ready" && !hasInvalidRepository) return "ready";
+              return `${environment.status}:${hasInvalidRepository ? "invalid-repository" : "pending"}`;
+            },
+            {
+              timeout: 90_000,
+              message: "Waiting for the Kubernetes workspace to become reusable after restart",
+            },
+          )
+          .toBe("ready");
+      }
       await testPage.goto(`/t/${task.id}`);
       await session.waitForLoad();
       await expect(session.recoveryResumeButton()).toBeVisible({ timeout: 30_000 });
