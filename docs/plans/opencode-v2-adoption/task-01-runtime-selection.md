@@ -103,7 +103,7 @@ Fixed the review gaps in startup and the Settings install path. Startup validate
 
 - `go test -race ./internal/agent/agents -run OpenCode -count=1`: passed.
 - `go test -race ./internal/backendapp -run 'OpenCode|ManagedRuntimeDefault' -count=1`: passed.
-- The complete `internal/agent/agents` package remains blocked by the shared `/tmp` filesystem: three unrelated Devin, Goose, and Muse installer tests failed with `cat: write error: No space left on device`. The OpenCode agent tests pass when run by name.
+- An earlier full `internal/agent/agents` race run failed three unrelated Devin, Goose, and Muse installer tests with `cat: write error: No space left on device` from shared `/tmp`. The full package suite was not rerun afterward; OpenCode-focused race tests passed when selected by name.
 
 The Sprites preview exposed that the fresh-install job also needs to prepare the private managed npm project prefix before running its shell command. Install execution now resolves the selected command, replaces the internal prefix marker with its prepared temporary directory, and leaves the displayed command readable. The fake npm fixture rejects a missing prefix and confirms that the created directory is passed to the install. The controller regression runs through the production streaming runner with an empty HOME and explicit TMPDIR, then verifies the executed prefix exists under that temp root while HOME/.kandev remains absent.
 
