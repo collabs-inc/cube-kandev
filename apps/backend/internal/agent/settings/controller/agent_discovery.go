@@ -133,12 +133,16 @@ func (c *Controller) buildAvailableAgentDTO(ctx context.Context, ag agents.Agent
 
 	loginCommand := buildLoginCommandDTO(ag)
 	runtimeUpdate := c.buildRuntimeUpdateDTO(ctx, ag, availability.Available)
+	installScript, installErr := c.installScriptForSettings(ctx, ag)
+	if installErr != nil {
+		installScript = ""
+	}
 
 	return dto.AvailableAgentDTO{
 		Name:               ag.ID(),
 		DisplayName:        displayName,
 		Description:        ag.Description(),
-		InstallScript:      ag.InstallScript(),
+		InstallScript:      installScript,
 		SupportsMCP:        availability.SupportsMCP,
 		MCPConfigPath:      availability.MCPConfigPath,
 		InstallationPaths:  availability.InstallationPaths,

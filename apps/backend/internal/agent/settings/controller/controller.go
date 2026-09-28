@@ -80,6 +80,7 @@ type Controller struct {
 	updateJobStore              *AgentUpdateJobStore
 	runtimeUpdater              RuntimeUpdater
 	managedRuntimeSelections    managedruntime.SelectionStore
+	openCodeMigrationGuard      OpenCodeMigrationGuard
 	maintenance                 *maintenanceCoordinator
 	hub                         JobBroadcaster
 	logger                      *logger.Logger
@@ -298,6 +299,17 @@ func (c *Controller) SetManagedRuntimeSelectionStore(store managedruntime.Select
 	c.initializeUpdateJobStore()
 }
 
+// OpenCodeMigrationGuard reserves lifecycle and utility admission around the
+// authoritative selection write.
+type OpenCodeMigrationGuard func(context.Context) (context.Context, func(), error)
+
+func (c *Controller) SetOpenCodeMigrationGuard(guard OpenCodeMigrationGuard) {
+	c.openCodeMigrationGuard = guard
+	if c.updateJobStore != nil {
+		c.updateJobStore.SetOpenCodeMigrationGuard(guard)
+	}
+}
+
 // SetJobBroadcaster initializes the install job store with a WS broadcaster
 // for streaming install progress. Called once during handler registration.
 // If unset (hub == nil), the streaming install API returns
@@ -444,6 +456,13 @@ func (c *Controller) initializeUpdateJobStore() {
 		c.managedRuntimeSelections,
 	)
 	c.updateJobStore.SetStatusInvalidator(c.InvalidateRuntimeUpdateStatus)
+	if reader, ok := c.managedRuntimeSelections.(managedruntime.OpenCodeSelectionReader); ok {
+		c.updateJobStore.SetOpenCodeSelectionReader(reader)
+	}
+	if writer, ok := c.managedRuntimeSelections.(managedruntime.OpenCodeSelectionWriter); ok {
+		c.updateJobStore.SetOpenCodeSelections(writer)
+	}
+	c.updateJobStore.SetOpenCodeMigrationGuard(c.openCodeMigrationGuard)
 }
 
 // BroadcastAvailableAgents fetches the current available-agents snapshot and

@@ -25,7 +25,39 @@ const FIRST_PREVIEW: AgentUpdatePreview = {
 const AGENT_NAME = FIRST_PREVIEW.agent_name;
 const UPDATE_ALREADY_RUNNING = "Update is already running";
 
-describe("useAgentUpdateDialogState", () => {
+describe("useAgentUpdateDialogState family migration", () => {
+  it("submits an explicit family migration with the preview revision", async () => {
+    const migrationPreview: AgentUpdatePreview = {
+      ...FIRST_PREVIEW,
+      family: "v1",
+      source: "managed",
+      target_family: "v2",
+      runtime_revision: 12,
+      migration_available: true,
+      target_version: "2.0.18",
+      operation: "migrate",
+    };
+    const onPreview = vi.fn().mockResolvedValue(migrationPreview);
+    const onUpdate = vi.fn().mockResolvedValue({ job_id: "migration-1" } as AgentUpdateJob);
+    const { result } = renderHook(() =>
+      useAgentUpdateDialogState({ agentName: AGENT_NAME, onPreview, onUpdate }),
+    );
+
+    await act(async () => {
+      result.current.selectMigration();
+    });
+    await waitFor(() => expect(result.current.preview).toEqual(migrationPreview));
+    expect(onPreview).toHaveBeenCalledWith(AGENT_NAME, undefined, false, "v2");
+
+    await act(async () => {
+      await result.current.approve();
+    });
+
+    expect(onUpdate).toHaveBeenCalledWith(AGENT_NAME, "2.0.18", false, "v2", 12);
+  });
+});
+
+describe("useAgentUpdateDialogState request races and failures", () => {
   it("ignores a preview that resolves after close and reopen", async () => {
     const firstRequest = deferred<AgentUpdatePreview>();
     const secondRequest = deferred<AgentUpdatePreview>();

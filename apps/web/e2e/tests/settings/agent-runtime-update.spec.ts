@@ -131,7 +131,8 @@ test.describe("managed agent runtime updates", () => {
     });
 
     await testPage.goto("/settings/agents");
-    await testPage.getByTestId(`agent-update-trigger-${runtime.agentName}`).click();
+    const trigger = testPage.getByTestId(`agent-update-trigger-${runtime.agentName}`);
+    await trigger.click();
 
     const dialog = testPage.getByTestId(`agent-update-dialog-${runtime.agentName}`);
     await expect(dialog).toContainText("Unknown → 0.63.0");
@@ -524,5 +525,169 @@ test.describe("managed agent runtime updates", () => {
     expect(
       failedOptionText.some((text) => text.includes("0.63.0") && text.includes("active")),
     ).toBe(false);
+  });
+
+  test("requires explicit opt-in before migrating OpenCode from v1 to v2", async ({ testPage }) => {
+    const runtime = await installRuntimeUpdateFixture(testPage, {
+      agentName: "opencode-acp",
+      displayName: "OpenCode",
+      packageName: "opencode-ai",
+      currentVersion: "1.18.32",
+      defaultVersion: "1.18.32",
+      latestVersion: "1.18.32",
+      previewResponse: {
+        agent_name: "opencode-acp",
+        package: "opencode-ai",
+        current_version: "1.18.32",
+        default_version: "1.18.32",
+        active_version: "1.18.32",
+        effective_version: "1.18.32",
+        target_version: "1.18.32",
+        family: "v1",
+        source: "managed",
+        target_family: "v1",
+        runtime_revision: 12,
+        migration_available: true,
+        operation: "up_to_date",
+        command: ["npm", "exec"],
+        command_string: "npm exec --package=opencode-ai@1.18.32 -- opencode acp",
+      },
+      migrationPreviewResponse: {
+        agent_name: "opencode-acp",
+        package: "@opencode/cli",
+        current_version: "1.18.32",
+        default_version: "2.0.18",
+        active_version: "1.18.32",
+        effective_version: "1.18.32",
+        target_version: "2.0.18",
+        family: "v1",
+        source: "managed",
+        target_family: "v2",
+        runtime_revision: 12,
+        migration_available: true,
+        operation: "migrate",
+        command: ["npm", "exec", "--package=@opencode/cli@2.0.18"],
+        command_string:
+          "npm exec --yes --prefer-online --package=@opencode/cli@2.0.18 -- opencode acp --print-logs --log-level ERROR",
+      },
+    });
+
+    await testPage.goto("/settings/agents");
+    await testPage.getByTestId(`agent-update-trigger-${runtime.agentName}`).click();
+    const dialog = testPage.getByTestId(`agent-update-dialog-${runtime.agentName}`);
+    await expect(
+      dialog.getByTestId(`agent-update-current-family-${runtime.agentName}`),
+    ).toHaveAttribute("aria-pressed", "true");
+    await expect(testPage.getByTestId(`agent-update-confirm-${runtime.agentName}`)).toBeDisabled();
+    expect(runtime.postCount()).toBe(0);
+
+    await dialog.getByTestId(`agent-update-migrate-family-${runtime.agentName}`).click();
+    await expect(dialog).toContainText("1.18.32 → 2.0.18");
+    await expect(dialog).toContainText(
+      "This selects managed OpenCode v2 for future launches across every OpenCode profile in this Kandev installation. The standalone CLI remains unchanged.",
+    );
+    await expect(dialog).toContainText(
+      "Stop standalone OpenCode v1 processes that use the same session data before upgrading.",
+    );
+    await expect(dialog).toContainText("--package=@opencode/cli@2.0.18");
+    expect(runtime.previewFamilies()).toEqual(["", "v2"]);
+    expect(runtime.postCount()).toBe(0);
+
+    await testPage.getByTestId(`agent-update-confirm-${runtime.agentName}`).click();
+    expect(runtime.postCount()).toBe(1);
+    expect(runtime.postBodies()).toEqual([
+      {
+        target_version: "2.0.18",
+        target_family: "v2",
+        expected_runtime_revision: 12,
+      },
+    ]);
+  });
+
+  test("keeps v1 selected after a failed migration and allows an explicit retry", async ({
+    testPage,
+  }) => {
+    const runtime = await installRuntimeUpdateFixture(testPage, {
+      agentName: "opencode-acp",
+      displayName: "OpenCode",
+      packageName: "opencode-ai",
+      currentVersion: "1.18.32",
+      defaultVersion: "1.18.32",
+      latestVersion: "1.18.32",
+      previewResponse: {
+        agent_name: "opencode-acp",
+        package: "opencode-ai",
+        current_version: "1.18.32",
+        default_version: "1.18.32",
+        active_version: "1.18.32",
+        effective_version: "1.18.32",
+        target_version: "1.18.32",
+        family: "v1",
+        source: "managed",
+        target_family: "v1",
+        runtime_revision: 12,
+        migration_available: true,
+        operation: "up_to_date",
+        command: ["npm", "exec"],
+        command_string: "npm exec --package=opencode-ai@1.18.32 -- opencode acp",
+      },
+      migrationPreviewResponse: {
+        agent_name: "opencode-acp",
+        package: "@opencode/cli",
+        current_version: "1.18.32",
+        default_version: "2.0.18",
+        active_version: "1.18.32",
+        effective_version: "1.18.32",
+        target_version: "2.0.18",
+        family: "v1",
+        source: "managed",
+        target_family: "v2",
+        runtime_revision: 12,
+        migration_available: true,
+        operation: "migrate",
+        command: ["npm", "exec", "--package=@opencode/cli@2.0.18"],
+        command_string:
+          "npm exec --yes --prefer-online --package=@opencode/cli@2.0.18 -- opencode acp --print-logs --log-level ERROR",
+      },
+    });
+
+    await testPage.goto("/settings/agents");
+    const trigger = testPage.getByTestId(`agent-update-trigger-${runtime.agentName}`);
+    await trigger.click();
+    const dialog = testPage.getByTestId(`agent-update-dialog-${runtime.agentName}`);
+    await dialog.getByTestId(`agent-update-migrate-family-${runtime.agentName}`).click();
+    await testPage.getByTestId(`agent-update-confirm-${runtime.agentName}`).click();
+
+    await runtime.emitUpdate(
+      updateJob({
+        agent_name: runtime.agentName,
+        operation: "migrate",
+        target_version: "2.0.18",
+        status: "failed",
+        error: "The isolated ACP probe failed",
+        finished_at: "2026-07-26T12:01:00.000Z",
+      }),
+    );
+
+    await expect(dialog.getByTestId(`agent-update-result-${runtime.agentName}`)).toContainText(
+      "The isolated ACP probe failed",
+    );
+    expect(runtime.postBodies()).toEqual([
+      {
+        target_version: "2.0.18",
+        target_family: "v2",
+        expected_runtime_revision: 12,
+      },
+    ]);
+
+    await dialog.getByRole("button", { name: "Cancel" }).click();
+    await trigger.click();
+    await expect(
+      dialog.getByTestId(`agent-update-current-family-${runtime.agentName}`),
+    ).toHaveAttribute("aria-pressed", "true");
+    await dialog.getByTestId(`agent-update-migrate-family-${runtime.agentName}`).click();
+    await testPage.getByTestId(`agent-update-confirm-${runtime.agentName}`).click();
+    expect(runtime.postCount()).toBe(2);
+    expect(runtime.postBodies()[1]).toEqual(runtime.postBodies()[0]);
   });
 });
