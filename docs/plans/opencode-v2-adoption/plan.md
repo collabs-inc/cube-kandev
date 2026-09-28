@@ -88,6 +88,31 @@ Preserve supported v1 files and disclose plugin/unsupported-transport limits.
 
 ## ASCII UI preview
 
+### Dialog simplification (2026-09-28)
+
+The user requested less update explanation in the dialog. This revision supersedes the expanded explanatory text and command block in UI-01/UI-02 below.
+Reuse `SettingsInfo`: hover/focus reveals details on desktop, and tapping opens its accessible information sheet on touch devices.
+Keep the version change, runtime choice, migration warning, and primary action visible. Hide the redundant header description visually but retain its accessible description.
+The command is an initially collapsed native details disclosure. Existing translations are reused.
+
+```text
+Desktop dialog                  Phone update drawer
+Update OpenCode                 Update OpenCode
+Upgrade to v2 (i)               Upgrade to v2       (i)
+1.18.32 -> 2.0.18                1.18.32 -> 2.0.18
+Version summary                 Version summary
+[Update v1] [Upgrade to v2]      [Update v1] [Upgrade to v2]
+Stop external v1 processes      Stop external v1 processes
+> Command that will run         > Command that will run
+[Cancel] [Upgrade to v2]         [Upgrade to v2] [Cancel]
+```
+
+The information disclosure holds shared profile scope, unchanged standalone CLI, model refresh behavior, and future-launch semantics.
+The desktop test checks hover/keyboard disclosure; the phone test checks tap, a 44px target, closing the information sheet back to the update drawer, and expanding the command.
+No update request is sent by either disclosure. Runtime behavior and activation semantics are unchanged.
+
+
+
 UI-01: Desktop, Settings > Agents > OpenCode update control, explicit migration selected.
 
 ```text
@@ -218,7 +243,12 @@ Review follow-up verification on 2026-09-28:
 - Race tests passed for `internal/agent/hostutility`, `internal/agent/managedruntime`, `internal/agent/settings/controller`, `internal/backendapp` OpenCode/default-startup tests, `internal/agentctl/server/utility` probe tests, and OpenCode tests in `internal/agent/agents`.
 - The full `internal/agent/agents` race suite is not green in this environment because the three unrelated installer tests write to the full shared `/tmp` filesystem. No broader claim is made for that package.
 - The targeted host-utility and mobile browser tests passed. Docker/SSH managed-runtime recovery was not verified locally: the container run encountered `ENOSPC` in the shared `/tmp` and an `runc` temp-file failure. All six container shards passed in the PR CI run after the review fixes.
-- The first exact-head PR E2E run failed an unrelated queue-reorder keyboard-focus test in Shard 4. The focused local run also showed fixture flakiness, failing its first attempt during setup and passing on retry. Rerunning the failed CI jobs passed the shard and both aggregate reports; the final snapshot had 60 passed, zero failed, and zero pending checks.
+- The later PR snapshot at `82cf819d078`, attempt 2 of run `36400881920`, had 57 checks passed, 10 skipped, one failed E2E shard, and two dependent E2E aggregates pending. The mobile clarification send target was covered by the update-available toast; the same shard reported one stale deletion preview as flaky after its retry passed.
+- After those failures, the mobile clarification test passed locally with retries disabled after waiting for the transient toast. The E2E delete helper now refreshes only on that exact stale-preview 409; its regression passed, and the focused deletion E2E passed with retries disabled. Four isolated repetitions before the helper change passed on the exact previous head, so the CI timing race did not reproduce locally.
+- The dialog simplification passed the full desktop runtime-update spec (17/17) and mobile runtime-update spec (6/6) with retries disabled. Focused Settings/API-client tests passed 13/13; web typecheck, targeted ESLint, and the production E2E build passed.
+- The managed npm install prefix fix passed `go test -race ./internal/agent/settings/controller`; the OpenCode fresh managed v2, managed v1, and native v1 install cases verify the prepared prefix and selected cache behavior. The live Sprites environment was not available for post-fix verification.
+- `python3 scripts/list-docs.py validate` validated 321 decisions and 1220 specifications; `python3 scripts/lint-spec-files.py --all` passed. `git diff --check` passed.
+- At the time of this record, new-head PR CI had not run yet. The `82cf819d078` counts above are the latest remote evidence and do not verify the subsequent fixup commit.
 - The verification-record update passed `node scripts/validate-public-docs.mjs` (47 pages) and `TMPDIR=/root/.cache/kandev-go-tmp node --test scripts/validate-public-docs.test.mjs` (62/62).
 - `git diff --check` passed.
 

@@ -32,7 +32,7 @@ Fresh installations select managed v2, while legacy installations retain their e
 - Trusted v1/v2 definitions and exact pins; family-major guard in pin maintenance and catalogue resolution.
 - Thread resolved source/package/version through registry, host utilities, lifecycle, preflight, installation, recovery, and interactive commands.
 - Native version dispatch, managed priority over PATH and native metadata, and unsupported-major errors.
-- Discovery/install readiness for a managed runtime without a native PATH executable; the existing install flow prepares the exact managed package.
+- Discovery/install readiness for a managed runtime without a native PATH executable; install execution prepares the exact managed package and private npm project prefix.
 - Preserve other providers' fixed-package behavior and existing public API compatibility.
 
 ## Out of scope
@@ -104,3 +104,8 @@ Fixed the review gaps in startup and the Settings install path. Startup validate
 - `go test -race ./internal/agent/agents -run OpenCode -count=1`: passed.
 - `go test -race ./internal/backendapp -run 'OpenCode|ManagedRuntimeDefault' -count=1`: passed.
 - The complete `internal/agent/agents` package remains blocked by the shared `/tmp` filesystem: three unrelated Devin, Goose, and Muse installer tests failed with `cat: write error: No space left on device`. The OpenCode agent tests pass when run by name.
+
+The Sprites preview exposed that the fresh-install job also needs to prepare the private managed npm project prefix before running its shell command. Install execution now resolves the selected command, replaces the internal prefix marker with its prepared temporary directory, and leaves the displayed command readable. The fake npm fixture rejects a missing prefix and confirms that the created directory is passed to the install.
+
+- `go test -race ./internal/agent/settings/controller`: passed, including fresh managed v2, managed v1, and native v1 install jobs with the prefix existence check.
+- The reported Sprites install failure was reproduced by the strengthened fixture before the fix and passed afterward. A live Sprites run was not available for post-fix verification.

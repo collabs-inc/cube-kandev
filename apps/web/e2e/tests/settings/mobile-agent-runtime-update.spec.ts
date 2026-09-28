@@ -258,19 +258,39 @@ test.describe("managed agent runtime updates on mobile", () => {
     expect(choiceBox!.height).toBeGreaterThanOrEqual(44);
     expect(choiceBox!.width).toBeGreaterThanOrEqual(44);
     expect(runtime.postCount()).toBe(0);
-    await prCapture.screenshot("mobile-opencode-migration-preview", {
-      caption: "OpenCode v1-to-v2 migration choice in the mobile drawer",
-    });
-
     await migrationChoice.tap();
     await expect(drawer).toContainText("1.18.32 → 2.0.18");
-    await expect(drawer).toContainText("The standalone CLI remains unchanged.");
+    const info = drawer.getByTestId(`agent-update-info-${runtime.agentName}`);
+    const infoBox = await info.boundingBox();
+    expect(infoBox!.height).toBeGreaterThanOrEqual(44);
+    expect(infoBox!.width).toBeGreaterThanOrEqual(44);
+    await info.tap();
+    const information = testPage.getByRole("dialog", { name: "Upgrade to managed OpenCode v2" });
+    await expect(information).toBeVisible();
+    await expect(information).toContainText("The standalone CLI remains unchanged.");
+    await information.getByRole("button", { name: "Close", exact: true }).tap();
+    await expect(information).toBeHidden();
+    await expect(drawer).toBeVisible();
     await expect(drawer).toContainText("Stop standalone OpenCode v1 processes");
     const body = drawer.getByTestId(`agent-update-dialog-body-${runtime.agentName}`);
     await expect(body).toHaveCSS("overflow-y", "auto");
-    await expect
-      .poll(() => body.evaluate((element) => element.scrollHeight > element.clientHeight))
-      .toBe(true);
+    const commandDetails = drawer.getByTestId(`agent-update-command-${runtime.agentName}`);
+    await expect(commandDetails).not.toHaveAttribute("open");
+    if (prCapture.capturing) {
+      await drawer.evaluate((element) =>
+        Promise.all(
+          element
+            .getAnimations({ subtree: true })
+            .filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity)
+            .map((animation) => animation.finished),
+        ),
+      );
+      await prCapture.screenshot("mobile-opencode-migration-preview", {
+        caption: "Mobile OpenCode v1-to-v2 migration preview with details available on demand",
+      });
+    }
+    await commandDetails.locator("summary").tap();
+    await expect(commandDetails).toHaveAttribute("open", "");
     const command = body.locator("pre");
     await command.scrollIntoViewIfNeeded();
     await expect(command).toBeInViewport();

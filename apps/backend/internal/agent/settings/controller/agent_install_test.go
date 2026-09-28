@@ -296,9 +296,11 @@ func TestOpenCodeInstallPreparesSelectedManagedRuntime(t *testing.T) {
 			packageSpec := spec.PackageSpec(version)
 			cacheRoot := t.TempDir()
 			binDir := t.TempDir()
+			homeDir := t.TempDir()
 			argsPath := filepath.Join(t.TempDir(), "npm-args")
 			fakeNPM := fmt.Sprintf("#!/bin/sh\n" +
 				"printf '%%s\\n' \"$@\" >> \"$NPM_ARGS_FILE\"\n" +
+				"if [ \"$1\" = \"--prefix\" ] && [ \"$3\" = exec ] && [ ! -d \"$2\" ]; then echo \"npm prefix does not exist: $2\" >&2; exit 17; fi\n" +
 				"if [ \"$1\" = config ]; then printf '%%s\\n' \"$NPM_CACHE_ROOT\"; exit 0; fi\n" +
 				"for arg do if [ \"$arg\" = \"--package=$EXPECTED_PACKAGE_SPEC\" ]; then /bin/mkdir -p \"$NPM_CACHE_ROOT/_npx/$EXPECTED_CACHE_KEY\"; exit 0; fi; done\n" +
 				"exit 0\n")
@@ -311,6 +313,7 @@ func TestOpenCodeInstallPreparesSelectedManagedRuntime(t *testing.T) {
 				}
 			}
 			t.Setenv("PATH", binDir)
+			t.Setenv("HOME", homeDir)
 			t.Setenv("NPM_CACHE_ROOT", cacheRoot)
 			t.Setenv("NPM_ARGS_FILE", argsPath)
 			t.Setenv("EXPECTED_PACKAGE_SPEC", packageSpec)
@@ -343,7 +346,14 @@ func TestOpenCodeInstallPreparesSelectedManagedRuntime(t *testing.T) {
 			if final := waitForStatus(t, controller, job.JobID, dto.InstallJobStatusSucceeded); final.Error != "" {
 				t.Fatalf("install job failed: %s", final.Error)
 			}
-			if enqueuedScript != displayedScript {
+			if tc.source == managedruntime.OpenCodeSourceManaged {
+				if !strings.Contains(displayedScript, managedruntime.NPMProjectPrefix) {
+					t.Fatalf("displayed install command %q omits the managed prefix marker", displayedScript)
+				}
+				if strings.Contains(enqueuedScript, managedruntime.NPMProjectPrefix) {
+					t.Fatalf("queued install command %q retains the unprepared managed prefix", enqueuedScript)
+				}
+			} else if enqueuedScript != displayedScript {
 				t.Fatalf("displayed install command %q differs from queued command %q", displayedScript, enqueuedScript)
 			}
 			installed, err := agent.IsInstalled(context.Background())
@@ -354,12 +364,25 @@ func TestOpenCodeInstallPreparesSelectedManagedRuntime(t *testing.T) {
 			if err != nil {
 				t.Fatalf("read npm argv: %v", err)
 			}
-			if tc.source == managedruntime.OpenCodeSourceNative {
+			switch tc.source {
+			case managedruntime.OpenCodeSourceNative:
 				if !strings.Contains(string(args), "install\n-g\n"+packageSpec) {
 					t.Fatalf("native install npm arguments = %q, want exact global package", args)
 				}
-			} else if !strings.Contains(string(args), "--package="+packageSpec) || strings.Contains(string(args), "-g") {
-				t.Fatalf("managed install npm arguments = %q, want exact managed package without global install", args)
+			case managedruntime.OpenCodeSourceManaged:
+				if !strings.Contains(string(args), "--package="+packageSpec) || strings.Contains(string(args), "\n-g\n") {
+					t.Fatalf("managed install npm arguments = %q, want exact managed package without global install", args)
+				}
+				installArgs := strings.SplitN(string(args), "\n", 4)
+				if len(installArgs) < 3 || installArgs[0] != "--prefix" || installArgs[2] != "exec" {
+					t.Fatalf("managed install npm arguments = %q, want an isolated prefix before exec", args)
+				}
+				if !filepath.IsAbs(installArgs[1]) || installArgs[1] == managedruntime.NPMProjectPrefix {
+					t.Fatalf("managed npm prefix = %q, want the prepared absolute directory", installArgs[1])
+				}
+				if info, err := os.Stat(installArgs[1]); err != nil || !info.IsDir() {
+					t.Fatalf("prepared managed npm prefix %q is not a directory: %v", installArgs[1], err)
+				}
 			}
 		})
 	}

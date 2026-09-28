@@ -55,7 +55,13 @@ test.describe("managed agent runtime updates", () => {
     await expect(dialog).toContainText(
       'npm exec --yes --prefer-online --package=@agentclientprotocol/claude-agent-acp -- node -e ""',
     );
-    await expect(dialog).toContainText("Active sessions keep running");
+    await expect(
+      dialog.getByTestId(`agent-update-command-${runtime.agentName}`),
+    ).not.toHaveAttribute("open");
+    await expect(dialog.getByText("Active sessions keep running", { exact: false })).toHaveCount(0);
+    await dialog.getByTestId(`agent-update-info-${runtime.agentName}`).focus();
+    await expect(testPage.getByRole("tooltip")).toContainText("Active sessions keep running");
+    await testPage.keyboard.press("Escape");
     expect(runtime.previewCount()).toBe(1);
     expect(runtime.postCount()).toBe(0);
     await prCapture.screenshot("desktop-update-preview", {
@@ -296,7 +302,11 @@ test.describe("managed agent runtime updates", () => {
     await expect(
       dialog.getByTestId(`agent-update-version-loading-${runtime.agentName}`),
     ).toBeVisible();
-    await expect(body).toContainText("Active sessions keep running");
+    const info = dialog.getByTestId(`agent-update-info-${runtime.agentName}`);
+    await expect(info).toBeVisible();
+    await info.focus();
+    await expect(testPage.getByRole("tooltip")).toContainText("Active sessions keep running");
+    await testPage.keyboard.press("Escape");
     await expect(body).toContainText("Command that will run");
     await expect(dialog.getByTestId(`agent-update-version-${runtime.agentName}`)).toBeDisabled();
     await expect(
@@ -527,7 +537,10 @@ test.describe("managed agent runtime updates", () => {
     ).toBe(false);
   });
 
-  test("requires explicit opt-in before migrating OpenCode from v1 to v2", async ({ testPage }) => {
+  test("requires explicit opt-in before migrating OpenCode from v1 to v2", async ({
+    testPage,
+    prCapture,
+  }) => {
     const runtime = await installRuntimeUpdateFixture(testPage, {
       agentName: "opencode-acp",
       displayName: "OpenCode",
@@ -583,15 +596,35 @@ test.describe("managed agent runtime updates", () => {
 
     await dialog.getByTestId(`agent-update-migrate-family-${runtime.agentName}`).click();
     await expect(dialog).toContainText("1.18.32 → 2.0.18");
-    await expect(dialog).toContainText(
-      "This selects managed OpenCode v2 for future launches across every OpenCode profile in this Kandev installation. The standalone CLI remains unchanged.",
+    const info = dialog.getByTestId(`agent-update-info-${runtime.agentName}`);
+    await expect(testPage.getByRole("tooltip")).toHaveCount(0);
+    await info.hover();
+    await expect(testPage.getByRole("tooltip")).toContainText(
+      "The standalone CLI remains unchanged.",
     );
+    await testPage.keyboard.press("Escape");
     await expect(dialog).toContainText(
       "Stop standalone OpenCode v1 processes that use the same session data before upgrading.",
     );
     await expect(dialog).toContainText("--package=@opencode/cli@2.0.18");
+    await expect(
+      dialog.getByTestId(`agent-update-command-${runtime.agentName}`),
+    ).not.toHaveAttribute("open");
     expect(runtime.previewFamilies()).toEqual(["", "v2"]);
     expect(runtime.postCount()).toBe(0);
+    if (prCapture.capturing) {
+      await dialog.evaluate((element) =>
+        Promise.all(
+          element
+            .getAnimations({ subtree: true })
+            .filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity)
+            .map((animation) => animation.finished),
+        ),
+      );
+      await prCapture.screenshot("desktop-opencode-migration-preview", {
+        caption: "Desktop OpenCode v1-to-v2 migration preview with details available on demand",
+      });
+    }
 
     await testPage.getByTestId(`agent-update-confirm-${runtime.agentName}`).click();
     expect(runtime.postCount()).toBe(1);

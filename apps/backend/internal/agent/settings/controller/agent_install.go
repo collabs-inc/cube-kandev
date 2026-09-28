@@ -31,7 +31,7 @@ func (c *Controller) EnqueueInstall(name string) (*dto.InstallJobDTO, error) {
 	if !ok {
 		return nil, ErrAgentNotFound
 	}
-	script, err := c.installScriptForSettings(context.Background(), ag)
+	script, err := c.installScriptForExecution(context.Background(), ag)
 	if err != nil {
 		return nil, err
 	}
@@ -60,22 +60,49 @@ func (c *Controller) installScriptForSettings(ctx context.Context, ag agents.Age
 	if !ok {
 		return ag.InstallScript(), nil
 	}
+	command, err := c.selectedRuntimeInstallCommand(ctx, provider)
+	if err != nil {
+		return "", err
+	}
+	return buildCommandString(command.Args()), nil
+}
+
+func (c *Controller) installScriptForExecution(ctx context.Context, ag agents.Agent) (string, error) {
+	provider, ok := ag.(agents.SelectedRuntimeInstallCommandProvider)
+	if !ok {
+		return ag.InstallScript(), nil
+	}
+	command, err := c.selectedRuntimeInstallCommand(ctx, provider)
+	if err != nil {
+		return "", err
+	}
+	args := command.Args()
+	if err := managedruntime.PrepareNPMProjectPrefix(args); err != nil {
+		return "", fmt.Errorf("prepare managed npm install prefix: %w", err)
+	}
+	return buildCommandString(args), nil
+}
+
+func (c *Controller) selectedRuntimeInstallCommand(
+	ctx context.Context,
+	provider agents.SelectedRuntimeInstallCommandProvider,
+) (agents.Command, error) {
 	reader, ok := c.managedRuntimeSelections.(managedruntime.OpenCodeSelectionReader)
 	if !ok {
-		return "", errors.New("OpenCode runtime selection is unavailable for installation")
+		return agents.Command{}, errors.New("OpenCode runtime selection is unavailable for installation")
 	}
 	selection, found, err := reader.GetOpenCodeSelection(ctx)
 	if err != nil {
-		return "", fmt.Errorf("read OpenCode runtime selection for installation: %w", err)
+		return agents.Command{}, fmt.Errorf("read OpenCode runtime selection for installation: %w", err)
 	}
 	if !found {
-		return "", errors.New("OpenCode runtime selection has not been initialized")
+		return agents.Command{}, errors.New("OpenCode runtime selection has not been initialized")
 	}
 	command, err := provider.SettingsInstallCommand(selection)
 	if err != nil {
-		return "", fmt.Errorf("resolve OpenCode install command: %w", err)
+		return agents.Command{}, fmt.Errorf("resolve OpenCode install command: %w", err)
 	}
-	return buildCommandString(command.Args()), nil
+	return command, nil
 }
 
 // ListInstallJobs returns a snapshot of every active or recently-finished

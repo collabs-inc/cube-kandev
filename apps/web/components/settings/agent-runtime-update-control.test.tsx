@@ -9,7 +9,10 @@ vi.mock("@/hooks/use-responsive-breakpoint", () => ({
   useResponsiveBreakpoint: () => ({ isMobile: false }),
 }));
 
+vi.mock("@/hooks/use-compact-task-chrome", () => ({ useTouchDrawer: () => false }));
+
 vi.mock("@kandev/ui/tooltip", () => ({
+  TooltipProvider: ({ children }: { children?: ReactNode }) => <>{children}</>,
   Tooltip: ({ children }: { children?: ReactNode }) => <>{children}</>,
   TooltipTrigger: ({ children }: { children?: ReactNode }) => <>{children}</>,
   TooltipContent: ({ children }: { children?: ReactNode }) => <>{children}</>,

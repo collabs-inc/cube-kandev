@@ -87,6 +87,48 @@ describe("ApiClient user settings", () => {
   });
 });
 
+describe("ApiClient.deleteTask", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("refreshes the preview when the task changes before deletion", async () => {
+    let previewCount = 0;
+    let deleteCount = 0;
+    const confirmationHeaders: string[] = [];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/api/v1/app-state?path=%2Fsettings%2Fagents")) {
+        return Response.json({ interimSettingsInterlockToken: "test-token" });
+      }
+      if (url.endsWith("/api/v1/tasks/delete-preflight")) {
+        previewCount += 1;
+        return Response.json({ confirmation_id: `preview-${previewCount}` });
+      }
+      if (url.endsWith("/api/v1/tasks/task-1")) {
+        deleteCount += 1;
+        const headers = init?.headers as Record<string, string>;
+        confirmationHeaders.push(headers["X-Kandev-Task-Delete-Confirmation"]);
+        if (deleteCount === 1) {
+          return Response.json(
+            { error: "task deletion preview is no longer current" },
+            { status: 409 },
+          );
+        }
+        return Response.json({ success: true });
+      }
+      throw new Error(`unexpected request: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await new ApiClient("http://backend.test").deleteTask("task-1");
+
+    expect(previewCount).toBe(2);
+    expect(deleteCount).toBe(2);
+    expect(confirmationHeaders).toEqual(["preview-1", "preview-2"]);
+  });
+});
+
 describe("loadInterimSettingsInterlockToken", () => {
   afterEach(() => {
     vi.unstubAllGlobals();

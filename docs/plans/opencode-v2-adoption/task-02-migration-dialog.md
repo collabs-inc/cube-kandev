@@ -49,6 +49,31 @@ Only a validated candidate becomes the durable managed v2 selection for all Open
 
 ## ASCII UI preview
 
+### Dialog simplification (2026-09-28)
+
+The user requested less update explanation in the dialog. This revision supersedes the expanded explanatory text and command block in UI-01/UI-02 below.
+Reuse `SettingsInfo`: hover/focus reveals details on desktop, and tapping opens its accessible information sheet on touch devices.
+Keep the version change, runtime choice, migration warning, and primary action visible. Hide the redundant header description visually but retain its accessible description.
+The command is an initially collapsed native details disclosure. Existing translations are reused.
+
+```text
+Desktop dialog                  Phone update drawer
+Update OpenCode                 Update OpenCode
+Upgrade to v2 (i)               Upgrade to v2       (i)
+1.18.32 -> 2.0.18                1.18.32 -> 2.0.18
+Version summary                 Version summary
+[Update v1] [Upgrade to v2]      [Update v1] [Upgrade to v2]
+Stop external v1 processes      Stop external v1 processes
+> Command that will run         > Command that will run
+[Cancel] [Upgrade to v2]         [Upgrade to v2] [Cancel]
+```
+
+The information disclosure holds shared profile scope, unchanged standalone CLI, model refresh behavior, and future-launch semantics.
+The desktop test checks hover/keyboard disclosure; the phone test checks tap, a 44px target, closing the information sheet back to the update drawer, and expanding the command.
+No update request is sent by either disclosure. Runtime behavior and activation semantics are unchanged.
+
+
+
 Excerpts of [UI-01, UI-02, and UI-03](plan.md#ascii-ui-preview), covering AC-AGENTS-OPENCODE-V2-001.3, .5, .6, .8-.10.
 
 ```text
@@ -157,6 +182,17 @@ Moved OpenCode utility command resolution inside the shared operation lease for 
 - `go test -race ./internal/agent/runtime/lifecycle -run 'OpenCode|ManagedRuntime' -count=1`: passed, including deterministic utility-versus-migration admission orderings.
 - The subprocess-boundary isolation regression verified effective HOME/XDG/OpenCode paths, ignored inherited OpenCode overrides, preserved npm cache/userconfig, and unchanged sentinel user config/database files.
 - Local Docker/SSH recovery E2E remains unverified because the shared `/tmp` filesystem was full and the container runtime could not create a temporary runc process file. All six container shards passed in the PR CI run after the review fixes.
-- The first exact-head PR E2E run failed an unrelated queue-reorder keyboard-focus test in Shard 4. A targeted local run was flaky during fixture setup and passed on retry. Rerunning the failed CI jobs passed the shard and both aggregate reports; the final snapshot had 60 passed, zero failed, and zero pending checks.
+- PR run `36400881920`, attempt 2 at `82cf819d078`, ended with 57 checks passed, 10 skipped, one failed, and two E2E aggregates pending. The leaf failure included the mobile clarification send target being covered by the transient update toast; the test now waits for that toast to hide. The shard also reported the task-deletion test as flaky after a stale deletion preview once returned 409 and its retry passed.
 - The verification-record update passed `node scripts/validate-public-docs.mjs` (47 pages) and `TMPDIR=/root/.cache/kandev-go-tmp node --test scripts/validate-public-docs.test.mjs` (62/62).
 - `git diff --check`: passed.
+
+## Fixup verification (2026-09-28)
+
+The update dialog keeps its migration warning and version choice visible while details and the command move behind disclosures. The existing Settings info component provides hover/focus details on desktop and a touch-open information sheet on phones. The user-facing runtime choice and migration semantics are unchanged.
+
+- Desktop runtime-update E2E passed 17/17 with retries disabled; mobile runtime-update E2E passed 6/6 with retries disabled. The production Vite and backend builds completed as part of these runs.
+- The desktop update-control component and API-client helper Vitest files passed 13/13. Web typecheck and targeted ESLint passed.
+- The mobile clarification failure passed locally with retries disabled after waiting for the known transient update toast to hide. The task-deletion helper now refreshes only on the stale-preview 409; its new unit regression passed, and the focused deletion E2E passed with retries disabled. Four isolated pre-fix repetitions passed on the exact prior head, so the CI timing race was not reproduced locally.
+- `go test -race ./internal/agent/settings/controller`: passed, including the managed npm prefix preparation regression.
+- `python3 scripts/list-docs.py validate` validated 321 decisions and 1220 specifications; `python3 scripts/lint-spec-files.py --all`: passed.
+- At the time of this record, new-head PR CI had not run yet. The `82cf819d078` counts above are the latest remote evidence and must not be read as verification of the subsequent fixup commit.

@@ -20,6 +20,7 @@ import type { AgentUpdateJob, AgentUpdatePreview, AgentUpdateStatus, InstallJob 
 import type { RuntimeUpdate } from "@/lib/types/http";
 import { AgentRuntimeUpdateSurface } from "./agent-runtime-update-surface";
 import { RuntimeVersionPicker } from "./runtime-version-picker";
+import { SettingsInfo } from "./settings-info";
 import { useAgentUpdateDialogState } from "./use-agent-update-dialog-state";
 
 const UPDATE_AGENT_KEY = "agents:updateAgent";
@@ -129,9 +130,19 @@ function RuntimeVersionSummary({
 
   return (
     <div className="space-y-0.5" data-testid={`agent-update-version-summary-${agentName}`}>
-      <p className="font-medium" role={isUpToDate ? "status" : undefined}>
-        {t(runtimeOperationLabelKey(operation))}
-      </p>
+      <div className="flex items-center gap-1">
+        <p className="font-medium" role={isUpToDate ? "status" : undefined}>
+          {t(runtimeOperationLabelKey(operation))}
+        </p>
+        <SettingsInfo
+          label={t(runtimeOperationLabelKey(operation))}
+          testId={`agent-update-info-${agentName}`}
+        >
+          {operation === "migrate" && <p>{t("agents:openCodeMigrationScope")}</p>}
+          <p>{t("agents:runtimeUpdateExplainer")}</p>
+          <p>{t("agents:runtimeUpdateSessionsNote")}</p>
+        </SettingsInfo>
+      </div>
       <p className="break-words font-mono text-sm">
         {isUpToDate ? currentVersion : `${currentVersion} → ${targetVersion}`}
       </p>
@@ -214,7 +225,6 @@ function RuntimeUpdatePreviewDetails({
           className="space-y-1 text-xs text-muted-foreground"
           data-testid={`agent-update-migration-scope-${agentName}`}
         >
-          <p>{t("agents:openCodeMigrationScope")}</p>
           <p>{t("agents:openCodeMigrationExternalProcesses")}</p>
         </div>
       ) : (
@@ -230,16 +240,14 @@ function RuntimeUpdatePreviewDetails({
           onSelectDefault={onSelectDefault}
         />
       )}
-      <div className="space-y-0.5 text-xs text-muted-foreground">
-        <p>{t("agents:runtimeUpdateExplainer")}</p>
-        <p>{t("agents:runtimeUpdateSessionsNote")}</p>
-      </div>
-      <div className="space-y-0.5">
-        <p className="font-medium">{t("agents:commandThatWillRun")}</p>
-        <pre className="whitespace-pre-wrap break-all rounded-md bg-muted p-2 font-mono text-xs text-muted-foreground">
+      <details className="group" data-testid={`agent-update-command-${agentName}`}>
+        <summary className="cursor-pointer py-1 font-medium text-muted-foreground focus-visible:outline-ring max-md:min-h-11 max-md:py-3 [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:py-3">
+          {t("agents:commandThatWillRun")}
+        </summary>
+        <pre className="mt-1 whitespace-pre-wrap break-all rounded-md bg-muted p-2 font-mono text-xs text-muted-foreground">
           {preview.command_string}
         </pre>
-      </div>
+      </details>
     </>
   );
 }

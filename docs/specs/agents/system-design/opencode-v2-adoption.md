@@ -75,6 +75,9 @@ Discovery and availability checks must recognize the selected managed runtime ev
 `OpenCodeACP.IsInstalled` currently checks native presence; reconcile that check with managed readiness so a successful
 managed installation remains selectable. An unprepared fresh runtime may show an install action; discovery alone must not
 perform an unrequested global install. Installation uses the normal Kandev install/launch flow and the resolved managed command.
+Before a managed Settings install command reaches the shell, prepare its internal npm project-prefix marker as a private
+temporary directory on the backend host. The displayed command may retain the readable marker; execution must not rely
+on creating or resolving that path beneath the user's home directory.
 Missing artifacts or executor failures must not fall back to another family or a native binary.
 Remote launchers use the same family and exact version, but installation occurs in the target executor.
 A successful host update does not certify remote installation success.
@@ -185,7 +188,7 @@ Closing the dialog does not cancel a submitted job or imply rollback.
 Use `agent-runtime-update-control.tsx`, the existing hooks/API client, and `AgentRuntimeUpdateSurface`.
 Entry remains Settings > Agents > OpenCode update control, including the profile context where it is displayed.
 V1 ordinary updates remain available. A separate Upgrade to v2 choice previews managed migration.
-Show current and target version, shared profile scope, and the unchanged standalone CLI before submission.
+Show current and target version before submission. The adjacent Settings info icon explains shared profile scope and the unchanged standalone CLI on hover/focus or in a tap-open information sheet. Keep the external-process migration warning visible. The command preview is collapsed by default and expands in place.
 No automatic submit or preselected cross-family ordinary Update action is allowed.
 
 Desktop uses the existing Dialog. Phone uses its inset bottom Drawer with a fixed title and action footer,
