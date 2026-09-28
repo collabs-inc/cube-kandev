@@ -70,23 +70,7 @@ async function listTerminalIds(
   apiClient: ApiClient,
   taskId: string,
   environmentId: string,
-): Promise<string[]> {
-  const response = await apiClient.wsRequest<{
-    shells?: Array<{ id?: string; terminal_id?: string }>;
-  }>("user_shell.list", {
-    task_id: taskId,
-    task_environment_id: environmentId,
-    include_parked: true,
-  });
-  return (response.shells ?? [])
-    .map((shell) => shell.id ?? shell.terminal_id)
-    .filter((id): id is string => Boolean(id));
-}
-
-async function listOrdinaryTerminalIds(
-  apiClient: ApiClient,
-  taskId: string,
-  environmentId: string,
+  filterKind?: string,
 ): Promise<string[]> {
   const response = await apiClient.wsRequest<{
     shells?: Array<{ id?: string; terminal_id?: string; kind?: string }>;
@@ -96,7 +80,7 @@ async function listOrdinaryTerminalIds(
     include_parked: true,
   });
   return (response.shells ?? [])
-    .filter((shell) => shell.kind === "ordinary")
+    .filter((shell) => !filterKind || shell.kind === filterKind)
     .map((shell) => shell.id ?? shell.terminal_id)
     .filter((id): id is string => Boolean(id));
 }
@@ -299,7 +283,7 @@ test.describe("Terminals — dockview UI", () => {
 
     await clickNewTerminalInPlusMenu(testPage, session);
     await expect
-      .poll(() => listOrdinaryTerminalIds(apiClient, task.id, environmentId), {
+      .poll(() => listTerminalIds(apiClient, task.id, environmentId, "ordinary"), {
         timeout: 10_000,
         message: "second ordinary terminal shell was not persisted",
       })

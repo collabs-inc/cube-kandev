@@ -172,6 +172,13 @@ export function readCascadeArchiveCleanupState(tmpDir: string, taskId: string): 
 export async function waitForCascadeArchiveCleanup(tmpDir: string, taskId: string) {
   await expect
     .poll(() => readCascadeArchiveCleanupState(tmpDir, taskId), {
+      timeout: 30_000,
+      intervals: [250, 500, 1_000],
+      message: `Waiting for cascade archive cleanup job row to be created for task ${taskId}`,
+    })
+    .not.toBeNull();
+  await expect
+    .poll(() => readCascadeArchiveCleanupState(tmpDir, taskId), {
       timeout: 60_000,
       intervals: [250, 500, 1_000],
       message: `Waiting for cascade archive cleanup to finish for task ${taskId}`,
