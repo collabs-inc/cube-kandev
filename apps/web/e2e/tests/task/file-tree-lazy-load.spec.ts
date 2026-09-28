@@ -2,12 +2,7 @@ import { type Page } from "@playwright/test";
 import path from "node:path";
 import { test, expect } from "../../fixtures/test-base";
 import type { ApiClient } from "../../helpers/api-client";
-import {
-  GitHelper,
-  makeGitEnv,
-  openTaskSession,
-  createStandardProfile,
-} from "../../helpers/git-helper";
+import { GitHelper, makeGitEnv, openTaskSession } from "../../helpers/git-helper";
 
 // Children of a directory are loaded lazily when the directory is first expanded
 // (see useFileBrowserHandlers.toggleExpand -> loadNodeChildren). The pre-refactor
@@ -18,12 +13,16 @@ import {
 async function setupTask(
   testPage: Page,
   apiClient: ApiClient,
-  seedData: { workspaceId: string; workflowId: string; startStepId: string; repositoryId: string },
-  profileName: string,
+  seedData: {
+    workspaceId: string;
+    workflowId: string;
+    startStepId: string;
+    repositoryId: string;
+    agentProfileId: string;
+  },
   taskTitle: string,
 ) {
-  const profile = await createStandardProfile(apiClient, profileName);
-  await apiClient.createTaskWithAgent(seedData.workspaceId, taskTitle, profile.id, {
+  await apiClient.createTaskWithAgent(seedData.workspaceId, taskTitle, seedData.agentProfileId, {
     description: "/e2e:simple-message",
     workflow_id: seedData.workflowId,
     workflow_step_id: seedData.startStepId,
@@ -51,7 +50,7 @@ test.describe("File tree lazy-load on expand", () => {
     git.stageAll();
     git.commit("seed lazy folder");
 
-    const session = await setupTask(testPage, apiClient, seedData, "ft-lazy-load", "FT Lazy Load");
+    const session = await setupTask(testPage, apiClient, seedData, "FT Lazy Load");
 
     const folder = session.fileTreeNode("lazyfolder");
     await expect(folder).toBeVisible({ timeout: 15_000 });
@@ -93,7 +92,7 @@ test.describe("File tree lazy-load on expand", () => {
     git.stageAll();
     git.commit("seed keep folder");
 
-    const session = await setupTask(testPage, apiClient, seedData, "ft-lazy-keep", "FT Lazy Keep");
+    const session = await setupTask(testPage, apiClient, seedData, "FT Lazy Keep");
 
     const folder = session.fileTreeNode("keepfolder");
     await expect(folder).toBeVisible({ timeout: 15_000 });

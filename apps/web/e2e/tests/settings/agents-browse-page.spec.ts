@@ -70,15 +70,34 @@ test.describe("Agents browse page", () => {
     const heading = testPage.getByRole("heading", { name: "Browse available agents" });
     await expect(heading).toBeVisible({ timeout: 15_000 });
 
-    // The SSR payload marks this resource as loaded before the client hook
-    // runs. Replace that hydrated snapshot directly so the assertion does not
-    // depend on whether a second fetch happens after the page mounts.
+    // Wait for the bootstrap or initial client request to finish before the
+    // fixture replaces the store. Otherwise a slow response can overwrite it.
+    await testPage.waitForFunction(
+      () => {
+        const availableAgents = (window as E2EStoreWindow).__KANDEV_E2E_STORE__?.getState()
+          .availableAgents;
+        return availableAgents?.loading || availableAgents?.loaded;
+      },
+      undefined,
+      { timeout: 15_000 },
+    );
+    await testPage.waitForFunction(
+      () => {
+        const availableAgents = (window as E2EStoreWindow).__KANDEV_E2E_STORE__?.getState()
+          .availableAgents;
+        return availableAgents?.loaded && !availableAgents.loading;
+      },
+      undefined,
+      { timeout: 15_000 },
+    );
+
+    // Replace the settled snapshot directly so this static catalog assertion
+    // owns its deterministic unavailable-agent fixture.
     await testPage.evaluate((agents) => {
       const store = (window as E2EStoreWindow).__KANDEV_E2E_STORE__;
       if (!store) throw new Error("E2E store bridge is unavailable");
       // Use the test store's partial-state bridge instead of the production
-      // action. The action rejects snapshots older than the SSR timestamp,
-      // while this fixture intentionally owns the catalog contents.
+      // action because this fixture intentionally owns the catalog contents.
       const current = store.getState().availableAgents;
       store.setState({
         availableAgents: {
