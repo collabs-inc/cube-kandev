@@ -91,8 +91,5 @@ check this boundary.
 - `python3 scripts/list-docs.py validate` and `python3 scripts/lint-spec-files.py --all`
   passed.
 - The race-enabled backend check first failed once in the unrelated task-service
-  test `TestArchiveUnarchiveResumeReactivatesLocalOnlyBranch`; that test passed
-  in 20 local repetitions and the failed-only CI rerun passed.
-- Current-head PR checks and review are terminal and clean, with no unresolved
-  threads.
-- PR #4010 is open against `main` for parent integration review.
+  test `TestArchiveUnarchiveResumeReactivatesLocalOnlyBranch`. The failure did
+  not reproduce in 20 local repetitions or in the failed-only CI rerun.

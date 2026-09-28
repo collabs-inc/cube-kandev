@@ -61,10 +61,8 @@ Local Office and Runs tests passed with `TMPDIR=/var/tmp`. Architecture lint
 tests passed (99 tests), `make lint-architecture` passed, and the local PR
 documentation preflight accepted this work order. The race-enabled backend
 check first failed once in the unrelated task-service test
-`TestArchiveUnarchiveResumeReactivatesLocalOnlyBranch`; that test passed in 20
-local repetitions and the failed-only CI rerun passed. Current-head PR checks
-and review are terminal and clean, with no unresolved threads. PR #4010 remains
-open against `main` for parent integration review.
+`TestArchiveUnarchiveResumeReactivatesLocalOnlyBranch`. The failure did not
+reproduce in 20 local repetitions or in the failed-only CI rerun.
 
 ## Risks
 
