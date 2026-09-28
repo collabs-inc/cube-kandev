@@ -130,3 +130,16 @@ Sequential.
 - Final desktop color-scenario rerun after the picker-close wait: 1 passed
   (`pnpm e2e:run --no-build --project chromium tests/task/change-workflow.spec.ts
   -- --grep "updates the open task stepper"`).
+
+## PR review remediation
+
+- CSS-color regressions failed before the compatibility repair (3 failures).
+- Preserve background utility classes and the prior inline CSS-color behavior.
+- Add reset-clears-dot and aria-hidden assertions requested in review.
+- Add a hex destination to desktop and phone checks and capture the open picker.
+- Final verification: dialog Vitest 9 passed; focused ESLint with zero warnings
+  passed; `make build-web` passed; managed desktop E2E 4 passed and phone E2E
+  1 passed (`--no-build` against that fresh web build). Commands are listed above.
+- Specification lint, documentation catalog validation and `git diff --check`
+  passed. Desktop and phone populated-picker screenshots recaptured.
+- Remote CI/review completion remains pending for the remediation commit.

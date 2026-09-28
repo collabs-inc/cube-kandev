@@ -51,7 +51,19 @@ export class ChangeWorkflowPage {
       const option = list.locator(`[role="option"][data-value="${step.id}"]`);
       const dot = option.locator("span.rounded-full");
       await expect(dot).toBeVisible();
-      await expect(dot).toHaveClass(new RegExp(step.color));
+      if (step.color.startsWith("bg-")) {
+        await expect(dot).toHaveClass(new RegExp(step.color));
+      } else {
+        const expected = await this.page.evaluate((color) => {
+          const element = document.createElement("span");
+          element.style.backgroundColor = color;
+          document.body.append(element);
+          const background = getComputedStyle(element).backgroundColor;
+          element.remove();
+          return background;
+        }, step.color);
+        await expect(dot).toHaveCSS("background-color", expected);
+      }
       await expect(dot).not.toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
       await expect(dot).toHaveAttribute("aria-hidden", "true");
       const background = await dot.evaluate((element) => getComputedStyle(element).backgroundColor);
@@ -62,6 +74,27 @@ export class ChangeWorkflowPage {
       await expect(trigger.locator("span.rounded-full")).toHaveCSS("background-color", background);
     }
     expect(new Set(backgrounds).size).toBe(steps.length);
+  }
+
+  async captureStepPicker(path: string) {
+    const trigger = this.form.getByTestId("change-workflow-step");
+    if (this.mobile) await trigger.tap();
+    else await trigger.click();
+    const list = this.page.locator('[role="listbox"]:visible');
+    await expect(list).toBeVisible();
+    await list.evaluate(async () => {
+      await Promise.all(
+        document
+          .getAnimations()
+          .filter((animation) => Number.isFinite(animation.effect?.getComputedTiming().iterations))
+          .map((animation) => animation.finished.catch(() => undefined)),
+      );
+    });
+    await this.page.screenshot({ path });
+    const selected = list.locator('[role="option"][aria-selected="true"]');
+    if (this.mobile) await selected.tap();
+    else await selected.click();
+    await expect(list).toBeHidden();
   }
 
   async chooseProfile(sourceProfileId: string, replacementProfileName: string) {

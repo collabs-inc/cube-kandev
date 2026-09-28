@@ -36,6 +36,8 @@ Smallest reproduction: open Change workflow, choose a workflow whose steps use
 the class is passed into a CSS color property. The failing component regression
 confirms this mismatch; post-fix browser checks verify computed colors.
 Apply the existing class-based dot pattern with `cn` and aria-hidden decoration.
+Preserve inline rendering for saved CSS color values, including imported hex
+values; only `bg-` tokens are treated as background utility classes.
 
 ## Companion package
 
@@ -113,3 +115,10 @@ results are recorded in Task 01.
 
 A class assertion alone cannot prove the CSS is present in a production build;
 computed-style browser checks must confirm visible, distinct backgrounds.
+
+## PR review remediation
+
+Preserve supported CSS colors alongside palette classes. Extend regression
+coverage with hex, RGB and named colors, reset-clears-dot and aria-hidden checks.
+Desktop and phone scenarios also verify a hex destination and capture the open
+populated picker. Verification results are recorded in Task 01.

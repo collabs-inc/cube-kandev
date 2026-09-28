@@ -71,7 +71,9 @@ conversation. Actual workflow configuration determines each step's recipient.
 - **AC-TASKS-CHANGE-WORKFLOW-001.9:** Each destination-step option and the
   selected step shall display its configured workflow color beside its name on
   desktop and phone. The name shall remain readable and accessible independently
-  of color. Changing workflows shall clear the previous selected step indicator.
+  of color. Both configured background classes and previously supported CSS
+  colors, including hex values, shall remain visible. Changing workflows shall
+  clear the previous selected step indicator.
 
 ### REQ-TASKS-CHANGE-WORKFLOW-002: Consistent task transition
 

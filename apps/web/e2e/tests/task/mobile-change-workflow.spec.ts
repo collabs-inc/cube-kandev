@@ -27,6 +27,7 @@ test("changes workflow from phone task actions with task-local agent routing", a
   const stepColors = [
     { id: fixture.analysisStep.id, color: "bg-blue-500" },
     { id: fixture.implementStep.id, color: "bg-green-500" },
+    { id: fixture.prStep.id, color: "#f97316" },
   ];
   for (const step of stepColors) {
     const response = await apiClient.rawRequest("PUT", `/api/v1/workflow/steps/${step.id}`, step);
@@ -67,7 +68,7 @@ test("changes workflow from phone task actions with task-local agent routing", a
     await form.chooseWorkflow(fixture.workflow.id);
     // @covers AC-TASKS-CHANGE-WORKFLOW-001.9
     await form.expectStepColors(stepColors);
-    await testPage.screenshot({ path: testInfo.outputPath("step-colors.png") });
+    await form.captureStepPicker(testInfo.outputPath("step-colors.png"));
     await form.chooseWorkflow(resetWorkflow.id);
     await form.chooseWorkflow(fixture.workflow.id);
     await expect(

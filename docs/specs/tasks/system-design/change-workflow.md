@@ -222,8 +222,10 @@ pending one-shot marker. Reset-context remains off by default.
 For AC-TASKS-CHANGE-WORKFLOW-001.9, `stepOptions` in
 `components/task/change-workflow-form-sections.tsx` applies the configured
 `WorkflowStepDTO.color` background utility class to its decorative dot using
-`cn`, following `task-move-context-menu.tsx`. It must not pass a utility class
-to inline `backgroundColor`. Keep the text label and mark the dot aria-hidden.
+`cn`, following `task-move-context-menu.tsx`. Values beginning with `bg-`
+are class tokens; other saved CSS colors retain the existing inline
+`backgroundColor` behavior, including imported hex values. Keep the text label
+and mark the dot aria-hidden.
 `Combobox` uses the same `renderLabel` for options and the selected trigger;
 retain that shared rendering and existing selection/reset behavior. This is a
 presentation correction with no API, persistence, or palette change.
