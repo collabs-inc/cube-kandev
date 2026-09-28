@@ -41,6 +41,29 @@ export class ChangeWorkflowPage {
     else await option.click();
   }
 
+  async expectStepColors(steps: Array<{ id: string; color: string }>) {
+    const trigger = this.form.getByTestId("change-workflow-step");
+    const backgrounds: string[] = [];
+    for (const step of steps) {
+      if (this.mobile) await trigger.tap();
+      else await trigger.click();
+      const list = this.page.locator('[role="listbox"]:visible');
+      const option = list.locator(`[role="option"][data-value="${step.id}"]`);
+      const dot = option.locator("span.rounded-full");
+      await expect(dot).toBeVisible();
+      await expect(dot).toHaveClass(new RegExp(step.color));
+      await expect(dot).not.toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+      await expect(dot).toHaveAttribute("aria-hidden", "true");
+      const background = await dot.evaluate((element) => getComputedStyle(element).backgroundColor);
+      backgrounds.push(background);
+      if (this.mobile) await option.tap();
+      else await option.click();
+      await expect(list).toBeHidden();
+      await expect(trigger.locator("span.rounded-full")).toHaveCSS("background-color", background);
+    }
+    expect(new Set(backgrounds).size).toBe(steps.length);
+  }
+
   async chooseProfile(sourceProfileId: string, replacementProfileName: string) {
     const trigger = this.form.getByTestId(`change-workflow-profile-selector-${sourceProfileId}`);
     await expect(trigger).toBeVisible();

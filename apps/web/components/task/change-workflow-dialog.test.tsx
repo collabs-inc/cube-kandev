@@ -46,7 +46,7 @@ function makeHookState(): HookState {
     id,
     name,
     position: id === "build" ? 0 : 1,
-    color: "#abcdef",
+    color: id === "build" ? "bg-blue-500" : "bg-green-500",
     session_target: sessionTarget,
   });
   return {
@@ -128,6 +128,27 @@ beforeEach(() => {
   responsiveMock.isFinePointer = true;
   useChangeWorkflowMock.mockReset();
   useChangeWorkflowMock.mockReturnValue(makeHookState());
+});
+
+describe("ChangeWorkflowDialog step colors", () => {
+  // @covers AC-TASKS-CHANGE-WORKFLOW-001.9
+  it("renders configured step colors in options and selected value", () => {
+    render(
+      <ChangeWorkflowDialog
+        open
+        onOpenChange={vi.fn()}
+        taskId="task-1"
+        workspaceId="workspace-1"
+      />,
+    );
+    const trigger = screen.getByTestId("change-workflow-step");
+    expect(trigger.querySelector(".bg-blue-500")).not.toBeNull();
+    fireEvent.click(trigger);
+    const review = screen.getByRole("option", { name: "Review" });
+    expect(review.querySelector(".bg-green-500")).not.toBeNull();
+    fireEvent.click(review);
+    expect(useChangeWorkflowMock().setSelectedStepId).toHaveBeenCalledWith("review");
+  });
 });
 
 describe("ChangeWorkflowDialog", () => {

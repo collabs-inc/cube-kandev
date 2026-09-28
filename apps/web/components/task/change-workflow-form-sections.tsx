@@ -94,7 +94,7 @@ function stepOptions(steps: readonly WorkflowStepDTO[]): ComboboxOption[] {
       label: step.name,
       renderLabel: () => (
         <span className="flex min-w-0 items-center gap-2">
-          <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: step.color }} />
+          <span className={cn("size-2 shrink-0 rounded-full", step.color)} aria-hidden="true" />
           <span className="truncate">{step.name}</span>
         </span>
       ),
