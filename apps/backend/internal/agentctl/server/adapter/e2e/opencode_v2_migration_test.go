@@ -553,6 +553,13 @@ func openCodeEventText(events []adapter.AgentEvent) string {
 }
 
 func ioReadAll(r *http.Request) ([]byte, error) {
-	defer r.Body.Close()
-	return io.ReadAll(r.Body)
+	body, readErr := io.ReadAll(r.Body)
+	closeErr := r.Body.Close()
+	if readErr != nil {
+		return nil, readErr
+	}
+	if closeErr != nil {
+		return nil, closeErr
+	}
+	return body, nil
 }
