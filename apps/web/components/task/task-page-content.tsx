@@ -186,10 +186,12 @@ export function TaskLoadErrorState() {
 export function useTaskDetails(activeTaskId: string | null, initialTask: Task | null) {
   const [taskDetails, setTaskDetails] = useState<Task | null>(initialTask);
   const [taskLoadError, setTaskLoadError] = useState<unknown | null>(null);
-  const activeTaskIdRef = useRef(activeTaskId);
   const connectionStatus = useAppStore((state) => state.connection.status);
   const previousConnectionStatus = useRef(connectionStatus);
-  const effectiveTaskId = activeTaskId ?? initialTask?.id ?? null;
+  const effectiveTaskId = initialTask?.id ?? activeTaskId ?? null;
+  const effectiveTaskIdRef = useRef(effectiveTaskId);
+  const taskDetailsRequestIdRef = useRef(0);
+  effectiveTaskIdRef.current = effectiveTaskId;
   const kanbanTask = useAppStore((state) =>
     resolveLatestTaskProjection(effectiveTaskId, state.kanban.tasks, state.kanbanMulti.snapshots),
   );
@@ -202,33 +204,43 @@ export function useTaskDetails(activeTaskId: string | null, initialTask: Task | 
     taskDetailsId: taskDetails?.id ?? null,
     initialTaskId: initialTask?.id ?? null,
   });
-  useEffect(() => {
-    activeTaskIdRef.current = activeTaskId;
-  }, [activeTaskId]);
+  const loadTaskDetails = useCallback(
+    async (taskId = effectiveTaskId) => {
+      if (!taskId) return;
+      const requestedTaskId = taskId;
+      const requestId = ++taskDetailsRequestIdRef.current;
+      try {
+        const response = await fetchTask(requestedTaskId, { cache: "no-store" });
+        if (
+          requestId !== taskDetailsRequestIdRef.current ||
+          effectiveTaskIdRef.current !== requestedTaskId
+        ) {
+          return;
+        }
+        setTaskDetails(response);
+        setTaskLoadError(null);
+      } catch (error) {
+        if (
+          requestId !== taskDetailsRequestIdRef.current ||
+          effectiveTaskIdRef.current !== requestedTaskId
+        ) {
+          return;
+        }
+        console.error("[TaskPageContent] Failed to load task details:", error);
+        setTaskLoadError(error);
+      }
+    },
+    [effectiveTaskId],
+  );
 
-  const loadTaskDetails = useCallback(async () => {
-    if (!activeTaskId) return;
-    const requestedTaskId = activeTaskId;
-    try {
-      const response = await fetchTask(requestedTaskId, { cache: "no-store" });
-      if (activeTaskIdRef.current !== requestedTaskId) return;
-      setTaskDetails(response);
-      setTaskLoadError(null);
-    } catch (error) {
-      if (activeTaskIdRef.current !== requestedTaskId) return;
-      console.error("[TaskPageContent] Failed to load task details:", error);
-      setTaskLoadError(error);
-    }
-  }, [activeTaskId]);
-
   useEffect(() => {
-    if (!activeTaskId || taskDetails?.id === activeTaskId) {
+    if (!effectiveTaskId || taskDetails?.id === effectiveTaskId) {
       setTaskLoadError(null);
       return;
     }
     setTaskLoadError(null);
-    void loadTaskDetails();
-  }, [activeTaskId, taskDetails?.id, loadTaskDetails]);
+    void loadTaskDetails(effectiveTaskId);
+  }, [effectiveTaskId, taskDetails?.id, loadTaskDetails]);
 
   useEffect(() => {
     const reconnected =
@@ -237,14 +249,14 @@ export function useTaskDetails(activeTaskId: string | null, initialTask: Task | 
     if (reconnected) void loadTaskDetails();
   }, [connectionStatus, loadTaskDetails]);
 
-  useForegroundRefresh(loadTaskDetails, Boolean(activeTaskId), activeTaskId);
+  useForegroundRefresh(loadTaskDetails, Boolean(effectiveTaskId), effectiveTaskId);
 
   const onTaskUnarchived = useCallback(
     (taskId: string) => {
-      if (activeTaskId !== taskId) return;
-      void loadTaskDetails();
+      if (effectiveTaskId !== taskId) return;
+      void loadTaskDetails(taskId);
     },
-    [activeTaskId, loadTaskDetails],
+    [effectiveTaskId, loadTaskDetails],
   );
 
   return {

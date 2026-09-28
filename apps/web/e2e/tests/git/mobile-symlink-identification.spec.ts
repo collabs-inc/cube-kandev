@@ -3,7 +3,6 @@ import path from "node:path";
 import { test, expect } from "../../fixtures/test-base";
 import { SessionPage } from "../../pages/session-page";
 import { waitForLatestSessionDone } from "../../helpers/session";
-import { waitForFiniteAnimations } from "../../helpers/animations";
 
 // @covers AC-WORKSPACES-SYMLINK-001.1, AC-WORKSPACES-SYMLINK-001.2, AC-WORKSPACES-SYMLINK-001.4
 test("identifies a symlink in Changes and the mobile file viewer", async ({
@@ -73,10 +72,11 @@ test("identifies a symlink in Changes and the mobile file viewer", async ({
     await actions.tap();
     const edit = testPage.getByRole("menuitem", { name: "Edit", exact: true });
     await expect(edit).toBeVisible();
-    await waitForFiniteAnimations(testPage.getByRole("menu").last());
-    // The menu item has a fixed 44px touch target. Check it after the entrance
-    // animation, then tap it while the menu stays open.
-    await expect(edit).toHaveCSS("min-height", "44px");
+    await expect
+      .poll(async () => (await edit.boundingBox())?.height ?? 0, {
+        message: "mobile Edit menu item reaches its touch target size",
+      })
+      .toBeGreaterThanOrEqual(44);
     await edit.tap({ timeout: 5_000 });
     const viewer = testPage.getByTestId("mobile-file-viewer-panel");
     await expect(viewer).toBeVisible();

@@ -383,8 +383,13 @@ test.describe("Prompt history panel on mobile", () => {
     const session = new SessionPage(testPage);
     await session.waitForLoad();
     const panelsButton = testPage.getByRole("button", { name: "Panels", exact: true });
+    const panelsDialog = testPage.getByRole("dialog", { name: "Panels" });
+    const historyOption = testPage.getByTestId("mobile-prompt-history-option");
     await panelsButton.tap();
-    await testPage.getByTestId("mobile-prompt-history-option").tap();
+    await expect(panelsDialog).toBeVisible({ timeout: 10_000 });
+    await expect(historyOption).toBeVisible({ timeout: 10_000 });
+    await historyOption.tap();
+    await expect(panelsDialog).toHaveCount(0, { timeout: 10_000 });
     const panel = testPage.getByTestId("prompt-history-panel");
     const targetBubble = panel.locator(`[data-message-id="${targetMessage.id}"]`);
     await revealPromptHistoryTarget(testPage, panel, targetBubble);
@@ -402,7 +407,10 @@ test.describe("Prompt history panel on mobile", () => {
       await route.continue();
     });
     await panelsButton.tap();
-    await testPage.getByTestId("mobile-prompt-history-option").tap();
+    await expect(panelsDialog).toBeVisible({ timeout: 10_000 });
+    await expect(historyOption).toBeVisible({ timeout: 10_000 });
+    await historyOption.tap();
+    await expect(panelsDialog).toHaveCount(0, { timeout: 10_000 });
     await revealPromptHistoryTarget(testPage, panel, targetBubble);
     await testPage.clock.install();
     await installTargetScrollCounter(testPage, targetMessage.id);

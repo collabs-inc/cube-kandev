@@ -28,6 +28,15 @@ async function beginPointerDrag(page: Page, card: Locator) {
   await page.mouse.move(x + 20, y, { steps: 4 });
 }
 
+async function cancelPointerDrag(page: Page) {
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("desktop-kanban-drag-end-reserve")).toHaveCount(0);
+  // Release away from the source card. Otherwise the cancelled pointer drag
+  // can synthesize a click on the card and navigate to its task route.
+  await page.mouse.move(0, 0);
+  await page.mouse.up();
+}
+
 async function renderedColumnWidths(page: Page) {
   return page
     .locator("[data-kanban-step-id]")
@@ -88,16 +97,30 @@ test("auto-hides empty columns without changing drag destinations", async ({
   });
   expect(dragOverflow.documentScrollWidth).toBe(dragOverflow.documentClientWidth);
   expect(dragOverflow.scrollbarWidth).toBe("none");
-  await testPage.keyboard.press("Escape");
-  await testPage.mouse.up();
+  await cancelPointerDrag(testPage);
+  await expect(kanban.columnByStepId(sourceStep.id)).toBeVisible();
 
   await openColumnsMenu(testPage, workflow.id);
   const autoHideToggle = testPage.getByTestId(`columns-menu-auto-hide-empty-${workflow.id}`);
   await expect(autoHideToggle).toHaveAttribute("aria-checked", "false");
   await autoHideToggle.click();
   await expect(autoHideToggle).toHaveAttribute("aria-checked", "true");
+  await expect
+    .poll(
+      async () =>
+        (await apiClient.getUserSettings()).settings.workflow_ids_with_auto_hide_empty_steps ?? [],
+      { message: "Auto-hide setting was persisted" },
+    )
+    .toContain(workflow.id);
   await testPage.getByTestId(`columns-menu-step-${manuallyHiddenStep.id}`).click();
   await closeColumnsMenu(testPage, workflow.id);
+  await expect
+    .poll(
+      async () =>
+        (await apiClient.getUserSettings()).settings.kanban_hidden_step_ids?.[workflow.id] ?? [],
+      { message: "Manual column visibility was persisted" },
+    )
+    .toContain(manuallyHiddenStep.id);
 
   await expect(kanban.columnByStepId(sourceStep.id)).toBeVisible();
   await expect(kanban.columnByStepId(autoHiddenStep.id)).toHaveCount(0);
@@ -106,6 +129,7 @@ test("auto-hides empty columns without changing drag destinations", async ({
   await testPage.reload();
   await expect(kanban.columnByStepId(sourceStep.id)).toBeVisible();
   await expect(kanban.columnByStepId(autoHiddenStep.id)).toHaveCount(0);
+  await expect(kanban.columnByStepId(manuallyHiddenStep.id)).toHaveCount(0);
   await openColumnsMenu(testPage, workflow.id);
   await expect(autoHideToggle).toHaveAttribute("aria-checked", "true");
   await closeColumnsMenu(testPage, workflow.id);
@@ -188,6 +212,5 @@ test("keeps the drag reserve after overflowing minimum-width tracks", async ({
   expect(scrollWidthDuringDrag - scrollWidthBeforeDrag).toBeGreaterThanOrEqual(
     clientWidth - 280 - 1,
   );
-  await testPage.keyboard.press("Escape");
-  await testPage.mouse.up();
+  await cancelPointerDrag(testPage);
 });

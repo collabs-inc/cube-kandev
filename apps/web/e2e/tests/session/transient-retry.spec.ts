@@ -37,14 +37,23 @@ test.describe("transient provider error (529 Overloaded) retry", () => {
     seedData,
   }) => {
     const session = await seedIdleSession(testPage, apiClient, seedData, "Overloaded Retry Test");
-
-    // /overloaded:9 keeps failing so the retry loop stays visible until cancel.
-    await session.sendMessage("/overloaded:9");
     const sessionId = await session.activeChat().getAttribute("data-session-id");
     if (!sessionId) throw new Error("active chat did not expose a session id");
 
+    // /overloaded:9 keeps failing so the retry loop stays visible until cancel.
+    const retryNoticePromise = waitForRetryNotice(apiClient, sessionId, 1);
+    await session.sendMessage("/overloaded:9");
+    const retryNotice = await retryNoticePromise;
+    expect(retryNotice.metadata).toMatchObject({ retrying: true });
+
+    // The backend persists the retry notice before the session is parked.
+    // Reload from that durable state so a delayed WebSocket render cannot let
+    // the short first backoff expire before the yellow card is asserted.
+    await testPage.reload();
+    await session.waitForLoad();
+
     // The calm yellow "retrying" card + Cancel button must appear...
-    await expect(session.transientRetryCard()).toBeVisible({ timeout: 30_000 });
+    await expect(session.transientRetryCard()).toBeVisible({ timeout: 10_000 });
     await expect(session.transientRetryCard()).toHaveCount(1);
     await expect(session.recoveryCancelRetryButton()).toBeVisible();
 
