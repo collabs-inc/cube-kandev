@@ -744,8 +744,7 @@ func (m *Manager) resolveOpenCodeCommandOptions(
 	openCode *agents.OpenCodeACP,
 	reader managedruntime.OpenCodeSelectionReader,
 ) (agents.CommandOptions, error) {
-	openCode.SetOpenCodeSelectionReader(reader)
-	selected, err := openCode.ResolveSelectedRuntime(ctx)
+	selected, err := openCode.ResolveSelectedRuntimeWithReader(ctx, reader)
 	if err != nil {
 		return agents.CommandOptions{}, fmt.Errorf("resolve OpenCode runtime selection: %w", err)
 	}
@@ -1652,6 +1651,8 @@ func (m *Manager) promoteWorkspaceExecution(ctx context.Context, execution *Agen
 		if err != nil {
 			return nil, err
 		}
+		releaseOpenCodeAdmission := m.acquireOpenCodeLaunchAdmission(agentTypeName)
+		defer releaseOpenCodeAdmission()
 		agentConfig, ok := m.registry.Get(agentTypeName)
 		if !ok {
 			return nil, fmt.Errorf("agent type %q not found in registry", agentTypeName)
@@ -1723,6 +1724,8 @@ func (m *Manager) launchInternal(ctx context.Context, req *LaunchRequest) (*Agen
 	if err != nil {
 		return nil, err
 	}
+	releaseOpenCodeAdmission := m.acquireOpenCodeLaunchAdmission(agentTypeName)
+	defer releaseOpenCodeAdmission()
 
 	// 2. Get agent config from registry
 	agentConfig, ok := m.registry.Get(agentTypeName)

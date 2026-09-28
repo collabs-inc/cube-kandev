@@ -416,10 +416,19 @@ func TestOpenCodeMigrationCoalescesDuplicateActiveJobs(t *testing.T) {
 func TestOpenCodeMigrationPreviewAndEnqueueBindFamilyAndRevision(t *testing.T) {
 	selection := newMigrationTestState(&migrationEventLog{})
 	updater := &migrationJobUpdater{
-		selectionEvents: selection.events,
-		probeCaps:       hostutility.AgentCapabilities{Status: hostutility.StatusOK, AgentVersion: "2.0.18"},
-		refreshCaps:     hostutility.AgentCapabilities{Status: hostutility.StatusOK, AgentVersion: "2.0.18"},
+		selectionEvents:  selection.events,
+		probeCaps:        hostutility.AgentCapabilities{Status: hostutility.StatusOK, AgentVersion: "2.0.18"},
+		refreshCaps:      hostutility.AgentCapabilities{Status: hostutility.StatusOK, AgentVersion: "2.0.18"},
+		stageStarted:     make(chan struct{}),
+		allowStageFinish: make(chan struct{}),
 	}
+	defer func() {
+		select {
+		case <-updater.allowStageFinish:
+		default:
+			close(updater.allowStageFinish)
+		}
+	}()
 	provider := agents.NewOpenCodeACP()
 	ctrl := newTestController(map[string]agents.Agent{provider.ID(): provider})
 	ctrl.SetRuntimeUpdater(updater)
@@ -452,9 +461,15 @@ func TestOpenCodeMigrationPreviewAndEnqueueBindFamilyAndRevision(t *testing.T) {
 	if err != nil {
 		t.Fatalf("enqueue migration: %v", err)
 	}
+	select {
+	case <-updater.stageStarted:
+	case <-time.After(time.Second):
+		t.Fatal("migration did not enter staging")
+	}
 	if job.TargetFamily != "v2" || job.RuntimeRevision != 4 || !job.Migration {
 		t.Fatalf("queued migration job = %+v", job)
 	}
+	close(updater.allowStageFinish)
 	waitForUpdateStatus(t, hub.completed, job.JobID, dto.AgentUpdateJobStatusSucceeded)
 }
 

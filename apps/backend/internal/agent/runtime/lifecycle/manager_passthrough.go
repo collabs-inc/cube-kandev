@@ -974,8 +974,7 @@ func (m *Manager) openCodePassthroughCommand(
 	if !ok {
 		return agents.Command{}, nil
 	}
-	openCode.SetOpenCodeSelectionReader(reader)
-	selected, err := openCode.ResolveSelectedRuntime(ctx)
+	selected, err := openCode.ResolveSelectedRuntimeWithReader(ctx, reader)
 	if err != nil {
 		return agents.Command{}, fmt.Errorf("resolve OpenCode interactive runtime: %w", err)
 	}

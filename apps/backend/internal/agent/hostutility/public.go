@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"go.uber.org/zap"
@@ -309,14 +311,26 @@ func (m *Manager) ProbeIsolatedWithCommand(
 	if err != nil {
 		return AgentCapabilities{}, err
 	}
+	npmCache, err := hostNPMConfig(ctx, "cache")
+	if err != nil {
+		return AgentCapabilities{}, fmt.Errorf("resolve host npm cache for isolated OpenCode probe: %w", err)
+	}
+	npmUserConfig, err := hostNPMConfig(ctx, "userconfig")
+	if err != nil {
+		return AgentCapabilities{}, fmt.Errorf("resolve host npm user config for isolated OpenCode probe: %w", err)
+	}
 	paths := map[string]string{
-		"HOME":            filepath.Join(root, "home"),
-		"XDG_CONFIG_HOME": filepath.Join(root, "config"),
-		"XDG_DATA_HOME":   filepath.Join(root, "data"),
-		"XDG_CACHE_HOME":  filepath.Join(root, "cache"),
-		"XDG_STATE_HOME":  filepath.Join(root, "state"),
-		"OPENCODE_CONFIG": filepath.Join(root, "config", "opencode.json"),
-		"OPENCODE_DB":     filepath.Join(root, "data", "opencode", "opencode.db"),
+		"HOME":                  filepath.Join(root, "home"),
+		"XDG_CONFIG_HOME":       filepath.Join(root, "config"),
+		"XDG_DATA_HOME":         filepath.Join(root, "data"),
+		"XDG_CACHE_HOME":        filepath.Join(root, "cache"),
+		"XDG_STATE_HOME":        filepath.Join(root, "state"),
+		"OPENCODE_CONFIG":       filepath.Join(root, "config", "opencode.json"),
+		"OPENCODE_DB":           filepath.Join(root, "data", "opencode", "opencode.db"),
+		"NPM_CONFIG_CACHE":      npmCache,
+		"npm_config_cache":      npmCache,
+		"NPM_CONFIG_USERCONFIG": npmUserConfig,
+		"npm_config_userconfig": npmUserConfig,
 	}
 	for _, path := range []string{
 		paths["HOME"], paths["XDG_CONFIG_HOME"], paths["XDG_DATA_HOME"],
@@ -334,6 +348,19 @@ func (m *Manager) ProbeIsolatedWithCommand(
 		},
 	)
 	return caps, nil
+}
+
+func hostNPMConfig(ctx context.Context, key string) (string, error) {
+	command := exec.CommandContext(ctx, "npm", "config", "get", key)
+	output, err := command.Output()
+	if err != nil {
+		return "", err
+	}
+	value := strings.TrimSpace(string(output))
+	if value == "" || value == "undefined" {
+		return "", fmt.Errorf("npm returned an empty %s path", key)
+	}
+	return value, nil
 }
 
 // AcquireRuntimeMaintenance waits for any in-flight utility process for this

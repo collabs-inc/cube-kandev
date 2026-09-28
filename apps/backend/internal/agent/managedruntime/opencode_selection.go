@@ -9,6 +9,11 @@ import (
 
 const openCodeSelectionKey = "managed_runtime.opencode.selection"
 
+const (
+	OpenCodeV1Package = "opencode-ai"
+	OpenCodeV2Package = "@opencode/cli"
+)
+
 var (
 	ErrInvalidOpenCodeSelection          = errors.New("invalid OpenCode runtime selection")
 	ErrOpenCodeSelectionRevisionConflict = errors.New("OpenCode runtime selection revision conflict")
@@ -115,6 +120,10 @@ func (s *Store) BootstrapOpenCode(
 	if err := s.SaveOpenCodeSelection(ctx, 0, selection); err != nil {
 		return OpenCodeSelection{}, fmt.Errorf("save initial OpenCode runtime selection: %w", err)
 	}
+	selection, err = s.reconcileOpenCodeDefault(ctx, selection, defaults)
+	if err != nil {
+		return OpenCodeSelection{}, err
+	}
 	if err := s.cleanupLegacyOpenCodeSelection(ctx); err != nil {
 		return OpenCodeSelection{}, err
 	}
@@ -147,7 +156,7 @@ func (s *Store) SaveOpenCodeSelection(ctx context.Context, expectedRevision uint
 	if err != nil {
 		return err
 	}
-	if found && current.Revision != expectedRevision || !found && expectedRevision != 0 {
+	if (found && current.Revision != expectedRevision) || (!found && expectedRevision != 0) {
 		return ErrOpenCodeSelectionRevisionConflict
 	}
 	if selection.Revision != expectedRevision+1 {
@@ -173,6 +182,8 @@ func (s *Store) reconcileOpenCodeDefault(
 		return selection, nil
 	}
 	updated := selection
+	// A new reviewed default replaces an older imported default and clears its
+	// version override so the selected family follows the shipped runtime.
 	updated.SelectedVersion = ""
 	updated.AppliedDefaultVersion = currentDefault
 	updated.Revision++
@@ -222,7 +233,7 @@ func selectInitialOpenCodeRuntime(
 		if err := json.Unmarshal(legacySelection, &selection); err != nil {
 			return OpenCodeSelection{}, fmt.Errorf("%w: decode legacy selection: %v", ErrInvalidOpenCodeSelection, err)
 		}
-		if selection.Package != "opencode-ai" {
+		if selection.Package != OpenCodeV1Package {
 			return OpenCodeSelection{}, fmt.Errorf("%w: unsupported legacy package %q", ErrInvalidOpenCodeSelection, selection.Package)
 		}
 		if err := validateFamilyVersion(OpenCodeFamilyV1, selection.Version); err != nil {
@@ -230,20 +241,31 @@ func selectInitialOpenCodeRuntime(
 		}
 		result := newOpenCodeSelection(OpenCodeFamilyV1, OpenCodeSourceManaged, defaults.V1Version, defaults)
 		result.SelectedVersion = selection.Version
+		result.AppliedDefaultVersion = legacyOpenCodeAppliedDefault(legacyMarker, markerFound, defaults)
 		return result, nil
 	}
 	if markerFound {
-		version := defaults.V1Version
-		var marker appliedDefaultGeneration
-		if json.Unmarshal(legacyMarker, &marker) == nil && marker.Package == defaults.V1Package && validateFamilyVersion(OpenCodeFamilyV1, marker.Version) == nil {
-			version = marker.Version
-		}
-		return newOpenCodeSelection(OpenCodeFamilyV1, OpenCodeSourceManaged, version, defaults), nil
+		selection := newOpenCodeSelection(OpenCodeFamilyV1, OpenCodeSourceManaged, defaults.V1Version, defaults)
+		selection.AppliedDefaultVersion = legacyOpenCodeAppliedDefault(legacyMarker, markerFound, defaults)
+		return selection, nil
 	}
 	if evidence.PriorUse {
 		return newOpenCodeSelection(OpenCodeFamilyV1, OpenCodeSourceManaged, defaults.V1Version, defaults), nil
 	}
 	return newOpenCodeSelection(OpenCodeFamilyV2, OpenCodeSourceManaged, defaults.V2Version, defaults), nil
+}
+
+func legacyOpenCodeAppliedDefault(
+	legacyMarker []byte,
+	markerFound bool,
+	defaults OpenCodeRuntimeDefaults,
+) string {
+	var marker appliedDefaultGeneration
+	if markerFound && json.Unmarshal(legacyMarker, &marker) == nil &&
+		marker.Package == defaults.V1Package && validateFamilyVersion(OpenCodeFamilyV1, marker.Version) == nil {
+		return marker.Version
+	}
+	return defaults.V1Version
 }
 
 func newOpenCodeSelection(
@@ -267,7 +289,7 @@ func newOpenCodeSelection(
 }
 
 func validateOpenCodeDefaults(defaults OpenCodeRuntimeDefaults) error {
-	if defaults.V1Package != "opencode-ai" || defaults.V2Package != "@opencode/cli" {
+	if defaults.V1Package != OpenCodeV1Package || defaults.V2Package != OpenCodeV2Package {
 		return fmt.Errorf("%w: OpenCode packages must match the trusted family allowlist", ErrInvalidOpenCodeSelection)
 	}
 	if err := validateFamilyVersion(OpenCodeFamilyV1, defaults.V1Version); err != nil {
@@ -307,9 +329,9 @@ func validateOpenCodeSelection(selection OpenCodeSelection) error {
 func openCodePackageForFamily(family OpenCodeFamily) (string, bool) {
 	switch family {
 	case OpenCodeFamilyV1:
-		return "opencode-ai", true
+		return OpenCodeV1Package, true
 	case OpenCodeFamilyV2:
-		return "@opencode/cli", true
+		return OpenCodeV2Package, true
 	default:
 		return "", false
 	}

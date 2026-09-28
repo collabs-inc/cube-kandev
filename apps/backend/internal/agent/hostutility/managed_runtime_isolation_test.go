@@ -62,6 +62,10 @@ mkdir -p "$config_dir" "$data_dir" "$cache_dir" "$state_dir" "$(dirname "$config
   printf 'OPENCODE_CACHE_DIR=%s\n' "${OPENCODE_CACHE_DIR-unset}"
   printf 'OPENCODE_STATE_DIR=%s\n' "${OPENCODE_STATE_DIR-unset}"
   printf 'OPENCODE_CONFIG_CONTENT=%s\n' "${OPENCODE_CONFIG_CONTENT-unset}"
+  printf 'NPM_CONFIG_CACHE=%s\n' "${NPM_CONFIG_CACHE-unset}"
+  printf 'npm_config_cache=%s\n' "${npm_config_cache-unset}"
+  printf 'NPM_CONFIG_USERCONFIG=%s\n' "${NPM_CONFIG_USERCONFIG-unset}"
+  printf 'npm_config_userconfig=%s\n' "${npm_config_userconfig-unset}"
 } > "$state_dir/effective.env"
 printf 'candidate config write\n' >> "$config_file"
 printf 'candidate database write\n' >> "$db_file"
@@ -75,6 +79,11 @@ cat >/dev/null
 `
 	if err := os.WriteFile(commandPath, []byte(command), 0o755); err != nil {
 		t.Fatalf("write OpenCode fixture: %v", err)
+	}
+	npmPath := filepath.Join(binDir, "npm")
+	npm := "#!/bin/sh\ncase \"$3\" in\n  cache) printf '%s\\n' '" + filepath.Join(outside, "npm-cache") + "' ;;\n  userconfig) printf '%s\\n' '" + filepath.Join(outside, "npmrc") + "' ;;\n  *) exit 2 ;;\nesac\n"
+	if err := os.WriteFile(npmPath, []byte(npm), 0o755); err != nil {
+		t.Fatalf("write npm config fixture: %v", err)
 	}
 	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 	userPaths := map[string]string{
@@ -90,6 +99,10 @@ cat >/dev/null
 		"OPENCODE_CACHE_DIR":      filepath.Join(outside, "cache-dir"),
 		"OPENCODE_STATE_DIR":      filepath.Join(outside, "state-dir"),
 		"OPENCODE_CONFIG_CONTENT": `{"provider":{"sentinel":"user"}}`,
+		"NPM_CONFIG_CACHE":        filepath.Join(outside, "inherited-npm-cache"),
+		"npm_config_cache":        filepath.Join(outside, "inherited-lower-npm-cache"),
+		"NPM_CONFIG_USERCONFIG":   filepath.Join(outside, "inherited-npmrc"),
+		"npm_config_userconfig":   filepath.Join(outside, "inherited-lower-npmrc"),
 	}
 	for key, value := range userPaths {
 		t.Setenv(key, value)
@@ -151,6 +164,10 @@ cat >/dev/null
 		"OPENCODE_CACHE_DIR":      "unset",
 		"OPENCODE_STATE_DIR":      "unset",
 		"OPENCODE_CONFIG_CONTENT": "unset",
+		"NPM_CONFIG_CACHE":        filepath.Join(outside, "npm-cache"),
+		"npm_config_cache":        filepath.Join(outside, "npm-cache"),
+		"NPM_CONFIG_USERCONFIG":   filepath.Join(outside, "npmrc"),
+		"npm_config_userconfig":   filepath.Join(outside, "npmrc"),
 	}
 	for key, value := range want {
 		if got[key] != value {

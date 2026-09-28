@@ -210,6 +210,47 @@ func TestOpenCodeFilesystemEvidenceUsesOnlyConfigurationAndSessionDatabase(t *te
 	}
 }
 
+func TestCollectOpenCodeBootstrapEvidenceTreatsNativeDetectionFailuresAsPriorUse(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+	}{
+		{name: "unsupported version", err: errors.New("native OpenCode major 3 is not supported")},
+		{name: "detector failure", err: errors.New("native OpenCode executable failed")},
+		{name: "detector timeout", err: context.DeadlineExceeded},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			evidence, err := collectOpenCodeBootstrapEvidence(
+				context.Background(), nil, nil, t.TempDir(), "",
+				func(context.Context) (agents.OpenCodeNativeRuntime, bool, error) {
+					return agents.OpenCodeNativeRuntime{}, true, tt.err
+				},
+			)
+			if err != nil {
+				t.Fatalf("collect evidence: %v", err)
+			}
+			if !evidence.PriorUse || evidence.NativeFamily != "" {
+				t.Fatalf("evidence = %+v, want prior use without a guessed native family", evidence)
+			}
+		})
+	}
+}
+
+func TestCollectOpenCodeBootstrapEvidencePropagatesCallerCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := collectOpenCodeBootstrapEvidence(
+		ctx, nil, nil, t.TempDir(), "",
+		func(ctx context.Context) (agents.OpenCodeNativeRuntime, bool, error) {
+			return agents.OpenCodeNativeRuntime{}, false, ctx.Err()
+		},
+	)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("collect evidence error = %v, want caller cancellation", err)
+	}
+}
+
 func TestOpenCodeBootstrapDoesNotInspectNativeCLIWhenSelectionExists(t *testing.T) {
 	defaults, err := openCodeRuntimeDefaults()
 	if err != nil {
@@ -241,8 +282,11 @@ func TestOpenCodeBootstrapDoesNotInspectNativeCLIWhenSelectionExists(t *testing.
 			if err := store.SaveOpenCodeSelection(context.Background(), 0, selection); err != nil {
 				t.Fatalf("save persisted selection: %v", err)
 			}
+			detectionMarker := filepath.Join(t.TempDir(), "native-detection-called")
+			t.Setenv("OPENCODE_DETECTION_MARKER", detectionMarker)
 			binDir := t.TempDir()
-			if err := os.WriteFile(filepath.Join(binDir, "opencode"), []byte(tc.script), 0o755); err != nil {
+			script := "#!/bin/sh\n: > \"$OPENCODE_DETECTION_MARKER\"\n" + tc.script
+			if err := os.WriteFile(filepath.Join(binDir, "opencode"), []byte(script), 0o755); err != nil {
 				t.Fatalf("write native OpenCode fixture: %v", err)
 			}
 			t.Setenv("PATH", binDir)
@@ -253,6 +297,9 @@ func TestOpenCodeBootstrapDoesNotInspectNativeCLIWhenSelectionExists(t *testing.
 			got, found, err := store.GetOpenCodeSelection(context.Background())
 			if err != nil || !found || got != selection {
 				t.Fatalf("persisted selection after bootstrap = %+v, found=%t err=%v", got, found, err)
+			}
+			if _, err := os.Stat(detectionMarker); !errors.Is(err, os.ErrNotExist) {
+				t.Fatalf("native CLI detector was called for persisted selection; marker stat error = %v", err)
 			}
 		})
 	}

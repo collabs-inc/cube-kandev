@@ -117,9 +117,13 @@ func collectOpenCodeBootstrapEvidence(
 	if detectNative != nil {
 		native, found, err := detectNative(ctx)
 		if err != nil {
-			return evidence, fmt.Errorf("detect native OpenCode runtime: %w", err)
-		}
-		if found {
+			if ctx.Err() != nil {
+				return evidence, ctx.Err()
+			}
+			// A broken native CLI is evidence of prior use, but it cannot safely
+			// select a native family. Keep the established v1 fallback.
+			evidence.PriorUse = true
+		} else if found {
 			evidence.NativeFamily = native.Family
 		}
 	}

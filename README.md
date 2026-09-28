@@ -93,7 +93,7 @@ Connect Kandev to GitHub, GitLab, Jira, Linear, Sentry, and Azure DevOps to pull
 |   **Gemini CLI**   |                                                                                                                 `@google/gemini-cli`                                                                                                                 |
 |      **Amp**       |                                                                                                                      `amp-acp`                                                                                                                       |
 |     **Auggie**     |                                                                                                                `@augmentcode/auggie`                                                                                                                 |
-|    **OpenCode**    |                                                                                                                    `opencode-ai`                                                                                                                     |
+|    **OpenCode**    |                                                                                  v2: `@opencode/cli`; existing v1: `opencode-ai`                                                                                  |
 |     **Cursor**     |                                                                                                        `cursor-agent` _(requires Cursor Pro)_                                                                                                        |
 |     **Devin**      |                                                                                       `devin` _(install Devin CLI from Devin Desktop or standalone installer)_                                                                                       |
 |      **Qwen**      |                                                                                                                `@qwen-code/qwen-code`                                                                                                                |
@@ -112,12 +112,16 @@ Connect Kandev to GitHub, GitLab, Jira, Linear, Sentry, and Azure DevOps to pull
 
 > All agents communicate via [ACP](https://agentclientprotocol.com) (Agent Client Protocol). Some agents support ACP natively, while others use ACP adapter packages that bridge their native protocols. **CLI Passthrough mode** is available when an integration provides a passthrough command. If your agent isn't supported yet, open an issue or submit a PR with the integration. See [Adding a New Agent CLI](docs/public/add-agent-cli.md) for a step-by-step guide.
 
-Kandev does not pin the managed npm runtimes for Claude, Codex, OpenCode,
-Copilot, or Gemini. Normal launches can reuse npm's best-effort execution
+Kandev does not pin the managed npm runtimes for Claude, Codex, Copilot, or
+Gemini. Normal launches can reuse npm's best-effort execution
 cache. To deliberately fetch an upstream release, use **Update agent** in
 **Settings > Agents**; Kandev updates the host runtime and refreshes its
 advertised models and modes for future sessions without restarting active
 sessions. See [Agents and Profiles](docs/public/agents-and-profiles.md#update-a-managed-agent-runtime).
+
+Fresh OpenCode installs use managed v2 (`@opencode/cli`). Existing v1
+selections remain on `opencode-ai` until you choose the explicit migration
+action. Kandev leaves a separately installed `opencode` CLI unchanged.
 
 ### Bring your own TUI agents
 

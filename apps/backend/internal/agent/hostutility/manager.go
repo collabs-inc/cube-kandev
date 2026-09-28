@@ -728,8 +728,7 @@ func (m *Manager) recoverManagedRuntimeProbe(
 	spec := managed.ManagedNPMRuntime()
 	if openCode, ok := ia.(*agents.OpenCodeACP); ok {
 		if reader, hasSelection := m.managedRuntimeSelections.(managedruntime.OpenCodeSelectionReader); hasSelection {
-			openCode.SetOpenCodeSelectionReader(reader)
-			selected, err := openCode.ResolveSelectedRuntime(ctx)
+			selected, err := openCode.ResolveSelectedRuntimeWithReader(ctx, reader)
 			if err != nil {
 				m.log.Warn("could not resolve selected OpenCode runtime for probe recovery", zap.Error(err))
 				return initial
@@ -909,8 +908,7 @@ func (m *Manager) resolveOpenCodeInferenceCommand(
 	openCode *agents.OpenCodeACP,
 	reader managedruntime.OpenCodeSelectionReader,
 ) (agents.Command, error) {
-	openCode.SetOpenCodeSelectionReader(reader)
-	selection, err := openCode.ResolveSelectedRuntime(ctx)
+	selection, err := openCode.ResolveSelectedRuntimeWithReader(ctx, reader)
 	if err != nil {
 		return agents.Command{}, fmt.Errorf("resolve OpenCode runtime selection: %w", err)
 	}

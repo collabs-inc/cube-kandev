@@ -195,8 +195,8 @@ The completed `managed-runtime-default-activation` package records the original 
 The `managed-runtime-recovery` package records exact candidate activation and responsive version selection.
 Their historical results remain unchanged. This package owns the OpenCode exception and updates the living
 requirements/designs and existing shared tests rather than rewriting completed work-order results.
-Public docs currently describe global native OpenCode updates and passthrough exclusion; task 03 must replace
-those statements with the new scoped rules before release.
+Public docs describe managed v2 for fresh OpenCode installs, retained v1 selections, the explicit migration
+action, and the unchanged standalone CLI.
 
 ## Verification results
 
@@ -217,6 +217,7 @@ Review follow-up verification on 2026-09-28:
 - `go build ./...` passed from `apps/backend` with task-owned `TMPDIR` and `GOTMPDIR`.
 - Race tests passed for `internal/agent/hostutility`, `internal/agent/managedruntime`, `internal/agent/settings/controller`, `internal/backendapp` OpenCode/default-startup tests, `internal/agentctl/server/utility` probe tests, and OpenCode tests in `internal/agent/agents`.
 - The full `internal/agent/agents` race suite is not green in this environment because the three unrelated installer tests write to the full shared `/tmp` filesystem. No broader claim is made for that package.
+- The targeted host-utility and mobile browser tests passed. Docker/SSH managed-runtime recovery was not verified locally: the container run encountered `ENOSPC` in the shared `/tmp` and an `runc` temp-file failure, so CI on the pushed head is the verification source for those cases.
 - `git diff --check` passed.
 
 Initial design-package validation on 2026-09-27:
@@ -230,7 +231,7 @@ Initial design-package validation on 2026-09-27:
 - `git diff --check -- docs/plans/opencode-v2-adoption docs/specs docs/decisions`: passed.
 - `git status --short -- docs/plans/opencode-v2-adoption`: confirmed the new untracked package.
 
-The plan package and implementation changes remain unstaged and uncommitted.
+The implementation and review fixes are tracked in PR #4014; public README guidance and these verification limits are recorded with the work orders.
 
 ## Risks
 

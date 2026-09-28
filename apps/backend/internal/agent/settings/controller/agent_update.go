@@ -13,10 +13,13 @@ import (
 	"sync"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/kandev/kandev/internal/agent/agents"
 	"github.com/kandev/kandev/internal/agent/hostutility"
 	"github.com/kandev/kandev/internal/agent/managedruntime"
 	"github.com/kandev/kandev/internal/agent/settings/dto"
+	commonlogger "github.com/kandev/kandev/internal/common/logger"
 )
 
 var (
@@ -250,7 +253,7 @@ func (c *Controller) managedRuntimeState(
 		return agents.ManagedNPMRuntimeSpec{}, "", "", 0, "", false, err
 	}
 	active := selection.SelectedVersion
-	if selection.Source == managedruntime.OpenCodeSourceNative {
+	if selection.Source == managedruntime.OpenCodeSourceNative && c.runtimeUpdater != nil {
 		if caps, ok := c.runtimeUpdater.CurrentCapabilities(name); ok {
 			active = caps.AgentVersion
 		}
@@ -428,6 +431,20 @@ func (c *Controller) InvalidateExecutionCacheVersion(ctx context.Context, packag
 type hostRuntimeUpdater struct {
 	host     *hostutility.Manager
 	executor directCommandExecutor
+	logger   *commonlogger.Logger
+}
+
+func isolatedProbeCleanupResult(probeErr, cleanupErr error, warn func(error)) error {
+	if cleanupErr == nil {
+		return probeErr
+	}
+	if probeErr == nil {
+		if warn != nil {
+			warn(cleanupErr)
+		}
+		return nil
+	}
+	return errors.Join(probeErr, fmt.Errorf("remove isolated OpenCode probe: %w", cleanupErr))
 }
 
 type directCommandExecutor interface {
@@ -617,9 +634,11 @@ func (u *hostRuntimeUpdater) ProbeIsolated(
 		return hostutility.AgentCapabilities{}, fmt.Errorf("create isolated OpenCode probe: %w", err)
 	}
 	defer func() {
-		if cleanupErr := os.RemoveAll(root); cleanupErr != nil {
-			err = errors.Join(err, fmt.Errorf("remove isolated OpenCode probe: %w", cleanupErr))
-		}
+		err = isolatedProbeCleanupResult(err, os.RemoveAll(root), func(cleanupErr error) {
+			if u.logger != nil {
+				u.logger.Warn("could not remove isolated OpenCode probe directory", zap.Error(cleanupErr))
+			}
+		})
 	}()
 	return u.host.ProbeIsolatedWithCommand(ctx, agentName, command, root)
 }

@@ -149,9 +149,12 @@ Implemented family/revision-aware previews and migration jobs, serialized launch
 
 ## Review follow-up (2026-09-28)
 
-Moved OpenCode utility command resolution inside the shared operation lease for profile prompts, ordinary prompts, capability refreshes, and model-configuration probes. Migration clears capability and model-config caches after saving the v2 selection and before releasing exclusive utility admission. Native-source update and repair jobs now keep the source-native selection unchanged and report the probed installed version.
+Moved OpenCode utility command resolution inside the shared operation lease for profile prompts, ordinary prompts, capability refreshes, and model-configuration probes. Migration clears capability and model-config caches after saving the v2 selection and before releasing exclusive utility admission. Native-source update, repair, and Use Kandev default jobs keep the source-native selection valid and report the probed installed version. The isolated migration probe keeps its HOME, XDG, and OpenCode config/database overrides after subprocess sanitization and strips inherited OpenCode directory/content overrides.
 
 - `go test -race ./internal/agent/hostutility -count=1`: passed, including subprocess environment isolation, all four utility request paths, and both utility-first and migration-first admission orderings.
 - `go test -race ./internal/agent/settings/controller -count=1`: passed, including SQLite-backed install/update regressions and migration activation ordering.
 - `go test -race ./internal/agentctl/server/utility -run TestProbe -count=1`: passed.
+- `go test -race ./internal/agent/runtime/lifecycle -run 'OpenCode|ManagedRuntime' -count=1`: passed, including deterministic utility-versus-migration admission orderings.
+- The subprocess-boundary isolation regression verified effective HOME/XDG/OpenCode paths, ignored inherited OpenCode overrides, preserved npm cache/userconfig, and unchanged sentinel user config/database files.
+- Local Docker/SSH recovery E2E remains unverified because the shared `/tmp` filesystem was full and the container runtime could not create a temporary runc process file; the existing CI run for the prior PR head is not treated as evidence for the fixes.
 - `git diff --check`: passed.

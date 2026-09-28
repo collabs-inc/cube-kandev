@@ -16,21 +16,30 @@ var (
 // authoritative runtime-selection write. It refuses active host work and any
 // remaining tracked OpenCode execution, including executions on remote hosts.
 func (m *Manager) AcquireOpenCodeMigration(ctx context.Context) (context.Context, func(), error) {
-	m.activityMu.Lock()
-	coordinator := m.activityCoordinator
-	m.activityMu.Unlock()
-	if coordinator == nil {
+	if m == nil || m.executionStore == nil {
 		return nil, nil, ErrOpenCodeMigrationUnavailable
 	}
-	lease, _, err := coordinator.TryAcquireExclusiveMaintenance(ctx)
-	if err != nil {
+	if err := ctx.Err(); err != nil {
+		return nil, nil, err
+	}
+	m.openCodeAdmission.Lock()
+	if err := ctx.Err(); err != nil {
+		m.openCodeAdmission.Unlock()
 		return nil, nil, err
 	}
 	for _, execution := range m.executionStore.List() {
 		if execution.AgentID == agents.OpenCodeACPAgentID {
-			lease.Release()
+			m.openCodeAdmission.Unlock()
 			return nil, nil, ErrOpenCodeExecutionActive
 		}
 	}
-	return lease.Context(), lease.Release, nil
+	return ctx, m.openCodeAdmission.Unlock, nil
+}
+
+func (m *Manager) acquireOpenCodeLaunchAdmission(agentType string) func() {
+	if agentType != agents.OpenCodeACPAgentID {
+		return func() {}
+	}
+	m.openCodeAdmission.RLock()
+	return m.openCodeAdmission.RUnlock
 }

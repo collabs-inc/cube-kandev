@@ -281,6 +281,7 @@ func (c *Controller) SetHostUtility(h *hostutility.Manager) {
 	c.SetRuntimeUpdater(&hostRuntimeUpdater{
 		host:     h,
 		executor: execDirectCommandExecutor{},
+		logger:   c.logger,
 	})
 }
 

@@ -60,6 +60,9 @@ func TestBootstrapOpenCodeImportsLegacySelectionBeforeMarkerAndCleansItAfterSave
 	if selection.Family != OpenCodeFamilyV1 || selection.Source != OpenCodeSourceManaged || selection.SelectedVersion != "1.18.5" {
 		t.Fatalf("imported selection = %+v, want managed v1@1.18.5", selection)
 	}
+	if selection.AppliedDefaultVersion != "1.18.32" || selection.Revision != 1 || selection.SelectedVersion != "1.18.5" {
+		t.Fatalf("imported current default = %+v, want the valid selection and marker at revision 1", selection)
+	}
 	if _, found := settings.values[selectionKey("opencode-acp")]; found {
 		t.Fatal("legacy active selection remains after authoritative save")
 	}
@@ -102,8 +105,8 @@ func TestBootstrapOpenCodeMarkerAndPriorUseKeepV1(t *testing.T) {
 			if selection.Family != OpenCodeFamilyV1 || selection.Source != OpenCodeSourceManaged {
 				t.Fatalf("selection = %+v, want managed v1", selection)
 			}
-			if tt.name == "old generation marker" && selection.AppliedDefaultVersion != "1.18.18" {
-				t.Fatalf("applied default = %q, want valid legacy marker version", selection.AppliedDefaultVersion)
+			if tt.name == "old generation marker" && (selection.AppliedDefaultVersion != "1.18.32" || selection.Revision != 2) {
+				t.Fatalf("reconciled selection = %+v, want current v1 default at revision 2", selection)
 			}
 		})
 	}

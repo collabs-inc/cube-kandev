@@ -44,8 +44,8 @@ var stableVersionPattern = regexp.MustCompile(
 )
 
 var openCodePackageMajors = map[string]uint64{
-	"opencode-ai":   1,
-	"@opencode/cli": 2,
+	OpenCodeV1Package: 1,
+	OpenCodeV2Package: 2,
 }
 
 // ParseStableVersion accepts only strict, prerelease-free SemVer values.

@@ -203,6 +203,7 @@ test.describe("managed agent runtime updates on mobile", () => {
     testPage,
     prCapture,
   }) => {
+    await testPage.setViewportSize({ width: 390, height: 600 });
     const runtime = await installRuntimeUpdateFixture(testPage, {
       agentName: "opencode-acp",
       displayName: "OpenCode",

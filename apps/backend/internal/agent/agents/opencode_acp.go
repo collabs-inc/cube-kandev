@@ -24,7 +24,7 @@ var opencodeACPLogoLight []byte
 //go:embed logos/opencode_dark.svg
 var opencodeACPLogoDark []byte
 
-const opencodeACPPackage = "opencode-ai"
+const opencodeACPPackage = managedruntime.OpenCodeV1Package
 
 // OpenCodeACPAgentID is the registry identifier for OpenCode's ACP provider.
 const OpenCodeACPAgentID = "opencode-acp"
@@ -72,10 +72,17 @@ func (a *OpenCodeACP) SetOpenCodeSelectionReader(reader managedruntime.OpenCodeS
 }
 
 func (a *OpenCodeACP) ResolveSelectedRuntime(ctx context.Context) (OpenCodeRuntimeResolution, error) {
-	if a.selectionReader == nil {
+	return a.ResolveSelectedRuntimeWithReader(ctx, a.selectionReader)
+}
+
+func (a *OpenCodeACP) ResolveSelectedRuntimeWithReader(
+	ctx context.Context,
+	reader managedruntime.OpenCodeSelectionReader,
+) (OpenCodeRuntimeResolution, error) {
+	if reader == nil {
 		return OpenCodeRuntimeResolution{}, errors.New("OpenCode runtime selection is unavailable")
 	}
-	selection, found, err := a.selectionReader.GetOpenCodeSelection(ctx)
+	selection, found, err := reader.GetOpenCodeSelection(ctx)
 	if err != nil {
 		return OpenCodeRuntimeResolution{}, fmt.Errorf("read OpenCode runtime selection: %w", err)
 	}
@@ -312,7 +319,7 @@ func (a *OpenCodeACP) ManagedNPMRuntimeForFamily(family managedruntime.OpenCodeF
 	case managedruntime.OpenCodeFamilyV1:
 		packageName = opencodeACPPackage
 	case managedruntime.OpenCodeFamilyV2:
-		packageName = "@opencode/cli"
+		packageName = managedruntime.OpenCodeV2Package
 		args[len(args)-1] = "error"
 	default:
 		return ManagedNPMRuntimeSpec{}, fmt.Errorf("unsupported OpenCode runtime family %q", family)

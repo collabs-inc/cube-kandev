@@ -427,7 +427,7 @@ func (s *AgentUpdateJobStore) validateOpenCodeMigration(
 	if !found || selection.Revision != job.ExpectedRevision || selection.Family != managedruntime.OpenCodeFamilyV1 {
 		return managedruntime.OpenCodeSelection{}, nil, managedruntime.ErrOpenCodeSelectionRevisionConflict
 	}
-	if spec.Package != "@opencode/cli" || job.TargetFamily != managedruntime.OpenCodeFamilyV2 {
+	if spec.Package != managedruntime.OpenCodeV2Package || job.TargetFamily != managedruntime.OpenCodeFamilyV2 {
 		return managedruntime.OpenCodeSelection{}, nil, errors.New("unsupported OpenCode migration target")
 	}
 	if err := ctx.Err(); err != nil {
@@ -593,7 +593,9 @@ func (s *AgentUpdateJobStore) persistOpenCodeRuntimeSelection(
 		return fmt.Errorf("read OpenCode runtime selection before activation: %w", err)
 	}
 	if selection.Source == managedruntime.OpenCodeSourceNative {
+		s.mu.Lock()
 		job.RuntimeRevision = selection.Revision
+		s.mu.Unlock()
 		return nil
 	}
 	expectedRevision := selection.Revision
@@ -607,12 +609,14 @@ func (s *AgentUpdateJobStore) persistOpenCodeRuntimeSelection(
 	if err := s.openCodeSelections.SaveOpenCodeSelection(ctx, expectedRevision, selection); err != nil {
 		return fmt.Errorf("persist OpenCode runtime selection: %w", err)
 	}
+	s.mu.Lock()
 	job.RuntimeRevision = selection.Revision
+	s.mu.Unlock()
 	return nil
 }
 
 func isOpenCodeRuntimePackage(packageName string) bool {
-	return packageName == "opencode-ai" || packageName == "@opencode/cli"
+	return packageName == managedruntime.OpenCodeV1Package || packageName == managedruntime.OpenCodeV2Package
 }
 
 func (s *AgentUpdateJobStore) resolveTarget(
@@ -745,7 +749,7 @@ func (s *AgentUpdateJobStore) useNativeRuntime(
 	ctx context.Context,
 	spec agents.ManagedNPMRuntimeSpec,
 ) (bool, error) {
-	if s.openCodeSelectionReader == nil || (spec.Package != "opencode-ai" && spec.Package != "@opencode/cli") {
+	if s.openCodeSelectionReader == nil || (spec.Package != managedruntime.OpenCodeV1Package && spec.Package != managedruntime.OpenCodeV2Package) {
 		return spec.NativeBinaryOnPath(), nil
 	}
 	selection, found, err := s.openCodeSelectionReader.GetOpenCodeSelection(ctx)

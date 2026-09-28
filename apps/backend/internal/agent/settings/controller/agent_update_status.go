@@ -264,19 +264,57 @@ func (c *Controller) resolveRuntimeUpdateLatest(ctx context.Context, packageName
 	resolver := c.runtimeUpdateStatusResolver
 	c.runtimeUpdateStatusMu.Unlock()
 	if resolver != nil {
-		return validateRuntimeUpdateLatest(resolver(ctx, packageName))
+		latest, err := validateRuntimeUpdateLatest(resolver(ctx, packageName))
+		if err != nil {
+			return "", err
+		}
+		if expectedMajor, restricted := managedruntime.ExpectedMajorForPackage(packageName); restricted {
+			parsed, parseErr := managedruntime.ParseStableVersion(latest)
+			if parseErr == nil && parsed.Major() != expectedMajor {
+				return c.resolveOpenCodeLatestFromCatalogue(ctx, packageName)
+			}
+		}
+		return latest, nil
 	}
 	if c.runtimeUpdater == nil {
 		return "", errors.New("runtime updater unavailable")
 	}
-	if metadataResolver, ok := c.runtimeUpdater.(RuntimeVersionResolver); ok {
-		metadata, err := metadataResolver.ResolveVersions(ctx, packageName)
-		if err != nil {
-			return "", err
-		}
-		return validateRuntimeUpdateLatest(metadata.Latest, nil)
+	if _, ok := c.runtimeUpdater.(RuntimeVersionResolver); ok {
+		return c.resolveOpenCodeLatestFromCatalogue(ctx, packageName)
 	}
-	return validateRuntimeUpdateLatest(c.runtimeUpdater.ResolveTarget(ctx, packageName))
+	latest, err := validateRuntimeUpdateLatest(c.runtimeUpdater.ResolveTarget(ctx, packageName))
+	if err != nil {
+		return "", err
+	}
+	if expectedMajor, restricted := managedruntime.ExpectedMajorForPackage(packageName); restricted {
+		parsed, parseErr := managedruntime.ParseStableVersion(latest)
+		if parseErr == nil && parsed.Major() != expectedMajor {
+			return "", fmt.Errorf("OpenCode package %s has no version in its selected family", packageName)
+		}
+	}
+	return latest, nil
+}
+
+func (c *Controller) resolveOpenCodeLatestFromCatalogue(
+	ctx context.Context,
+	packageName string,
+) (string, error) {
+	if c.runtimeUpdater == nil {
+		return "", fmt.Errorf("version catalogue unavailable for OpenCode package %s", packageName)
+	}
+	versionResolver, ok := c.runtimeUpdater.(RuntimeVersionResolver)
+	if !ok {
+		return "", fmt.Errorf("version catalogue unavailable for OpenCode package %s", packageName)
+	}
+	metadata, err := versionResolver.ResolveVersions(ctx, packageName)
+	if err != nil {
+		return "", err
+	}
+	catalogue, err := managedruntime.BuildCatalogueForPackage(packageName, metadata.Versions, metadata.Latest)
+	if err != nil {
+		return "", err
+	}
+	return catalogue.Latest, nil
 }
 
 func validateRuntimeUpdateLatest(latest string, err error) (string, error) {

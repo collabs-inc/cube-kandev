@@ -55,6 +55,38 @@ describe("useAgentUpdateDialogState family migration", () => {
 
     expect(onUpdate).toHaveBeenCalledWith(AGENT_NAME, "2.0.18", false, "v2", 12);
   });
+
+  it("does not submit a family migration without the matching revision", async () => {
+    const migrationPreview: AgentUpdatePreview = {
+      ...FIRST_PREVIEW,
+      family: "v1",
+      source: "managed",
+      target_family: "v2",
+      migration_available: true,
+      target_version: "2.0.18",
+      operation: "migrate",
+    };
+    const onUpdate = vi.fn().mockResolvedValue({ job_id: "migration-1" } as AgentUpdateJob);
+    const { result } = renderHook(() =>
+      useAgentUpdateDialogState({
+        agentName: AGENT_NAME,
+        onPreview: vi.fn().mockResolvedValue(migrationPreview),
+        onUpdate,
+      }),
+    );
+
+    await act(async () => {
+      result.current.selectMigration();
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(result.current.preview).toEqual(migrationPreview));
+    await act(async () => {
+      await result.current.approve();
+    });
+
+    expect(onUpdate).not.toHaveBeenCalled();
+    expect(result.current.approveError).toBeTruthy();
+  });
 });
 
 describe("useAgentUpdateDialogState request races and failures", () => {
@@ -212,6 +244,44 @@ describe("useAgentUpdateDialogState target selection", () => {
       await selectedTargetPreview.promise;
     });
     await waitFor(() => expect(result.current.preview?.target_version).toBe("0.61.0"));
+  });
+
+  it("clears an old preview when a family change is loading or fails", async () => {
+    const migrationRequest = deferred<AgentUpdatePreview>();
+    const onPreview = vi
+      .fn<
+        (
+          agentName: string,
+          targetVersion?: string,
+          useDefault?: boolean,
+          targetFamily?: "v2",
+        ) => Promise<AgentUpdatePreview>
+      >()
+      .mockResolvedValueOnce(FIRST_PREVIEW)
+      .mockReturnValueOnce(migrationRequest.promise);
+    const { result } = renderHook(() =>
+      useAgentUpdateDialogState({
+        agentName: AGENT_NAME,
+        onPreview,
+        onUpdate: vi.fn(),
+      }),
+    );
+
+    await act(async () => {
+      await result.current.loadPreview();
+    });
+    expect(result.current.preview).toEqual(FIRST_PREVIEW);
+
+    act(() => result.current.selectMigration());
+    expect(result.current.preview).toBeNull();
+    expect(result.current.loading).toBe(true);
+    await act(async () => {
+      migrationRequest.reject(new Error("preview failed"));
+      await migrationRequest.promise.catch(() => undefined);
+    });
+
+    expect(result.current.preview).toBeNull();
+    expect(result.current.previewError).toBe("preview failed");
   });
 
   it("refreshes a selected target and ignores an older target response", async () => {
