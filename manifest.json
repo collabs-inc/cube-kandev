@@ -1,0 +1,21 @@
+{
+  "generated_at": "2026-09-28T17:20:50.574Z",
+  "assets": [
+    {
+      "name": "same-task-agent-message-desktop",
+      "type": "screenshot",
+      "format": "png",
+      "file": "agent-message-attribution--same-task-agent-message-desktop.png",
+      "test": "agent-message-attribution.spec.ts",
+      "caption": "Desktop queue row: the sender chip opens the full session and task context."
+    },
+    {
+      "name": "same-task-agent-message-phone",
+      "type": "screenshot",
+      "format": "png",
+      "file": "mobile-agent-message-attribution--same-task-agent-message-phone.png",
+      "test": "mobile-agent-message-attribution.spec.ts",
+      "caption": "Phone queue row: tapping the sender chip reveals its full session and task context."
+    }
+  ]
+}
