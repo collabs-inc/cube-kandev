@@ -63,9 +63,8 @@ documentation preflight accepted this work order. The race-enabled backend
 check first failed once in the unrelated task-service test
 `TestArchiveUnarchiveResumeReactivatesLocalOnlyBranch`; that test passed in 20
 local repetitions and the failed-only CI rerun passed. Current-head PR checks
-are terminal with 54 passed, 16 skipped, 1 neutral, 0 failed, and 0 pending.
-The review-thread list is empty. PR #4010 remains open against `main` at head
-`9d2574ad8fb03abd8eb3731f429f993d737c578e`.
+and review are terminal and clean, with no unresolved threads. PR #4010 remains
+open against `main` for parent integration review.
 
 ## Risks
 

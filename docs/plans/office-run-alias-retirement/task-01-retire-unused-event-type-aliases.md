@@ -93,8 +93,6 @@ check this boundary.
 - The race-enabled backend check first failed once in the unrelated task-service
   test `TestArchiveUnarchiveResumeReactivatesLocalOnlyBranch`; that test passed
   in 20 local repetitions and the failed-only CI rerun passed.
-- Current-head PR checks are terminal with 54 passed, 16 skipped, 1 neutral,
-  0 failed, and 0 pending. `scripts/pr-resolve list 4010` reported no unresolved
-  review threads.
-- PR #4010 is open against `main` at head
-  `9d2574ad8fb03abd8eb3731f429f993d737c578e`.
+- Current-head PR checks and review are terminal and clean, with no unresolved
+  threads.
+- PR #4010 is open against `main` for parent integration review.
