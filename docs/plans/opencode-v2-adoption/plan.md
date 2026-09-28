@@ -217,7 +217,9 @@ Review follow-up verification on 2026-09-28:
 - `go build ./...` passed from `apps/backend` with task-owned `TMPDIR` and `GOTMPDIR`.
 - Race tests passed for `internal/agent/hostutility`, `internal/agent/managedruntime`, `internal/agent/settings/controller`, `internal/backendapp` OpenCode/default-startup tests, `internal/agentctl/server/utility` probe tests, and OpenCode tests in `internal/agent/agents`.
 - The full `internal/agent/agents` race suite is not green in this environment because the three unrelated installer tests write to the full shared `/tmp` filesystem. No broader claim is made for that package.
-- The targeted host-utility and mobile browser tests passed. Docker/SSH managed-runtime recovery was not verified locally: the container run encountered `ENOSPC` in the shared `/tmp` and an `runc` temp-file failure, so CI on the pushed head is the verification source for those cases.
+- The targeted host-utility and mobile browser tests passed. Docker/SSH managed-runtime recovery was not verified locally: the container run encountered `ENOSPC` in the shared `/tmp` and an `runc` temp-file failure. All six container shards passed in the PR CI run after the review fixes.
+- The first exact-head PR E2E run failed an unrelated queue-reorder keyboard-focus test in Shard 4. The focused local run also showed fixture flakiness, failing its first attempt during setup and passing on retry. Rerunning the failed CI jobs passed the shard and both aggregate reports; the final snapshot had 60 passed, zero failed, and zero pending checks.
+- The verification-record update passed `node scripts/validate-public-docs.mjs` (47 pages) and `TMPDIR=/root/.cache/kandev-go-tmp node --test scripts/validate-public-docs.test.mjs` (62/62).
 - `git diff --check` passed.
 
 Initial design-package validation on 2026-09-27:

@@ -156,5 +156,7 @@ Moved OpenCode utility command resolution inside the shared operation lease for 
 - `go test -race ./internal/agentctl/server/utility -run TestProbe -count=1`: passed.
 - `go test -race ./internal/agent/runtime/lifecycle -run 'OpenCode|ManagedRuntime' -count=1`: passed, including deterministic utility-versus-migration admission orderings.
 - The subprocess-boundary isolation regression verified effective HOME/XDG/OpenCode paths, ignored inherited OpenCode overrides, preserved npm cache/userconfig, and unchanged sentinel user config/database files.
-- Local Docker/SSH recovery E2E remains unverified because the shared `/tmp` filesystem was full and the container runtime could not create a temporary runc process file; the existing CI run for the prior PR head is not treated as evidence for the fixes.
+- Local Docker/SSH recovery E2E remains unverified because the shared `/tmp` filesystem was full and the container runtime could not create a temporary runc process file. All six container shards passed in the PR CI run after the review fixes.
+- The first exact-head PR E2E run failed an unrelated queue-reorder keyboard-focus test in Shard 4. A targeted local run was flaky during fixture setup and passed on retry. Rerunning the failed CI jobs passed the shard and both aggregate reports; the final snapshot had 60 passed, zero failed, and zero pending checks.
+- The verification-record update passed `node scripts/validate-public-docs.mjs` (47 pages) and `TMPDIR=/root/.cache/kandev-go-tmp node --test scripts/validate-public-docs.test.mjs` (62/62).
 - `git diff --check`: passed.
