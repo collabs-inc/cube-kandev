@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -297,7 +296,11 @@ func TestOpenCodeInstallPreparesSelectedManagedRuntime(t *testing.T) {
 			cacheRoot := t.TempDir()
 			binDir := t.TempDir()
 			homeDir := t.TempDir()
+			managedTempRoot := t.TempDir()
 			argsPath := filepath.Join(t.TempDir(), "npm-args")
+			if _, err := os.Lstat(filepath.Join(homeDir, ".kandev")); !errors.Is(err, os.ErrNotExist) {
+				t.Fatalf("HOME/.kandev exists before install, lstat error = %v", err)
+			}
 			fakeNPM := fmt.Sprintf("#!/bin/sh\n" +
 				"printf '%%s\\n' \"$@\" >> \"$NPM_ARGS_FILE\"\n" +
 				"if [ \"$1\" = \"--prefix\" ] && [ \"$3\" = exec ] && [ ! -d \"$2\" ]; then echo \"npm prefix does not exist: $2\" >&2; exit 17; fi\n" +
@@ -312,8 +315,9 @@ func TestOpenCodeInstallPreparesSelectedManagedRuntime(t *testing.T) {
 					t.Fatalf("write native OpenCode fixture: %v", err)
 				}
 			}
-			t.Setenv("PATH", binDir)
+			t.Setenv("PATH", binDir+string(os.PathListSeparator)+"/bin")
 			t.Setenv("HOME", homeDir)
+			t.Setenv("TMPDIR", managedTempRoot)
 			t.Setenv("NPM_CACHE_ROOT", cacheRoot)
 			t.Setenv("NPM_ARGS_FILE", argsPath)
 			t.Setenv("EXPECTED_PACKAGE_SPEC", packageSpec)
@@ -332,19 +336,15 @@ func TestOpenCodeInstallPreparesSelectedManagedRuntime(t *testing.T) {
 			var enqueuedScript string
 			withStubStreamingRunner(t, func(ctx context.Context, script string, onChunk func(string)) error {
 				enqueuedScript = script
-				cmd := exec.CommandContext(ctx, "/bin/sh", "-c", script)
-				output, err := cmd.CombinedOutput()
-				if len(output) > 0 {
-					onChunk(string(output))
-				}
-				return err
+				return defaultStreamingInstallRunner(ctx, script, onChunk)
 			})
 			job, err := controller.EnqueueInstall(agent.ID())
 			if err != nil {
 				t.Fatalf("EnqueueInstall: %v", err)
 			}
-			if final := waitForStatus(t, controller, job.JobID, dto.InstallJobStatusSucceeded); final.Error != "" {
-				t.Fatalf("install job failed: %s", final.Error)
+			final := waitForStatus(t, controller, job.JobID, dto.InstallJobStatusSucceeded, dto.InstallJobStatusFailed)
+			if final.Status != dto.InstallJobStatusSucceeded {
+				t.Fatalf("install job failed: %s (output: %s)", final.Error, final.Output)
 			}
 			if tc.source == managedruntime.OpenCodeSourceManaged {
 				if !strings.Contains(displayedScript, managedruntime.NPMProjectPrefix) {
@@ -382,6 +382,13 @@ func TestOpenCodeInstallPreparesSelectedManagedRuntime(t *testing.T) {
 				}
 				if info, err := os.Stat(installArgs[1]); err != nil || !info.IsDir() {
 					t.Fatalf("prepared managed npm prefix %q is not a directory: %v", installArgs[1], err)
+				}
+				managedTempPrefix := filepath.Clean(managedTempRoot) + string(filepath.Separator)
+				if !strings.HasPrefix(filepath.Clean(installArgs[1])+string(filepath.Separator), managedTempPrefix) {
+					t.Fatalf("executed npm prefix %q is outside managed temp root %q", installArgs[1], managedTempRoot)
+				}
+				if _, err := os.Lstat(filepath.Join(homeDir, ".kandev")); !errors.Is(err, os.ErrNotExist) {
+					t.Fatalf("managed install touched HOME/.kandev, lstat error = %v", err)
 				}
 			}
 		})

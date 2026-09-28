@@ -228,6 +228,9 @@ Reconcile new v2 capability shapes at the ACP boundary while preserving v1 tests
 
 Reuse the existing admin update permission, trusted package allowlist, exact version validation,
 filtered installer environment, managed npm project prefix, and bounded sanitized job logs.
+Settings may display the managed-prefix marker, but install execution resolves the trusted argv and
+prepares its prefix on the execution host before serializing that argv for the shell. Never execute
+the display string or parse arbitrary shell text to recover command arguments.
 Temporary probe paths are owned by the job and cleaned on every exit.
 Log source/target family, versions, activation boundary, and failure phase without credentials or conversation data.
 No new metric or feature flag is required.
