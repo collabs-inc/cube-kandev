@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { execSync } from "node:child_process";
 import type { ApiClient } from "./api-client";
+import { getMockAgent } from "./agent-fixtures";
 import { KanbanPage } from "../pages/kanban-page";
 import { SessionPage } from "../pages/session-page";
 
@@ -100,9 +101,8 @@ export async function openTaskSession(page: Page, title: string): Promise<Sessio
 
 export async function createStandardProfile(apiClient: ApiClient, name: string) {
   const { agents } = await apiClient.listAgents();
-  const agentId = agents[0]?.id;
-  if (!agentId) throw new Error("No agent available");
-  return apiClient.createAgentProfile(agentId, name, {
+  const agent = getMockAgent(agents);
+  return apiClient.createAgentProfile(agent.id, name, {
     model: "mock-fast",
     auto_approve: true,
     cli_passthrough: false,
