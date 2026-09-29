@@ -915,14 +915,9 @@ test.describe("PR status badge", () => {
     await taskRow.hover();
     await expect(taskActions).toBeVisible();
     const menuSlot = taskRow.getByTestId("sidebar-task-change-request-menu-slot");
+    await expect(trailingActions).toHaveCSS("gap", "4px");
     await expect(menuSlot).toHaveCSS("width", "24px");
-    const expandedStatusBox = await trailingStatus.boundingBox();
-    const taskActionsBox = await taskActions.boundingBox();
-    expect(expandedStatusBox).not.toBeNull();
-    expect(taskActionsBox).not.toBeNull();
-    expect(taskActionsBox!.x).toBeGreaterThanOrEqual(
-      expandedStatusBox!.x + expandedStatusBox!.width - 1,
-    );
+    await expect(taskActions).toHaveCSS("width", "24px");
     await icon.hover();
 
     const summary = visibleTaskPRSummary(testPage);

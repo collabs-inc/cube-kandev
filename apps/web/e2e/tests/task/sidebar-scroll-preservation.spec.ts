@@ -281,7 +281,7 @@ test.describe("sidebar scrolling", () => {
   test("reveals a command-selected task", async ({ testPage, apiClient, seedData }) => {
     test.setTimeout(60_000);
 
-    const taskCount = 25;
+    const taskCount = 40;
     const created: { id: string; title: string }[] = [];
     for (let index = 0; index < taskCount; index++) {
       const title = `Command Reveal Task ${String(index).padStart(2, "0")}`;
@@ -313,27 +313,22 @@ test.describe("sidebar scrolling", () => {
     }));
     expect(dimensions.scrollHeight).toBeGreaterThan(dimensions.clientHeight);
 
-    const offscreenTitle = await scrollContainer.evaluate(
-      (element, taskTitles) => {
-        const containerRect = element.getBoundingClientRect();
-        const rows = element.querySelectorAll<HTMLElement>("[data-testid='sidebar-task-item']");
-        for (const row of rows) {
-          const rowRect = row.getBoundingClientRect();
-          const isOutside =
-            rowRect.bottom <= containerRect.top + 1 || rowRect.top >= containerRect.bottom - 1;
-          if (isOutside) {
-            const title = taskTitles.find((candidate) => row.textContent?.includes(candidate));
-            if (title) return title;
-          }
-        }
-        return null;
-      },
-      created.map(({ title }) => title),
-    );
-    if (!offscreenTitle) throw new Error("Expected a rendered task row outside the viewport");
-    const targetTask = created.find(({ title }) => title === offscreenTitle)!;
+    const targetTask = created[0]!;
     const targetRow = session.sidebarTaskItem(targetTask.title);
     await expect(targetRow).toBeVisible();
+    await expect
+      .poll(async () => {
+        const [containerBox, rowBox] = await Promise.all([
+          scrollContainer.boundingBox(),
+          targetRow.boundingBox(),
+        ]);
+        if (!containerBox || !rowBox) return false;
+        return (
+          rowBox.y + rowBox.height <= containerBox.y + 1 ||
+          rowBox.y >= containerBox.y + containerBox.height - 1
+        );
+      })
+      .toBe(true);
     const before = await Promise.all([scrollContainer.boundingBox(), targetRow.boundingBox()]);
     if (!before[0] || !before[1]) throw new Error("Command-selected target has no layout box");
     expect(

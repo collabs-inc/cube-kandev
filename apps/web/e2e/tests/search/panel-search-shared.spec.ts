@@ -97,9 +97,9 @@ test.describe("@search panel search bar — shared contract", () => {
 });
 
 /**
- * Ensure the given panel is rendered, visible, and ready to receive keyboard focus.
- * For the terminal panel we additionally wait for the xterm buffer to have some
- * content (indicates the shell has connected).
+ * Ensure the given panel is rendered and ready for shared keyboard interactions.
+ * For the terminal panel, send a command and verify its output so readiness
+ * covers the input path this search behavior uses.
  */
 async function preparePanel(session: SessionPage, kind: PanelKind): Promise<void> {
   if (kind === "session") {
@@ -116,7 +116,6 @@ async function preparePanel(session: SessionPage, kind: PanelKind): Promise<void
   }
   // terminal
   await expect(session.terminal).toBeVisible({ timeout: 15_000 });
-  await session.expectTerminalShellReady();
   await session.typeInTerminal("printf panel-search-shell-ready");
   await session.expectTerminalHasText("panel-search-shell-ready");
 }
