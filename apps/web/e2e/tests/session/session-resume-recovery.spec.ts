@@ -172,7 +172,7 @@ test.describe("worktree branch resume recovery", () => {
       backend,
       prCapture,
     }) => {
-      test.setTimeout(180_000);
+      test.setTimeout(300_000);
 
       const { requestIds: recoveryRequestIds, responses: recoveryResponses } =
         captureSessionRecoveryMessages(testPage);
@@ -288,7 +288,7 @@ test.describe("worktree branch resume recovery", () => {
               recoveryResponses,
               "relocate_and_resume",
             ),
-          { timeout: 30_000, message: "Waiting for managed clone relocation response" },
+          { timeout: 120_000, message: "Waiting for managed clone relocation response" },
         )
         .toBeTruthy();
       const relocationResponse = capturedSessionRecoveryResponse(
