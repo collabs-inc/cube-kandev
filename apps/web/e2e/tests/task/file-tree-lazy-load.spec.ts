@@ -1,13 +1,10 @@
 import { type Page } from "@playwright/test";
+import fs from "node:fs";
 import path from "node:path";
-import { test, expect } from "../../fixtures/test-base";
+import { test, expect, resetSeedRepositoryCheckout } from "../../fixtures/test-base";
 import type { ApiClient } from "../../helpers/api-client";
-import {
-  GitHelper,
-  makeGitEnv,
-  openTaskSession,
-  createStandardProfile,
-} from "../../helpers/git-helper";
+import { GitHelper, makeGitEnv, createStandardProfile } from "../../helpers/git-helper";
+import { SessionPage } from "../../pages/session-page";
 
 // Children of a directory are loaded lazily when the directory is first expanded
 // (see useFileBrowserHandlers.toggleExpand -> loadNodeChildren). The pre-refactor
@@ -19,22 +16,69 @@ async function setupTask(
   testPage: Page,
   apiClient: ApiClient,
   seedData: { workspaceId: string; workflowId: string; startStepId: string; repositoryId: string },
-  profileName: string,
-  taskTitle: string,
+  options: { profileName: string; taskTitle: string; requiredPath: string },
 ) {
-  const profile = await createStandardProfile(apiClient, profileName);
-  await apiClient.createTaskWithAgent(seedData.workspaceId, taskTitle, profile.id, {
-    description: "/e2e:simple-message",
-    workflow_id: seedData.workflowId,
-    workflow_step_id: seedData.startStepId,
-    repository_ids: [seedData.repositoryId],
-  });
-  const session = await openTaskSession(testPage, taskTitle);
+  const profile = await createStandardProfile(apiClient, options.profileName);
+  const task = await apiClient.createTaskWithAgent(
+    seedData.workspaceId,
+    options.taskTitle,
+    profile.id,
+    {
+      description: "/e2e:simple-message",
+      workflow_id: seedData.workflowId,
+      workflow_step_id: seedData.startStepId,
+      repository_ids: [seedData.repositoryId],
+    },
+  );
+
+  await expect
+    .poll(async () => (await apiClient.getTaskEnvironment(task.id))?.status ?? null, {
+      timeout: 30_000,
+      message: `Waiting for ${options.taskTitle} task environment to be ready`,
+    })
+    .toBe("ready");
+  await expect
+    .poll(
+      async () => {
+        const environment = await apiClient.getTaskEnvironment(task.id);
+        const candidatePaths = [
+          environment?.repos?.find(
+            (repository) => repository.repository_id === seedData.repositoryId,
+          )?.worktree_path,
+          ...(environment?.repos ?? []).map((repository) => repository.worktree_path),
+          environment?.workspace_path,
+          environment?.worktree_path,
+        ].filter(
+          (candidate, index, paths): candidate is string =>
+            Boolean(candidate) && paths.indexOf(candidate) === index,
+        );
+        return candidatePaths.some((candidate) =>
+          fs.existsSync(path.join(candidate, options.requiredPath)),
+        );
+      },
+      {
+        timeout: 90_000,
+        message: `Waiting for ${options.requiredPath} in the ${options.taskTitle} task environment`,
+      },
+    )
+    .toBe(true);
+
+  await testPage.goto(`/t/${task.id}`);
+  const session = new SessionPage(testPage);
+  await session.activeChat().waitFor({ state: "visible", timeout: 30_000 });
   await session.clickTab("Files");
   return session;
 }
 
 test.describe("File tree lazy-load on expand", () => {
+  test.beforeEach(({ backend, seedData }) => {
+    resetSeedRepositoryCheckout(seedData, backend.tmpDir);
+  });
+
+  test.afterEach(({ backend, seedData }) => {
+    resetSeedRepositoryCheckout(seedData, backend.tmpDir);
+  });
+
   test("children render only after directory is expanded", async ({
     testPage,
     apiClient,
@@ -51,7 +95,11 @@ test.describe("File tree lazy-load on expand", () => {
     git.stageAll();
     git.commit("seed lazy folder");
 
-    const session = await setupTask(testPage, apiClient, seedData, "ft-lazy-load", "FT Lazy Load");
+    const session = await setupTask(testPage, apiClient, seedData, {
+      profileName: "ft-lazy-load",
+      taskTitle: "FT Lazy Load",
+      requiredPath: "lazyfolder/child-a.ts",
+    });
 
     const folder = session.fileTreeNode("lazyfolder");
     await expect(folder).toBeVisible({ timeout: 15_000 });
@@ -93,7 +141,11 @@ test.describe("File tree lazy-load on expand", () => {
     git.stageAll();
     git.commit("seed keep folder");
 
-    const session = await setupTask(testPage, apiClient, seedData, "ft-lazy-keep", "FT Lazy Keep");
+    const session = await setupTask(testPage, apiClient, seedData, {
+      profileName: "ft-lazy-keep",
+      taskTitle: "FT Lazy Keep",
+      requiredPath: "keepfolder/keep-a.ts",
+    });
 
     const folder = session.fileTreeNode("keepfolder");
     await expect(folder).toBeVisible({ timeout: 15_000 });
