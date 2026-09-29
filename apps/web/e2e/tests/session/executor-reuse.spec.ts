@@ -168,7 +168,7 @@ test.describe("Executor reuse", () => {
 
     // Navigate to task
     const kanban = new KanbanPage(testPage);
-    await kanban.goto();
+    await kanban.goto(seedData.workflowId);
 
     const card = kanban.taskCardByTitle("Reset Env Task");
     await expect(card).toBeVisible({ timeout: 10_000 });
