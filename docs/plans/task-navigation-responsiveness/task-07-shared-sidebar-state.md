@@ -62,3 +62,10 @@ No local test execution, per user instruction. CI must run affected Vitest suite
 typecheck, lint, specs and desktop/mobile Playwright coverage. Keep normal static
 commit hooks. Do not start another seeded instance or claim memory measurements.
 Implementation and CI results will be recorded before delivery.
+
+## Expanded approved scope
+
+The user subsequently selected [the full shared-state and query-memory package](../sidebar-query-memory/plan.md).
+Its explicit coverage, normalized ownership, local/server conformance, and native
+SQLite resource requirements supersede this work order's <=100 inventory shortcut.
+Task 07 remains in progress until that package is implemented and CI is green.

@@ -72,16 +72,24 @@ func (r *Repository) QuerySidebarTaskPage(
 	if err := validateSidebarTaskPreferences(prefs); err != nil {
 		return nil, err
 	}
-	baseSQL, baseArgs, err := sidebarTaskBaseSQL(r.ro.DriverName(), workspaceID, query)
+	snapshot, err := beginSidebarQuerySnapshot(ctx, r.ro)
 	if err != nil {
 		return nil, err
 	}
-
-	tx, err := r.ro.BeginTxx(ctx, &sql.TxOptions{ReadOnly: true, Isolation: sql.LevelRepeatableRead})
+	defer snapshot.close()
+	snapshot.afterStage = r.sidebarQueryStage
+	baseSQL, baseArgs, err := snapshot.prepare(ctx, r.ro.DriverName(), workspaceID, query)
 	if err != nil {
-		return nil, fmt.Errorf("begin sidebar query snapshot: %w", err)
+		return nil, err
 	}
-	defer func() { _ = tx.Rollback() }()
+	return r.readSidebarTaskPage(ctx, snapshot, workspaceID, query, prefs, baseSQL, baseArgs)
+}
+
+func (r *Repository) readSidebarTaskPage(
+	ctx context.Context, snapshot *sidebarQuerySnapshot, workspaceID string,
+	query models.SidebarTaskViewQuery, prefs models.SidebarTaskViewPreferences, baseSQL string, baseArgs []any,
+) (*models.SidebarTaskPageResult, error) {
+	tx := snapshot.tx
 
 	pageCTEs, cteArgs := sidebarPageCTEs(r.ro.DriverName(), query, prefs)
 	pageQueryArgs := append(append([]any(nil), baseArgs...), cteArgs...)
@@ -94,6 +102,9 @@ func (r *Repository) QuerySidebarTaskPage(
 	if err != nil {
 		return nil, err
 	}
+	if err := snapshot.checkpoint("page"); err != nil {
+		return nil, err
+	}
 	pageRows := pageResult.rows
 	totalTasks, totalVisible, totalGroups, page := pageResult.totalTasks, pageResult.totalVisible, pageResult.totalGroups, pageResult.page
 	if !pageResult.hasSummary {
@@ -102,6 +113,9 @@ func (r *Repository) QuerySidebarTaskPage(
 			return nil, fmt.Errorf("count empty sidebar task page: %w", err)
 		}
 		page = 1
+		if err := snapshot.checkpoint("empty_count"); err != nil {
+			return nil, err
+		}
 	}
 	query.Page = page
 	pageCTEs, cteArgs = sidebarPageCTEs(r.ro.DriverName(), query, prefs)
@@ -115,18 +129,33 @@ func (r *Repository) QuerySidebarTaskPage(
 	} else {
 		headerRows = sidebarHeadersFromPageRows(pageRows)
 	}
+	if err := snapshot.checkpoint("headers"); err != nil {
+		return nil, err
+	}
 	tasks, err := loadSidebarPageTasks(ctx, tx, r, pageRows)
 	if err != nil {
 		return nil, err
 	}
+	if err := snapshot.checkpoint("hydrated"); err != nil {
+		return nil, err
+	}
 	result := buildSidebarTaskPageResult(workspaceID, query, prefs, page, totalTasks, totalVisible, totalGroups, headerRows, pageRows, tasks)
-	if err := tx.Commit(); err != nil {
-		return nil, fmt.Errorf("commit sidebar query snapshot: %w", err)
+	if err := snapshot.commit(ctx); err != nil {
+		return nil, err
 	}
 	return result, nil
 }
 
 func sidebarTaskBaseSQL(driver, workspaceID string, query models.SidebarTaskViewQuery) (string, []any, error) {
+	baseSQL, baseArgs, err := sidebarTaskCandidateSQL(driver, workspaceID, query)
+	if err != nil {
+		return "", nil, err
+	}
+	visibleSQL, visibleArgs := sidebarVisibleCTE(query)
+	return baseSQL + visibleSQL, append(baseArgs, visibleArgs...), nil
+}
+
+func sidebarTaskCandidateSQL(driver, workspaceID string, query models.SidebarTaskViewQuery) (string, []any, error) {
 	groupExpr, groupLabelExpr := sidebarGroupExpressions(query.Group)
 	baseSQL := sidebarBaseCTE(driver, groupExpr, groupLabelExpr, query)
 	baseArgs := []any{workspaceID}
@@ -136,8 +165,7 @@ func sidebarTaskBaseSQL(driver, workspaceID string, query models.SidebarTaskView
 	}
 	baseSQL += ", filtered AS MATERIALIZED (SELECT * FROM candidate WHERE " + filterSQL + ")"
 	baseArgs = append(baseArgs, filterArgs...)
-	visibleSQL, visibleArgs := sidebarVisibleCTE(query)
-	return baseSQL + visibleSQL, append(baseArgs, visibleArgs...), nil
+	return baseSQL, baseArgs, nil
 }
 
 func validateSidebarTaskPreferences(prefs models.SidebarTaskViewPreferences) error {

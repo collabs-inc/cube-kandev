@@ -54,18 +54,12 @@ No task/session lifecycle, settings schema, or database migration changes.
 - [Browsing design](../specs/ui/system-design/sidebar-archived-filter.md)
 - [Repair plan](../plans/sidebar-view-loading-repair/plan.md)
 
-## Shared-store restoration (2026-09-29)
+## Shared-state revision (2026-09-30)
 
-The user requests restoring the pre-pagination Zustand path for small loaded
-active inventories. A complete, current-workspace set of successful workflow
-snapshots with at most 100 tasks now supplies sidebar rows directly. No full
-snapshot is fetched solely for the sidebar. Missing, failed or placeholder
-snapshots, larger inventories and archived views keep the bounded query path.
-The store-backed path releases outstanding page reads and evicts the redundant
-current-view response. No additional per-view task cache is introduced.
-
-This supersedes the always-query rule for that complete small inventory and
-restores the client view engine's prior ordering there. Text collation and equal
-sort-value ties can differ when crossing to server paging. It does not relax
-server-page order, archive bounds, access checks or workspace ownership.
-See [Task 07](../plans/task-navigation-responsiveness/task-07-shared-sidebar-state.md).
+The approved [shared sidebar task-state decision](2026-09-29-shared-sidebar-task-state.md)
+revises unconditional server queries and blanket rejection after ordinary invalidation.
+Complete eligible resident data can supply local pages at any collection size;
+uncovered views retain bounded server evaluation. Explicit coverage and verified
+ordering supersede the earlier small-inventory shortcut. The
+[implementation package](../plans/sidebar-query-memory/plan.md) owns this migration,
+native-memory limits, hard context barriers, and bounded record ownership.

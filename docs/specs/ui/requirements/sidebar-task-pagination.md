@@ -32,7 +32,7 @@ Archive membership remains defined by [archived views](sidebar-archived-filter.m
 - **AC-UI-SIDEBAR-ARCHIVED-FILTER-002.8:** Live task changes shall update visible rows and invalidate affected page membership. Settled reads shall converge without duplicates or a browser reload.
 - **AC-UI-SIDEBAR-ARCHIVED-FILTER-002.9:** Phone navigation shall offer the same paging and conversation access. Controls shall remain touch-reachable, with contained scrolling and no document horizontal overflow.
 
-- **AC-UI-SIDEBAR-ARCHIVED-FILTER-002.10:** Server-paged text ordering shall remain consistent across pages on the same server, independent of browser locale. Complete small inventories reuse the existing client view ordering when rendered from shared task state.
+- **AC-UI-SIDEBAR-ARCHIVED-FILTER-002.10:** Text ordering shall remain consistent across pages and across the 100-task threshold on the same server, independent of browser locale.
 
 - **AC-UI-SIDEBAR-ARCHIVED-FILTER-002.11:** Successful paging shall replace the list and scroll only its list area to the top. The open task and conversation shall remain unchanged.
 - **AC-UI-SIDEBAR-ARCHIVED-FILTER-002.12:** A failed page read shall retain the displayed page, scroll position, and open conversation, with Retry available.
@@ -43,8 +43,13 @@ Archive membership remains defined by [archived views](sidebar-archived-filter.m
 - **AC-UI-SIDEBAR-ARCHIVED-FILTER-002.17:** Each task-list surface shall show at most one query-error announcement. A rejected filter shall identify the affected filter and the actionable limit or correction. Transport and server failures shall offer Retry without describing an active-task view as an archive failure. Errors shall remain distinct from successful empty results.
 - **AC-UI-SIDEBAR-ARCHIVED-FILTER-002.18:** A failed background refresh shall retain usable rows and identify them as not refreshed, with Retry available. Access denial shall clear the affected retained results. Loading, refreshing, and recovery controls shall remain localized, keyboard accessible, and touch reachable.
 
-- **AC-UI-SIDEBAR-ARCHIVED-FILTER-002.19:** When the current workspace has complete, successfully loaded active workflow snapshots containing at most 100 tasks, desktop and phone sidebar views shall render directly from the same Zustand task state without a sidebar page request. Built-in, saved and draft active views shall apply their filters, grouping, tree order and pins immediately. Live updates shall update that shared projection without retaining duplicate per-view task responses.
-- **AC-UI-SIDEBAR-ARCHIVED-FILTER-002.20:** Missing, placeholder, failed or wrong-workspace snapshots shall not establish inventory completeness. Larger inventories and archived views shall retain bounded server paging. Moving to the shared-store path shall release its pending page request, clear its displayed response and evict the redundant current-view snapshot. Access denial and context changes shall prevent stale task reuse.
+- **AC-UI-SIDEBAR-ARCHIVED-FILTER-002.19:** For a fixed workspace of at most 101 tasks, 100 repeated reads shall add at most 512 MiB of backend resident memory. Measure above an initialized baseline with up to four concurrent requests and no unrelated workload. This applies to every supported sort and group, including Last activity with State grouping. Reads shall preserve the selected view and existing page semantics.
+
+- **AC-UI-SIDEBAR-ARCHIVED-FILTER-002.20:** Homepage and sidebar task overviews shall reuse one accepted task record per task in the current account and workspace. Accepted live updates shall appear on both surfaces without another sidebar read for unchanged view membership.
+- **AC-UI-SIDEBAR-ARCHIVED-FILTER-002.21:** When complete, current task data and supported ordering semantics cover a view, its first page shall render without waiting for a sidebar request. The sidebar shall not fetch those tasks again merely because it mounted. Local results shall preserve server filtering, complete-tree ordering, counts, and page boundaries. Existing complete data can supply subsequent pages locally.
+- **AC-UI-SIDEBAR-ARCHIVED-FILTER-002.22:** When coverage is incomplete, stale, or unavailable, the sidebar shall fetch only the requested bounded view page. Archived saved views shall fetch on demand unless complete eligible archived coverage already exists. A partial collection shall never establish an authoritative empty result, total, or complete-tree order.
+- **AC-UI-SIDEBAR-ARCHIVED-FILTER-002.23:** For the same authorized view and workspace, ordinary task updates during a successful read shall not indefinitely prevent initial rows from appearing. The sidebar shall reconcile known newer changes, display safe results, and refresh in the background. Superseded views, account changes, access denial, and known deletions shall retain their stale-response safeguards.
+- **AC-UI-SIDEBAR-ARCHIVED-FILTER-002.24:** Repeated page and view navigation shall not retain every task encountered. Shared records shall remain only while an active consumer or a bounded reusable page owns them. Cached records shall not count as proof of complete view membership.
 
 ## Counting and scope
 
@@ -61,3 +66,5 @@ It does not add pagination to Kanban columns, the full Tasks page, or the comman
 
 - [Sidebar loading and archived navigation](../../../plans/archived-sidebar-loading/plan.md)
 - [Sidebar view loading repair](../../../plans/sidebar-view-loading-repair/plan.md)
+
+- [Shared sidebar state and query memory](../../../plans/sidebar-query-memory/plan.md)
