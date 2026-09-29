@@ -100,7 +100,11 @@ test("task details omit native coordination controls for ordinary and configured
         .getByTestId("workflow-step-disclosure")
         .getByTestId(`workflow-step-disclosure-row-${completingStep.id}`);
       await expect(targetStep).toBeVisible();
-      await targetStep.getByTestId("workflow-step-move-here").click();
+      const moveButton = targetStep.getByTestId(
+        `workflow-step-disclosure-move-${completingStep.id}`,
+      );
+      await expect(moveButton).toBeVisible();
+      await moveButton.click();
     }
     await blockedMove;
     await expect(testPage.getByTestId("task-move-error-banner")).toBeVisible();

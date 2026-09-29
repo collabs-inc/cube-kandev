@@ -69,9 +69,9 @@ test.describe("task chat attachment workspace scope", () => {
     await expect(
       sentMessage.getByRole("button", { name: "Open Attachment 1", exact: true }),
     ).toHaveCount(1);
-    const image = sentMessage.locator(
-      `img[src*="/api/v1/attachments/${String(attachment?.attachment_id)}/content"]`,
-    );
+    const image = sentMessage
+      .getByRole("button", { name: "Open Attachment 1", exact: true })
+      .locator(`img[src*="/api/v1/attachments/${String(attachment?.attachment_id)}/content"]`);
     await expect(image).toHaveCount(1);
     await expect(image).toBeVisible();
     await expect
