@@ -53,3 +53,8 @@ No task/session lifecycle, settings schema, or database migration changes.
 - [Pagination requirements](../specs/ui/requirements/sidebar-task-pagination.md)
 - [Browsing design](../specs/ui/system-design/sidebar-archived-filter.md)
 - [Repair plan](../plans/sidebar-view-loading-repair/plan.md)
+
+## Proposed shared-state revision
+
+[Shared sidebar task state](2026-09-29-shared-sidebar-task-state.md) proposes reuse of complete resident data and safe initial display during ordinary invalidation.
+It preserves bounded pages, hard context barriers, and finite retention. The linked draft package owns implementation and new validation.

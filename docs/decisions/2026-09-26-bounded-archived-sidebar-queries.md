@@ -71,3 +71,8 @@ Server-side view evaluation and size-based paging remain unchanged.
 The user explicitly required size-based pagination for all sidebar views.
 Archive status determines membership, never whether pagination is available.
 The archived conversation navigation repair remains a separate outcome in this package.
+
+## Proposed shared-state revision
+
+[Shared sidebar task state](2026-09-29-shared-sidebar-task-state.md) proposes reuse of complete resident data and safe initial display during ordinary invalidation.
+It preserves bounded pages, hard context barriers, and finite retention. The linked draft package owns implementation and new validation.
