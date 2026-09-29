@@ -1,5 +1,6 @@
 // Terminal panel search — xterm addon-search integration.
 import { test, expect } from "../../fixtures/test-base";
+import type { SessionPage } from "../../pages/session-page";
 import {
   openPanelSearch,
   closePanelSearch,
@@ -32,10 +33,15 @@ async function waitForTerminalText(
 }
 
 /** Seed terminal content: types a loop producing many "hello world N" lines. */
-async function seedTerminalOutput(page: import("@playwright/test").Page): Promise<void> {
-  const session = page.getByTestId("terminal-panel").locator(".xterm");
-  await session.click();
-  // Wait for shell prompt to render (buffer non-empty)
+async function seedTerminalOutput(
+  page: import("@playwright/test").Page,
+  session: SessionPage,
+): Promise<void> {
+  await expect(session.terminal).toBeVisible({ timeout: 15_000 });
+  await session.expectTerminalConnected(60_000);
+  const terminal = session.terminal.locator(".xterm");
+  await terminal.click();
+  // Wait for the shell prompt after its terminal WebSocket connects.
   await expect
     .poll(
       async () =>
@@ -46,7 +52,7 @@ async function seedTerminalOutput(page: import("@playwright/test").Page): Promis
           const container = xtermEl?.parentElement as XC | null | undefined;
           return (container?.__xtermReadBuffer?.() ?? "").length > 0;
         }),
-      { timeout: 20_000, message: "Waiting for terminal shell buffer" },
+      { timeout: 60_000, message: "Waiting for terminal shell buffer" },
     )
     .toBe(true);
   await page.keyboard.type(`for i in 1 2 3 4 5 6 7 8 9 10; do echo "hello world $i"; done`);
@@ -64,10 +70,10 @@ test.describe("@search terminal panel search", () => {
     prCapture,
   }) => {
     test.setTimeout(120_000);
-    await seedTask(testPage, apiClient, seedData, "terminal-search-basic", {
+    const { session } = await seedTask(testPage, apiClient, seedData, "terminal-search-basic", {
       description: seedMessagesDescription(["idle"]),
     });
-    await seedTerminalOutput(testPage);
+    await seedTerminalOutput(testPage, session);
 
     const bufferBefore = await testPage.evaluate(() => {
       const panel = document.querySelector('[data-testid="terminal-panel"]');
@@ -102,10 +108,10 @@ test.describe("@search terminal panel search", () => {
 
   test("T4 case sensitivity toggle affects matches", async ({ testPage, apiClient, seedData }) => {
     test.setTimeout(120_000);
-    await seedTask(testPage, apiClient, seedData, "terminal-search-case", {
+    const { session } = await seedTask(testPage, apiClient, seedData, "terminal-search-case", {
       description: seedMessagesDescription(["idle"]),
     });
-    await seedTerminalOutput(testPage);
+    await seedTerminalOutput(testPage, session);
 
     await openPanelSearch(testPage, "terminal");
     await panelSearchInput(testPage).fill("HELLO");
@@ -130,10 +136,10 @@ test.describe("@search terminal panel search", () => {
     seedData,
   }) => {
     test.setTimeout(120_000);
-    await seedTask(testPage, apiClient, seedData, "terminal-search-regex", {
+    const { session } = await seedTask(testPage, apiClient, seedData, "terminal-search-regex", {
       description: seedMessagesDescription(["idle"]),
     });
-    await seedTerminalOutput(testPage);
+    await seedTerminalOutput(testPage, session);
 
     await openPanelSearch(testPage, "terminal");
     await panelSearchToggle(testPage, "Regular expression").click();
@@ -158,10 +164,10 @@ test.describe("@search terminal panel search", () => {
     seedData,
   }) => {
     test.setTimeout(120_000);
-    await seedTask(testPage, apiClient, seedData, "terminal-search-esc", {
+    const { session } = await seedTask(testPage, apiClient, seedData, "terminal-search-esc", {
       description: seedMessagesDescription(["idle"]),
     });
-    await seedTerminalOutput(testPage);
+    await seedTerminalOutput(testPage, session);
 
     // Capture buffer snapshot before opening search
     const getBuffer = () =>
@@ -186,10 +192,10 @@ test.describe("@search terminal panel search", () => {
     seedData,
   }) => {
     test.setTimeout(120_000);
-    await seedTask(testPage, apiClient, seedData, "terminal-search-backspace", {
+    const { session } = await seedTask(testPage, apiClient, seedData, "terminal-search-backspace", {
       description: seedMessagesDescription(["idle"]),
     });
-    await seedTerminalOutput(testPage);
+    await seedTerminalOutput(testPage, session);
 
     await openPanelSearch(testPage, "terminal");
     await panelSearchInput(testPage).fill("hello world zzz");

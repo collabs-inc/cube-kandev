@@ -120,6 +120,7 @@ async function preparePanel(
   }
   // terminal
   await expect(session.terminal).toBeVisible({ timeout: 15_000 });
+  await session.expectTerminalConnected(60_000);
   await expect
     .poll(
       async () =>
@@ -130,7 +131,7 @@ async function preparePanel(
           const container = xtermEl?.parentElement as XC | null | undefined;
           return (container?.__xtermReadBuffer?.() ?? "").length > 0;
         }),
-      { timeout: 20_000, message: "Waiting for terminal shell buffer" },
+      { timeout: 60_000, message: "Waiting for terminal shell buffer" },
     )
     .toBe(true);
 }

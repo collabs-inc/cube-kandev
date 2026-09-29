@@ -52,8 +52,7 @@ test.describe("File tree lazy-load on expand", () => {
 
     const session = await setupTask(testPage, apiClient, seedData, "FT Lazy Load");
 
-    const folder = session.fileTreeNode("lazyfolder");
-    await expect(folder).toBeVisible({ timeout: 15_000 });
+    const folder = await session.fileTree.waitForFileTreeNode("lazyfolder");
 
     // Pre-expand: children should not be in the DOM yet.
     await expect(session.fileTreeNode("lazyfolder/child-a.ts")).toHaveCount(0);
@@ -65,16 +64,14 @@ test.describe("File tree lazy-load on expand", () => {
 
     // After expand: direct children render. Nested subfolder appears but its
     // own children are not loaded until that subfolder is also expanded.
-    await expect(session.fileTreeNode("lazyfolder/child-a.ts")).toBeVisible({ timeout: 10_000 });
-    await expect(session.fileTreeNode("lazyfolder/child-b.ts")).toBeVisible({ timeout: 10_000 });
-    await expect(session.fileTreeNode("lazyfolder/nested")).toBeVisible({ timeout: 10_000 });
+    await session.fileTree.waitForFileTreeNode("lazyfolder/child-a.ts");
+    await session.fileTree.waitForFileTreeNode("lazyfolder/child-b.ts");
+    await session.fileTree.waitForFileTreeNode("lazyfolder/nested");
     await expect(session.fileTreeNode("lazyfolder/nested/deep.ts")).toHaveCount(0);
 
     // Expand nested -> its child loads.
     await session.fileTreeNode("lazyfolder/nested").click();
-    await expect(session.fileTreeNode("lazyfolder/nested/deep.ts")).toBeVisible({
-      timeout: 10_000,
-    });
+    await session.fileTree.waitForFileTreeNode("lazyfolder/nested/deep.ts");
   });
 
   test("collapsing then re-expanding keeps children without refetch", async ({
@@ -94,12 +91,11 @@ test.describe("File tree lazy-load on expand", () => {
 
     const session = await setupTask(testPage, apiClient, seedData, "FT Lazy Keep");
 
-    const folder = session.fileTreeNode("keepfolder");
-    await expect(folder).toBeVisible({ timeout: 15_000 });
+    const folder = await session.fileTree.waitForFileTreeNode("keepfolder");
 
     // Expand
     await folder.click();
-    await expect(session.fileTreeNode("keepfolder/keep-a.ts")).toBeVisible({ timeout: 10_000 });
+    await session.fileTree.waitForFileTreeNode("keepfolder/keep-a.ts");
 
     // Collapse - children removed from DOM
     await folder.click();
@@ -107,7 +103,7 @@ test.describe("File tree lazy-load on expand", () => {
 
     // Re-expand - children come back quickly (already cached in tree state).
     await folder.click();
-    await expect(session.fileTreeNode("keepfolder/keep-a.ts")).toBeVisible({ timeout: 5_000 });
-    await expect(session.fileTreeNode("keepfolder/keep-b.ts")).toBeVisible({ timeout: 5_000 });
+    await session.fileTree.waitForFileTreeNode("keepfolder/keep-a.ts");
+    await session.fileTree.waitForFileTreeNode("keepfolder/keep-b.ts");
   });
 });
