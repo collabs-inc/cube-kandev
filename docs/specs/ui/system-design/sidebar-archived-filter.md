@@ -318,12 +318,13 @@ Use one shared task-query status presenter per visible task-list surface. Remove
 the duplicate archive banner for this query from desktop and phone paths; actual
 workspace-context failures remain separately typed and take presentation priority.
 Initial query failure replaces the list's loading state; refresh failure appears
-once alongside retained rows. Place status immediately below the view controls,
+once alongside retained rows. Place errors immediately below the view controls,
 with pagination below the rows. An invalid filter names its one-based position,
 translated dimension where available, and correction; the existing Filters control
-remains available. Retry is for reads that can succeed unchanged. A compact
-`Updating tasks...` status uses a polite announcement without removing rows or
-introducing a blocking overlay. Hide status after success; distinguish empty success.
+remains available. Retry is for reads that can succeed unchanged. Background
+refresh uses a visually hidden, polite `Updating tasks...` announcement. It must
+not occupy layout space or shift retained task rows on desktop or phone. Remove
+the announcement after success; distinguish empty success.
 Keep stable button names and Retry separate from page actions.
 A standalone current-task marker outside the page must not affect page totals or sort order.
 

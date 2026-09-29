@@ -8,11 +8,14 @@ depends_on:
 plan: "plan.md"
 requirements:
   - REQ-UI-TASK-NAVIGATION-RESPONSIVENESS-001
+  - REQ-UI-SIDEBAR-ARCHIVED-FILTER-002
 acceptance_criteria:
   - AC-UI-TASK-NAVIGATION-RESPONSIVENESS-001.6
   - AC-UI-TASK-NAVIGATION-RESPONSIVENESS-001.7
+  - AC-UI-SIDEBAR-ARCHIVED-FILTER-002.15
 system_design:
   - ../../specs/ui/system-design/task-navigation-responsiveness.md
+  - ../../specs/ui/system-design/sidebar-archived-filter.md
 ---
 
 # Task 06: Firefox task-switch paint
@@ -166,3 +169,35 @@ Post-follow-up browser validation rebuilt through
 through `pnpm e2e:raw` for the Firefox desktop suite and the mobile Chrome
 `mobile-large-file-tree-virtualization.spec.ts` suite (four passed). Specification
 catalog/lint checks and normal commit hooks also validate the follow-up.
+
+### Background refresh layout follow-up
+
+The user reported that the `Updating tasks...` label moved the task list down.
+The shared query-status presenter added a normal-flow row above retained tasks
+on each background read. A causal browser regression held that read open and
+measured a 40px downward shift before the fix. The same presenter now uses the
+existing screen-reader-only utility for its polite refresh announcement. Initial
+loading and actionable errors/Retry retain their existing presentation.
+
+The desktop sidebar and the phone `SessionTaskSwitcherSheet` keep their current
+view controls, scroll owner, task actions and focus behavior. The shared phone
+app-navigation outlet inherits the same presenter. The retained-view regression
+compares task-row geometry before and during refresh and after recovery, retaining
+the existing query rejection, Retry, conversation and phone touch-target checks.
+This change needs no public documentation update: no control, configuration or
+API changes. The owning sidebar requirement/design record the stable layout.
+
+Before this follow-up, the branch was rebased without conflict onto the landed
+session-refresh/navigation work, `320f050e12071342522a7ba0730af03e6ce1b386`.
+Earlier benchmark and CI results above remain evidence for their named revisions;
+verification of the combined revision is recorded separately.
+
+Combined-revision verification recorded 148 passing unit tests across 14 files,
+passing typecheck, changed-file lint/format, i18n and specification checks. The
+held-refresh regression passed in Chromium, Firefox and mobile Chrome. The
+seven-scenario phone navigation/sidebar suite passed. Two combined desktop
+attempts lost their isolated backend without a diagnosed cause; a final
+seven-scenario desktop run passed with exit tracing showing normal fixture
+shutdown. These earlier failures remain recorded rather than attributed to a
+source fix. At the user's request, further test execution is delegated to CI;
+no additional local test runs are required for delivery.

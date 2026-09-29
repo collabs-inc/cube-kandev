@@ -3,8 +3,10 @@ created: 2026-09-28
 status: done
 requirements:
   - REQ-UI-TASK-NAVIGATION-RESPONSIVENESS-001
+  - REQ-UI-SIDEBAR-ARCHIVED-FILTER-002
 system_design:
   - ../../specs/ui/system-design/task-navigation-responsiveness.md
+  - ../../specs/ui/system-design/sidebar-archived-filter.md
 legacy_specs: []
 ---
 
@@ -18,7 +20,8 @@ memory/debug questions in an isolated runtime. Execute the work orders
 sequentially in the primary session. Implementation was explicitly requested
 after the design checkpoint. Tasks 01-06 are complete; the user's follow-up
 [Task 06](task-06-firefox-task-paint.md) removes measured Firefox rendering work
-and records the remaining latency and desktop/phone verification.
+and records the remaining latency and desktop/phone verification. Its background
+refresh follow-up also removes the task-list shift caused by routine query status.
 
 ## Evidence and confirmed causes
 
