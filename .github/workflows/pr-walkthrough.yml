@@ -8,12 +8,8 @@ on:
     types: [opened, ready_for_review, reopened, synchronize, labeled]
 
 env:
-  # Free model, accepted explicitly: it may use prompts and completions to
-  # train future Meta models, so PR patches and prepared head context are
-  # subject to that policy. To revoke, restore a non-training model such as
-  # opencode-go/muse-spark-1.3-contributor here and in the agent block below.
-  PR_WALKTHROUGH_MODEL: opencode/muse-spark-1.3-contributor-free
-  PR_WALKTHROUGH_VARIANT: high
+  # Keep this model ID in sync with the agent definition below.
+  PR_WALKTHROUGH_MODEL: opencode/deepseek-v4-flash-free
 
 concurrency:
   # GitHub resolves workflow concurrency before it evaluates the job `if`.
@@ -188,7 +184,7 @@ jobs:
           ---
           description: Generate and render a visual pull request walkthrough.
           mode: primary
-          model: "opencode/muse-spark-1.3-contributor-free"
+          model: "opencode/deepseek-v4-flash-free"
           temperature: 0.1
           permission:
             "*": deny
@@ -246,7 +242,6 @@ jobs:
             "$HOME/.opencode/bin/opencode" run \
               --agent github-pr-walkthrough \
               --model "$PR_WALKTHROUGH_MODEL" \
-              --variant "$PR_WALKTHROUGH_VARIANT" \
               --title "PR #${PR_NUMBER} walkthrough" \
               --file .pr-walkthrough/guidelines.md \
               --file .pr-walkthrough/walkthrough.patch \
