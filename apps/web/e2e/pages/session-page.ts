@@ -1374,6 +1374,16 @@ export class SessionPage {
       .waitFor({ state: "hidden", timeout });
   }
 
+  /** Wait for the active shell to emit its initial prompt before sending input. */
+  async expectTerminalShellReady(timeout = 20_000): Promise<void> {
+    await expect
+      .poll(async () => (await this.readXtermBuffer("terminal-panel")).trim().length > 0, {
+        timeout,
+        message: "Waiting for terminal shell output",
+      })
+      .toBe(true);
+  }
+
   /** Wait for the terminal WebSocket to connect, then type a command and press Enter. */
   async typeInTerminal(command: string): Promise<void> {
     await this.expectTerminalConnected();

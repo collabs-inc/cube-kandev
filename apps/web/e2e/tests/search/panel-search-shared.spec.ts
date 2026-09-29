@@ -116,6 +116,7 @@ async function preparePanel(session: SessionPage, kind: PanelKind): Promise<void
   }
   // terminal
   await expect(session.terminal).toBeVisible({ timeout: 15_000 });
+  await session.expectTerminalShellReady();
   await session.typeInTerminal("printf panel-search-shell-ready");
   await session.expectTerminalHasText("panel-search-shell-ready");
 }
