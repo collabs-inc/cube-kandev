@@ -190,8 +190,22 @@ test.describe("Mobile plugin menu actions", () => {
     await expect(pluginSection.locator("#hello-main-top-bar")).toHaveCount(0);
     const workspaceAction = pluginSection.getByTestId("e2e-sidebar-workspace-actions");
     await expect(workspaceAction).toHaveCount(1);
+    await testPage.evaluate(() => {
+      document.documentElement.dataset.e2eWorkspaceActionClicked = "false";
+      document.addEventListener("click", function observeWorkspaceAction(event) {
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+        const action = target.closest<HTMLElement>('[data-testid="e2e-sidebar-workspace-actions"]');
+        if (!action) return;
+        document.documentElement.dataset.e2eWorkspaceActionClicked =
+          action.dataset.clicked === "true" ? "true" : "false";
+        document.removeEventListener("click", observeWorkspaceAction);
+      });
+    });
     await workspaceAction.tap();
-    await expect(workspaceAction).toHaveAttribute("data-clicked", "true");
+    await expect
+      .poll(() => testPage.locator("html").getAttribute("data-e2e-workspace-action-clicked"))
+      .toBe("true");
     await expect(menu.locator("nav.overflow-y-auto")).toHaveCount(1);
     const metrics = menu.getByTestId("app-status-metrics");
     await expect(metrics.getByLabel(/^CPU /)).toBeVisible();
