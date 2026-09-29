@@ -54,12 +54,14 @@ test("uses nested task commands and the move drawer on a phone", async ({
   await expect
     .poll(async () => (await apiClient.getTask(fixture.taskId)).workflow_step_id)
     .toBe(fixture.targetStepId);
+  await expect(drawer).toBeHidden();
   await testPage.keyboard.press("Control+k");
   await testPage.getByRole("combobox").fill("Archive task");
-  await testPage
+  const archiveCommand = testPage
     .getByRole("option")
-    .filter({ has: testPage.getByText("Archive task", { exact: true }) })
-    .tap();
+    .filter({ has: testPage.getByText("Archive task", { exact: true }) });
+  await expect(archiveCommand).toBeVisible();
+  await archiveCommand.tap();
   // Tapping the command starts the archive action asynchronously. Wait for
   // the palette portal to close before locating the confirmation dialog.
   await expect(palette).toBeHidden({ timeout: 10_000 });

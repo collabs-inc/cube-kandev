@@ -167,7 +167,17 @@ test.describe("Mobile workspace repository sets", () => {
     expect(refreshButtonBox!.height).toBeGreaterThanOrEqual(44);
     expect(refreshButtonBox!.width).toBeGreaterThanOrEqual(44);
     await waitForFiniteAnimations(dropdown);
-    await refreshButton.tap({ timeout: 5_000 });
+    await expect(dropdown).toBeVisible();
+    const refreshResponse = testPage.waitForResponse((response) => {
+      const url = new URL(response.url());
+      return (
+        response.request().method() === "GET" &&
+        url.pathname === `/api/v1/repositories/${seedData.repositoryId}/branches` &&
+        url.searchParams.get("refresh") === "true"
+      );
+    });
+    await refreshButton.tap();
+    expect((await refreshResponse).ok()).toBe(true);
     await expect(dropdown.getByRole("option", { name: /^origin\/main origin/ })).toBeVisible();
 
     const search = dropdown.getByPlaceholder("Search branches...");

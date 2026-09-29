@@ -1381,6 +1381,13 @@ export class SessionPage {
 
     const xterm = this.activePanel("terminal-panel").locator(".xterm");
     await expect(xterm).toBeVisible();
+    // The terminal WebSocket can open before the shell starts and emits its prompt.
+    await expect
+      .poll(async () => (await this.readXtermBuffer("terminal-panel")).length > 0, {
+        timeout: TERMINAL_READY_TIMEOUT,
+        message: "Waiting for the terminal shell prompt before typing",
+      })
+      .toBe(true);
     await xterm.click();
     await expect(xterm.locator(".xterm-helper-textarea")).toBeFocused();
     // xterm forwards each key through a PTY. A zero-delay burst can overrun
