@@ -1,13 +1,14 @@
 import { useMemo, useRef } from "react";
 import { useAppStore } from "@/components/state-provider";
 import { useSidebarTaskPage } from "@/hooks/domains/kanban/use-sidebar-task-page";
+import { useSidebarStoreTasks } from "@/hooks/domains/kanban/use-sidebar-store-tasks";
 import { toKanbanTask } from "@/lib/kanban/map-task";
 import type { AggregatedSidebarTasks } from "@/components/task/task-session-sidebar-aggregate";
 import type { TaskMoveWorkflow } from "@/components/task/task-move-context-menu";
 import type { WorkspaceContextReadError } from "@/lib/state/slices/kanban/types";
 import type { AppState } from "@/lib/state/store";
 import type { Task } from "@/lib/types/http";
-import type { WipQueueStatus } from "@/lib/kanban/wip-queue";
+import { getDestinationQueue, type WipQueueStatus } from "@/lib/kanban/wip-queue";
 import type { TaskStatusSummary } from "@/lib/types/task-status-summary";
 import { pickFreshestStatusSummary } from "@/lib/task-status-summary";
 import { useShallow } from "zustand/react/shallow";
@@ -20,7 +21,9 @@ export type WorkspaceSidebarTasksResult = AggregatedSidebarTasks & {
   archivedError: string | null;
   retryArchivedTasks: () => void;
   page: ReturnType<typeof useSidebarTaskPage>;
-  pageEntries: NonNullable<ReturnType<typeof useSidebarTaskPage>["response"]>["entries"];
+  pageEntries:
+    | NonNullable<ReturnType<typeof useSidebarTaskPage>["response"]>["entries"]
+    | undefined;
   workspaceContextError: WorkspaceContextReadError | null;
   workspaceContextPending: boolean;
   workspaceContextAccessDenied: boolean;
@@ -52,10 +55,12 @@ function reuseUnchangedTasks(previous: SidebarTask[], next: SidebarTask[]): Side
 }
 
 function buildWipQueueByTaskId(
-  entries: NonNullable<ReturnType<typeof useSidebarTaskPage>["response"]>["entries"],
+  entries: WorkspaceSidebarTasksResult["pageEntries"],
   allSteps: AggregatedSidebarTasks["allSteps"],
   stepsByWorkflowId: AggregatedSidebarTasks["stepsByWorkflowId"],
+  allTasks: SidebarTask[],
 ): Map<string, WipQueueStatus> {
+  if (!entries) return buildStoreWipQueue(allTasks, allSteps);
   const result = new Map<string, WipQueueStatus>();
   for (const entry of entries) {
     if (
@@ -79,6 +84,21 @@ function buildWipQueueByTaskId(
       total: entry.wip_queue_total,
       destinationTitle: stepTitle,
     });
+  }
+  return result;
+}
+
+function buildStoreWipQueue(allTasks: SidebarTask[], allSteps: AggregatedSidebarTasks["allSteps"]) {
+  const result = new Map<string, WipQueueStatus>();
+  for (const stepId of new Set(allTasks.map((task) => task.queuedForStepId))) {
+    if (!stepId) continue;
+    for (const entry of getDestinationQueue(allTasks, stepId)) {
+      result.set(entry.task.id, {
+        position: entry.position,
+        total: entry.total,
+        destinationTitle: allSteps.find((step) => step.id === stepId)?.title ?? stepId,
+      });
+    }
   }
   return result;
 }
@@ -147,6 +167,18 @@ function workspacePageTasks(
   return tasks;
 }
 
+function projectSidebarTasks(
+  storeTasks: SidebarTask[] | null,
+  entries: WorkspaceSidebarTasksResult["pageEntries"],
+  summaries: Record<string, TaskStatusSummary>,
+) {
+  if (!storeTasks) return workspacePageTasks(entries!, summaries);
+  return storeTasks.map((task) => ({
+    ...task,
+    statusSummary: pickFreshestStatusSummary(task.statusSummary, summaries[task.id]),
+  }));
+}
+
 function useWorkspaceWorkflowMetadata(workspaceId: string | null) {
   const snapshots = useAppStore((state) => state.kanbanMulti.snapshots);
   const workflows = useAppStore((state) => state.workflows.items);
@@ -197,12 +229,12 @@ function useWorkspaceWorkflowMetadata(workspaceId: string | null) {
 }
 
 /**
- * Sidebar rows come from the server's bounded, globally ordered query. Workflow
- * metadata can reuse snapshots already loaded by a board, but this hook never
- * fetches complete task snapshots for the sidebar.
+ * Complete small inventories reuse the board's task state; other views use a
+ * bounded server page. This hook never fetches workflow snapshots for the sidebar.
  */
 export function useWorkspaceSidebarTasks(workspaceId: string | null): WorkspaceSidebarTasksResult {
-  const page = useSidebarTaskPage(workspaceId);
+  const storeTasks = useSidebarStoreTasks(workspaceId);
+  const page = useSidebarTaskPage(workspaceId, storeTasks === null);
   const taskRemoval = useAppStore((state) => state.taskRemoval);
   const { filteredWorkflows, stepsByWorkflowId, allSteps } =
     useWorkspaceWorkflowMetadata(workspaceId);
@@ -212,11 +244,12 @@ export function useWorkspaceSidebarTasks(workspaceId: string | null): WorkspaceS
     (state) => state.requestWorkspaceContextRefresh ?? NOOP_REFRESH,
   );
 
-  const pageEntries = page.response?.entries ?? [];
+  const pageEntries = storeTasks !== null ? undefined : (page.response?.entries ?? []);
   const pageTaskIds = useMemo(
     () =>
-      pageEntries.flatMap((entry) => (entry.kind === "task" && entry.task ? [entry.task.id] : [])),
-    [pageEntries],
+      storeTasks?.map((task) => task.id) ??
+      pageEntries!.flatMap((entry) => (entry.kind === "task" && entry.task ? [entry.task.id] : [])),
+    [pageEntries, storeTasks],
   );
   const statusSummaryByTaskId = useAppStore(
     useShallow((state) => {
@@ -229,8 +262,8 @@ export function useWorkspaceSidebarTasks(workspaceId: string | null): WorkspaceS
     }),
   );
   const nextPageTasks = useMemo(
-    () => workspacePageTasks(pageEntries, statusSummaryByTaskId),
-    [pageEntries, statusSummaryByTaskId],
+    () => projectSidebarTasks(storeTasks, pageEntries, statusSummaryByTaskId),
+    [pageEntries, statusSummaryByTaskId, storeTasks],
   );
   const previousTasksRef = useRef<SidebarTask[]>([]);
   const allTasks = useMemo(() => {
@@ -258,8 +291,8 @@ export function useWorkspaceSidebarTasks(workspaceId: string | null): WorkspaceS
   }, [allTasks, taskRemoval, workspaceId]);
 
   const wipQueueByTaskId = useMemo(
-    () => buildWipQueueByTaskId(pageEntries, allSteps, stepsByWorkflowId),
-    [pageEntries, allSteps, stepsByWorkflowId],
+    () => buildWipQueueByTaskId(pageEntries, allSteps, stepsByWorkflowId, allTasks),
+    [pageEntries, allSteps, stepsByWorkflowId, allTasks],
   );
   const workspaceWorkflows = useMemo<TaskMoveWorkflow[]>(
     () =>

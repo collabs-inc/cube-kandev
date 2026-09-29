@@ -66,6 +66,10 @@ export class SidebarTaskPageCache {
     this.pages.delete(key);
   }
 
+  forget(key: string) {
+    this.remove(key);
+  }
+
   clear() {
     this.epoch += 1;
     this.pages.clear();

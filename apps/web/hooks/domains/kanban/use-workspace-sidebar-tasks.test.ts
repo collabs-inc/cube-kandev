@@ -32,6 +32,9 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/components/state-provider", () => ({
   useAppStore: (selector: (state: typeof mocks.state) => unknown) => selector(mocks.state),
 }));
+vi.mock("@/hooks/domains/kanban/use-sidebar-store-tasks", () => ({
+  useSidebarStoreTasks: () => null,
+}));
 vi.mock("@/hooks/domains/kanban/use-sidebar-task-page", () => ({
   useSidebarTaskPage: () => ({
     ...mocks.page,

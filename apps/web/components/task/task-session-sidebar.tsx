@@ -58,7 +58,7 @@ function buildSidebarTaskItems(params: {
   repositoriesByWorkspace: Record<string, Repository[]>;
   allTasks: AggregatedSidebarTasks["allTasks"];
   allSteps: AggregatedSidebarTasks["allSteps"];
-  pageEntries: SidebarTaskPageResponse["entries"];
+  pageEntries: SidebarTaskPageResponse["entries"] | undefined;
   workflows: Array<{ id: string; name: string }>;
   wipQueueByTaskId: Map<string, WipQueueStatus>;
   acknowledgedAgentErrors: Record<string, string>;
@@ -90,7 +90,7 @@ function buildSidebarTaskItems(params: {
   const titleById = new Map(allTasks.map((task) => [task.id, task.title]));
   const workflowNameById = new Map(workflows.map((workflow) => [workflow.id, workflow.name]));
   const stepTitleById = new Map(allSteps.map((step) => [step.id, step.title]));
-  applySidebarPageMetadata(pageEntries, {
+  applySidebarPageMetadata(pageEntries ?? [], {
     titleById,
     workflowNameById,
     stepTitleById,
@@ -538,7 +538,7 @@ export const TaskSessionSidebar = memo(function TaskSessionSidebar({
   const prefs = useSidebarTaskPrefs();
   const grouped = useMemo(
     () =>
-      MOCK_SIDEBAR
+      MOCK_SIDEBAR || pageEntries === undefined
         ? applyView(displayTasks, effectiveView, {
             pinnedTaskIds: prefs.pinnedTaskIds,
             orderedTaskIds: prefs.orderedTaskIds,

@@ -1,6 +1,6 @@
 ---
 created: 2026-09-28
-status: done
+status: in_progress
 requirements:
   - REQ-UI-TASK-NAVIGATION-RESPONSIVENESS-001
   - REQ-UI-SIDEBAR-ARCHIVED-FILTER-002
@@ -18,7 +18,9 @@ Repair overview hydration, repeated session reads, and blocking file-tree
 restoration. Then measure the repaired task switch and investigate the remaining
 memory/debug questions in an isolated runtime. Execute the work orders
 sequentially in the primary session. Implementation was explicitly requested
-after the design checkpoint. Tasks 01-06 are complete; the user's follow-up
+after the design checkpoint. Tasks 01-06 are complete; Task 07 restores small sidebar views from Zustand in
+the same PR, as explicitly requested. No additional local test runs or seeded
+preview are required; CI owns further validation. the user's follow-up
 [Task 06](task-06-firefox-task-paint.md) removes measured Firefox rendering work
 and records the remaining latency and desktop/phone verification. Its background
 refresh follow-up also removes the task-list shift caused by routine query status.
@@ -322,3 +324,7 @@ Preserve this package's row, file-tree, and scoped-read regression guarantees.
 Task 04 and Tasks 06–08 now have implementation and desktop/phone regression
 coverage. Task 05 remains open pending editor-owner attribution. These tasks do
 not reopen completed work here.
+
+## Added work order
+
+- [Task 07: Restore shared-store sidebar rows](task-07-shared-sidebar-state.md), after Task 06.

@@ -56,7 +56,7 @@ function buildSheetItems(params: {
   repositoriesByWorkspace: Record<string, Repository[]>;
   allTasks: AggregatedSidebarTasks["allTasks"];
   allSteps: AggregatedSidebarTasks["allSteps"];
-  pageEntries: SidebarTaskPageResponse["entries"];
+  pageEntries: SidebarTaskPageResponse["entries"] | undefined;
   workflows: Array<{ id: string; name: string }>;
   wipQueueByTaskId: NonNullable<ReturnType<typeof useWorkspaceSidebarTasks>["wipQueueByTaskId"]>;
   acknowledgedAgentErrors: Record<string, string>;
@@ -90,7 +90,7 @@ function buildSheetItems(params: {
   const stepTitleById = new Map(allSteps.map((step) => [step.id, step.title]));
   const stepColorById = new Map(allSteps.map((step) => [step.id, step.color]));
   const titleById = new Map(allTasks.map((task) => [task.id, task.title]));
-  applySidebarPageMetadata(pageEntries, {
+  applySidebarPageMetadata(pageEntries ?? [], {
     titleById,
     workflowNameById,
     stepTitleById,

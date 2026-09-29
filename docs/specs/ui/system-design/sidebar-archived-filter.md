@@ -91,7 +91,7 @@ The response contains `query_key`, `page`, `page_size`, `total_entries`, `total_
 `total_tasks` counts all matching tasks. Add `total_visible_tasks` for task rows after collapse visibility.
 `total_entries` is display metadata only and never drives pagination.
 Paginator visibility is `total_visible_tasks > 100`; headings and continuation labels do not count.
-Use this same endpoint for small and large lists, with no eager-fetch threshold probe.
+Use this endpoint for large or unavailable active inventories and archived lists, with no eager-fetch threshold probe.
 Small views return their full task-row set in the first response and hide pagination controls.
 
 Task entries contain identity, parent ID, depth, filtered descendant count, and the bounded
@@ -153,11 +153,13 @@ order. This gives a concrete database ordering rule without installing custom co
 For built-in groups, retain their explicit rank. Order user-named groups by stored name.
 This deliberately replaces browser-dependent `localeCompare` for sidebar text ordering;
 case and accented-title ties can move after upgrade. Last activity ranking is unchanged.
-Use the same ordering policy for small and large views, so crossing the threshold cannot change collation.
+Small complete store-backed inventories restore the pre-pagination client view ordering.
+Crossing into the server path can change text collation and equal-value tie order;
+server pages retain their canonical order without client re-sorting.
 Other non-sidebar consumers of the client engine remain unchanged.
 Conformance fixtures record this text-order compatibility difference explicitly for each
 dialect; all filter, tree, pin, and numeric ordering expectations remain shared.
-The query response is authoritative for every sidebar view order; the browser must not re-sort it.
+The query response is authoritative for server-paged view order; the browser must not re-sort it.
 
 Cycle guards must bound recursive traversal by the candidate graph size.
 Break malformed cycles deterministically at the smallest task ID and promote that node.
@@ -171,7 +173,21 @@ only when the measured plan needs them; no new persisted presentation aggregate 
 
 ## Cache and live updates
 
-Replace the archive accumulator and active sidebar aggregation with one shared sidebar page cache per mounted query owner.
+Reuse the existing active sidebar aggregation for a complete current-workspace
+inventory of at most 100 non-archived tasks. Require every current-workspace
+workflow to have a non-placeholder, non-failed snapshot, and reject access-denied
+or mismatched workspace contexts. Do not fetch workflow snapshots solely to
+qualify for this path. Reuse the existing client view engine for active saved,
+draft and built-in views; archived views still use the bounded query.
+
+The store-backed path disables page loading, foreground query refresh and
+invalidation timers, releases the consumer request, clears the hook response and
+evicts the current view's redundant retained page. Its task references come from
+the current store projection and change with WebSocket updates; no new per-view
+task cache is added. A count above 100 or incomplete inventory switches back to
+server paging. Both desktop and phone use this single eligibility rule.
+
+Other inventories use one shared sidebar page cache per mounted query owner.
 The effective workspace/view hook owns the query key, current page, request generation,
 loading state, error state, and current response. Desktop and phone consumers share it.
 Retain one displayed page plus at most five distinct first-page snapshots for the
@@ -251,7 +267,8 @@ pagination does not bound an earlier sidebar-owned load.
 
 ## Active-task actions and independent detail
 
-All views consume the same paged projection, including lists of at most 100 tasks.
+Views with a complete small active inventory consume the shared store projection;
+other views consume the paged projection.
 Keep task/session detail and active Kanban snapshots separate from this list cache.
 Paging never calls setActiveTask, setActiveSession, or route navigation.
 Only a successful user-initiated page change scrolls the list to the top.

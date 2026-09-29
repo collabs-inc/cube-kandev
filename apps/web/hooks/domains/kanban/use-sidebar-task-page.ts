@@ -396,7 +396,7 @@ function useSidebarPageNavigation({
   useEffect(() => {
     const pending = navigation.current;
     if (!pending) return;
-    if (pending.key !== viewKey || error) {
+    if (pending.key !== viewKey || error || (!currentResponse && pendingPage === null)) {
       navigation.current = null;
       return;
     }
@@ -420,7 +420,7 @@ function useSidebarPageNavigation({
 }
 
 /** One current server-ordered page is shared by every built-in, saved, and draft view. */
-export function useSidebarTaskPage(workspaceId: string | null) {
+export function useSidebarTaskPage(workspaceId: string | null, enabled = true) {
   const view = useEffectiveSidebarView(workspaceId);
   const { i18n, t } = useTranslation();
   const store = useAppStoreApi();
@@ -448,14 +448,22 @@ export function useSidebarTaskPage(workspaceId: string | null) {
     subtaskOrderByParentId,
   });
   viewKeyRef.current = viewKey;
-  const loader = useSidebarPageLoader(workspaceId, workspaceGeneration, store, t, viewKeyRef);
-  const { response, pendingPage, error, loadPage } = loader;
-  const cachedResponse = workspaceId ? sidebarTaskPageCache(store).get(viewKey) : null;
-  const currentResponse = loader.responseViewKey === viewKey ? response : cachedResponse;
+  const queryWorkspaceId = enabled ? workspaceId : null;
+  const loader = useSidebarPageLoader(queryWorkspaceId, workspaceGeneration, store, t, viewKeyRef);
+  const { response, loadPage } = loader;
+  const pendingPage = enabled ? loader.pendingPage : null;
+  const error = enabled ? loader.error : null;
+  const cachedResponse = queryWorkspaceId ? sidebarTaskPageCache(store).get(viewKey) : null;
+  const viewResponse = loader.responseViewKey === viewKey ? response : cachedResponse;
+  const currentResponse = enabled ? viewResponse : null;
   const currentPage = currentResponse?.page ?? 1;
 
+  useEffect(() => {
+    if (!enabled) sidebarTaskPageCache(store).forget(viewKey);
+  }, [enabled, store, viewKey]);
+
   useSidebarPageAutoLoad({
-    workspaceId,
+    workspaceId: queryWorkspaceId,
     workspaceGeneration,
     viewKey,
     queryView,
@@ -476,8 +484,8 @@ export function useSidebarTaskPage(workspaceId: string | null) {
     setRefreshRevision((revision) => revision + 1);
   }, [loader.hasInFlight]);
 
-  useForegroundRefresh(refresh, Boolean(workspaceId), workspaceId);
-  useSidebarRevisionRefresh(workspaceId, queryRevision, refresh);
+  useForegroundRefresh(refresh, Boolean(queryWorkspaceId), queryWorkspaceId);
+  useSidebarRevisionRefresh(queryWorkspaceId, queryRevision, refresh);
 
   const goToPage = useSidebarPageNavigation({
     currentResponse,

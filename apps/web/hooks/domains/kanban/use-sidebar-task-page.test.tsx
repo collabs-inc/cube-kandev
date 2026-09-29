@@ -5,6 +5,8 @@ import { ApiError } from "@/lib/api/client";
 import { querySidebarTasks } from "@/lib/api/domains/kanban-api";
 import type { SidebarTaskPageResponse, SidebarTaskQuery } from "@/lib/types/http";
 import { useSidebarTaskPage } from "./use-sidebar-task-page";
+import { sidebarTaskPageCache } from "@/lib/sidebar/sidebar-task-page-cache";
+import type { AppState } from "@/lib/state/store";
 
 const mocks = vi.hoisted(() => ({
   state: {
@@ -90,6 +92,33 @@ beforeEach(() => {
 });
 
 describe("useSidebarTaskPage", () => {
+  it("releases pending reads and drops the duplicate page when shared state takes over", async () => {
+    const pending = deferred<SidebarTaskPageResponse>();
+    vi.mocked(querySidebarTasks).mockResolvedValueOnce(response(1, false, false));
+    const hook = renderHook(({ enabled }) => useSidebarTaskPage("ws-1", enabled), {
+      initialProps: { enabled: true },
+    });
+    await waitFor(() => expect(hook.result.current.response).not.toBeNull());
+    const key = hook.result.current.scopeKey;
+    const cache = sidebarTaskPageCache(store as unknown as { getState: () => AppState });
+    expect(cache.get(key)).not.toBeNull();
+    vi.mocked(querySidebarTasks).mockReturnValueOnce(pending.promise);
+    act(() => hook.result.current.refresh());
+    await waitFor(() => expect(querySidebarTasks).toHaveBeenCalledTimes(2));
+    const signal = vi.mocked(querySidebarTasks).mock.calls[1][2]?.init?.signal;
+    hook.rerender({ enabled: false });
+    expect(signal?.aborted).toBe(true);
+    expect(hook.result.current.response).toBeNull();
+    expect(cache.get(key)).toBeNull();
+    expect(hook.result.current.isLoading).toBe(false);
+    expect(hook.result.current.requestedPage).toBeNull();
+    await act(async () => pending.resolve(response(1, false, false)));
+    expect(cache.get(key)).toBeNull();
+    expect(hook.result.current.response).toBeNull();
+    act(() => hook.result.current.retry());
+    expect(querySidebarTasks).toHaveBeenCalledTimes(2);
+  });
+
   it("requests one bounded page and keeps the accepted page when a replacement fails", async () => {
     vi.mocked(querySidebarTasks)
       .mockResolvedValueOnce(response(1, false, true))
