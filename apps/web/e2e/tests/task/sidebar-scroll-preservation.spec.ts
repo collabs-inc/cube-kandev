@@ -182,11 +182,14 @@ test.describe("sidebar scrolling", () => {
     await expect
       .poll(() => titleText.evaluate((element) => element.style.transform))
       .toMatch(/^translateX\(-/);
-    const rowBoxBeforeHover = await taskRow.boundingBox();
-    if (!rowBoxBeforeHover) throw new Error("Long-title sidebar row has no layout box");
-    await taskRow.hover({
-      position: { x: rowBoxBeforeHover.width - 2, y: rowBoxBeforeHover.height / 2 },
-    });
+    // The title animation is checked above. Move to stable row padding so the
+    // moving text cannot disturb the action-button hover transition.
+    const hoverRowBox = await taskRow.boundingBox();
+    if (!hoverRowBox) throw new Error("Long-title sidebar row has no layout box");
+    await testPage.mouse.move(
+      hoverRowBox.x + hoverRowBox.width - 2,
+      hoverRowBox.y + hoverRowBox.height / 2,
+    );
     await expect(actions.locator("..")).toHaveCSS("opacity", "1");
     await expect(actions).toBeInViewport();
 

@@ -42,7 +42,16 @@ test.describe("Agent profile — enable/disable", () => {
       await expect(saveButton).toHaveCount(1);
       await expect(saveButton).toBeEnabled({ timeout: 10_000 });
       await saveButton.click();
-      await expect(testPage.getByText(/unsaved changes/i)).toBeHidden({ timeout: 15_000 });
+      await expect(testPage.getByTestId("settings-floating-save")).toHaveAttribute(
+        "data-status",
+        "saved",
+        { timeout: 15_000 },
+      );
+      await expect
+        .poll(async () => (await apiClient.getAgentProfile(profile.id)).enabled, {
+          timeout: 15_000,
+        })
+        .toBe(false);
 
       // 2. Reload — the toggle must reflect the persisted disabled state.
       await testPage.reload();
@@ -124,7 +133,16 @@ test.describe("Agent profile — enable/disable", () => {
       const saveButton = testPage.getByRole("button", { name: /^Save( changes)?$/i });
       await expect(saveButton).toBeEnabled({ timeout: 10_000 });
       await saveButton.click();
-      await expect(testPage.getByText(/unsaved changes/i)).toBeHidden({ timeout: 15_000 });
+      await expect(testPage.getByTestId("settings-floating-save")).toHaveAttribute(
+        "data-status",
+        "saved",
+        { timeout: 15_000 },
+      );
+      await expect
+        .poll(async () => (await apiClient.getAgentProfile(profile.id)).enabled, {
+          timeout: 15_000,
+        })
+        .toBe(enable);
 
       await testPage.goto("/settings/agents");
       await expect(row).toBeVisible({ timeout: 15_000 });
