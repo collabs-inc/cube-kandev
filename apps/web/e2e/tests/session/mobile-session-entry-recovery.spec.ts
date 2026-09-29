@@ -29,15 +29,18 @@ test.describe("mobile session entry recovery", () => {
     );
 
     if (!task.session_id) throw new Error("created recovery task has no session");
-    proxy.rejectResponsesUntilReleased("message.list", "injected history load failure", {
-      sessionId: task.session_id,
-    });
+    proxy.dropNextResponses("message.list", 2, { sessionId: task.session_id });
 
     const session = await openTaskSession(testPage, task.id);
     const chat = session.activeChat();
     const historyNotice = chat.getByTestId("session-history-unavailable");
+    await expect
+      .poll(() => proxy.droppedResponseCount("message.list"), {
+        timeout: 45_000,
+        message: "Waiting for both message.list responses to be dropped for this session",
+      })
+      .toBe(2);
     await expect(historyNotice).toBeVisible({ timeout: 45_000 });
-    expect(proxy.rejectedResponseCount("message.list")).toBeGreaterThan(0);
 
     const retry = historyNotice.getByTestId("session-history-retry");
     const retryBox = await retry.boundingBox();
@@ -47,12 +50,9 @@ test.describe("mobile session entry recovery", () => {
     expect(detailsBox?.height).toBeGreaterThanOrEqual(44);
     await assertNoDocumentHorizontalOverflow(testPage, "mobile session history recovery");
 
-    // Keep the simulated outage in place until after validating the retry
-    // controls. Otherwise an already-scheduled history refresh can succeed
-    // between releasing the route and measuring the phone-sized buttons.
-    proxy.releaseRejectedResponses("message.list");
     await retry.click();
     await expect(historyNotice).toHaveCount(0);
     await expect(chat).toContainText("simple mock response", { timeout: 30_000 });
+    expect(proxy.droppedResponseCount("message.list")).toBe(2);
   });
 });
