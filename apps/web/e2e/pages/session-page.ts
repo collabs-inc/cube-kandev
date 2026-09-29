@@ -777,15 +777,18 @@ export class SessionPage {
    */
   async openSidebarMenuAndClick(title: string, itemName: string, retries = 3): Promise<void> {
     const taskRow = this.sidebar.locator('[role="button"]').filter({ hasText: title });
-    for (let attempt = 0; attempt < retries; attempt++) {
+    const taskActions = taskRow.getByRole("button", { name: "Task actions" });
+    const attempts = Math.max(1, retries);
+    for (let attempt = 0; attempt < attempts; attempt++) {
       try {
-        await taskRow.hover();
-        await taskRow.getByRole("button", { name: "Task actions" }).click();
+        await taskRow.hover({ timeout: 3_000 });
+        await taskActions.click({ timeout: 3_000 });
         const menuItem = this.page.getByRole("menuitem", { name: itemName });
         await menuItem.waitFor({ state: "visible", timeout: 3_000 });
         await menuItem.click({ timeout: 3_000 });
         return;
-      } catch {
+      } catch (error) {
+        if (attempt === attempts - 1) throw error;
         // Menu was likely detached by a re-render — dismiss and retry
         await this.page.keyboard.press("Escape");
         await dwell(
@@ -796,10 +799,6 @@ export class SessionPage {
         );
       }
     }
-    // Final attempt without catch
-    await taskRow.hover();
-    await taskRow.getByRole("button", { name: "Task actions" }).click();
-    await this.page.getByRole("menuitem", { name: itemName }).click();
   }
 
   stepperStep(name: string): Locator {

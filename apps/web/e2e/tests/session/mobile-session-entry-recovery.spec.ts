@@ -15,8 +15,6 @@ async function createEntryTask(apiClient: ApiClient, seedData: SeedData, title: 
 }
 
 test.describe("mobile session entry recovery", () => {
-  test.describe.configure({ retries: 1 });
-
   test("keeps cached access while history recovers with phone-sized controls", async ({
     testPage,
     apiClient,
@@ -52,7 +50,7 @@ test.describe("mobile session entry recovery", () => {
     await assertNoDocumentHorizontalOverflow(testPage, "mobile session history recovery");
 
     proxy.releaseRejectedResponses("message.list");
-    await retry.click();
+    await retry.tap();
     await expect(historyNotice).toHaveCount(0);
     await expect(chat).toContainText("simple mock response", { timeout: 30_000 });
   });
