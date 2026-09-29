@@ -1,4 +1,5 @@
 import { expect, test } from "../../fixtures/test-base";
+import { waitForFiniteAnimations } from "../../helpers/animations";
 import { dwell } from "../../helpers/causal-waits";
 
 test("task details omit native coordination controls for ordinary and configured tasks", async ({
@@ -82,31 +83,37 @@ test("task details omit native coordination controls for ordinary and configured
     const completingStep = seedData.steps.find((step) => step.complete_task_on_enter);
     if (!completingStep) throw new Error("seed workflow has no completing step");
     const stepButton = testPage.getByTestId(`workflow-step-${completingStep.name}`);
-    const blockedMove = testPage.waitForResponse(
+    const moveResponse = testPage.waitForResponse(
       (response) =>
-        response.url().endsWith(`/api/v1/tasks/${configuredTask.id}/move`) &&
-        response.status() === 409,
+        new URL(response.url()).pathname === `/api/v1/tasks/${configuredTask.id}/move` &&
+        response.request().method() === "POST",
     );
     if (await stepButton.isVisible()) {
       await stepButton.hover();
       const movePopover = testPage.getByTestId("workflow-step-popover");
       await expect(movePopover).toBeVisible();
+      await waitForFiniteAnimations(movePopover);
       await movePopover.getByTestId("workflow-step-move-here").click();
     } else {
       // The responsive top bar replaces the full step list with a disclosure
       // when its center region is constrained.
-      await testPage.getByTestId("workflow-stepper-minimal").click();
-      const targetStep = testPage
-        .getByTestId("workflow-step-disclosure")
-        .getByTestId(`workflow-step-disclosure-row-${completingStep.id}`);
+      await testPage.getByTestId("workflow-stepper-minimal").hover();
+      const disclosure = testPage.getByTestId("workflow-step-disclosure");
+      await expect(disclosure).toBeVisible();
+      await waitForFiniteAnimations(disclosure);
+      const targetStep = disclosure.getByTestId(
+        `workflow-step-disclosure-row-${completingStep.id}`,
+      );
       await expect(targetStep).toBeVisible();
       const moveButton = targetStep.getByTestId(
         `workflow-step-disclosure-move-${completingStep.id}`,
       );
       await expect(moveButton).toBeVisible();
+      await waitForFiniteAnimations(disclosure);
       await moveButton.click();
     }
-    await blockedMove;
+    const move = await moveResponse;
+    expect(move.status()).toBe(409);
     await expect(testPage.getByTestId("task-move-error-banner")).toBeVisible();
     expect(coordinationReads).toEqual([]);
   } finally {
