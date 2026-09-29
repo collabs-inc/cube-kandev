@@ -8,6 +8,10 @@ on:
     types: [opened, ready_for_review, reopened, synchronize, labeled]
 
 env:
+  # OpenCode Zen states that providers use zero retention and do not train by
+  # default; its privacy page lists model-specific exceptions. DeepSeek is not
+  # listed (checked 2026-09-29). Recheck the policy before changing this model:
+  # https://opencode.ai/docs/zen/
   # Keep this model ID in sync with the agent definition below.
   PR_WALKTHROUGH_MODEL: opencode/deepseek-v4-flash-free
 
