@@ -3,7 +3,7 @@ import { Virtualizer } from "@tanstack/react-virtual";
 import { measureFileTreeElement, observeFileTreeRect } from "./file-tree-measurement";
 
 function createVirtualizer(estimateSize: number): Virtualizer<HTMLDivElement, HTMLDivElement> {
-  return new Virtualizer<HTMLDivElement, HTMLDivElement>({
+  const instance = new Virtualizer<HTMLDivElement, HTMLDivElement>({
     count: 1,
     getScrollElement: () => null,
     estimateSize: () => estimateSize,
@@ -12,6 +12,8 @@ function createVirtualizer(estimateSize: number): Virtualizer<HTMLDivElement, HT
     observeElementOffset: () => {},
     getItemKey: () => "row-a",
   });
+  instance.targetWindow = window;
+  return instance;
 }
 
 function resizeEntry(element: HTMLDivElement, blockSize: number): ResizeObserverEntry {
@@ -80,6 +82,24 @@ describe("file-tree viewport measurements", () => {
 });
 
 describe("file-tree row measurements", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("measures rows synchronously without ResizeObserver and protects hidden geometry", () => {
+    vi.stubGlobal("ResizeObserver", undefined);
+    const element = document.createElement("div");
+    element.dataset.index = "0";
+    let height = 52;
+    const readHeight = vi.fn(() => height);
+    Object.defineProperty(element, "offsetHeight", { get: readHeight });
+    const virtualizer = createVirtualizer(28);
+    virtualizer.itemSizeCache.set("row-a", 44);
+
+    expect(measureFileTreeElement(element, undefined, virtualizer)).toBe(52);
+    expect(readHeight).toHaveBeenCalledOnce();
+    height = 0;
+    expect(measureFileTreeElement(element, undefined, virtualizer)).toBe(44);
+  });
+
   it.each([28, 44, 48])("mounts with positive %dpx geometry without forcing layout", (estimate) => {
     const element = document.createElement("div");
     element.dataset.index = "0";

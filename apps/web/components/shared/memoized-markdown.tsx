@@ -27,6 +27,8 @@ function renderStaticMarkdown(content: string): ReturnType<typeof ReactMarkdown>
     renderedMarkdown.set(content, cached);
     return cached;
   }
+  // This cache requires react-markdown's synchronous, hook-free export.
+  // Re-check that contract when upgrading the dependency.
   const result = ReactMarkdown({
     children: content,
     remarkPlugins,

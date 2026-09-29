@@ -36,7 +36,10 @@ export function measureFileTreeElement(
 ): number {
   // ResizeObserver supplies actual geometry after layout. Mounting rows uses
   // cached/estimated sizes instead of forcing layout for each new DOM node.
-  const measuredSize = entry ? tanstackMeasureElement(element, entry, instance) : 0;
+  // Without an observer, synchronous measurement remains the geometry source.
+  let measuredSize = 0;
+  if (entry) measuredSize = tanstackMeasureElement(element, entry, instance);
+  else if (!instance.targetWindow?.ResizeObserver) measuredSize = element.offsetHeight;
   if (measuredSize > 0) return measuredSize;
 
   const index = instance.indexFromElement(element);

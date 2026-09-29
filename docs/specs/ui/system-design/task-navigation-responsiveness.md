@@ -296,8 +296,10 @@ Cached route data must also avoid unnecessary synchronous browser work:
   it so a later mount reads the current viewport.
 - File-tree rows initially use positive cached or estimated heights. Browser
   ResizeObserver entries provide actual row and viewport sizes, including later
-  resizes and visibility changes. Keep the library fallback when ResizeObserver
-  is unavailable. Preserve the existing row window, selection and scroll rules.
+  resizes and visibility changes. When ResizeObserver is unavailable, measure
+  mounted rows synchronously and keep the library's viewport fallback. Preserve
+  positive cached row geometry while hidden and retain the existing row window,
+  selection and scroll rules.
 - Pinned-pane enforcement reads container width once before changing constraints;
   each subsequent layout event still measures the current container.
 - Spinner CSS provides initial motion; animation promotion runs after the first

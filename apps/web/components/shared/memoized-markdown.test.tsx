@@ -1,6 +1,6 @@
 import { createContext, useState } from "react";
 import { cleanup, fireEvent, render } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const markdownSpy = vi.fn();
 
@@ -20,9 +20,8 @@ vi.mock("@/components/shared/markdown-components", () => ({
   remarkPlugins: [],
 }));
 
-import { MemoizedMarkdown } from "./memoized-markdown";
+let MemoizedMarkdown: typeof import("./memoized-markdown").MemoizedMarkdown;
 import { markdownComponents } from "./markdown-components";
-import { __resetMarkdownCounters } from "@/lib/markdown/normalize-cache";
 
 function Parent({ content }: { content: string }) {
   const [tick, setTick] = useState(0);
@@ -35,10 +34,14 @@ function Parent({ content }: { content: string }) {
 }
 
 describe("MemoizedMarkdown", () => {
+  beforeEach(async () => {
+    vi.resetModules();
+    ({ MemoizedMarkdown } = await import("./memoized-markdown"));
+  });
+
   afterEach(() => {
     cleanup();
     markdownSpy.mockClear();
-    __resetMarkdownCounters();
   });
 
   it("does not re-render markdown when the parent re-renders with same content", () => {
@@ -50,7 +53,7 @@ describe("MemoizedMarkdown", () => {
   });
 
   it("re-renders markdown when content changes", () => {
-    const { rerender } = render(<MemoizedMarkdown content="first" />);
+    const { rerender } = render(<MemoizedMarkdown content="hello world" />);
     expect(markdownSpy).toHaveBeenCalledTimes(1);
     rerender(<MemoizedMarkdown content="second" />);
     expect(markdownSpy).toHaveBeenCalledTimes(2);

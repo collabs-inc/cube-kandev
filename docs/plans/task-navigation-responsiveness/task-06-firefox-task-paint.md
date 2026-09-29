@@ -143,3 +143,26 @@ source/build identity; `start.py` and `stop.py` operate only on its owned runtim
 No private transcript content enters fixtures or public assets. Public docs need
 no change: controls, terminology, API/configuration and installation behavior
 remain unchanged; the owning system design records the rendering/cache bounds.
+
+### Review follow-up
+
+PR #4062 identified a missing synchronous row fallback when ResizeObserver is
+unavailable. A new regression first failed with the stale 44px cached height
+instead of the actual 52px height. Rows now read actual height in that environment
+and preserve the positive cache only while hidden; observer-backed browsers keep
+the deferred measurement path. The fallback and Markdown rendering/context/motion
+suites passed all 63 tests after this change; changed-file lint/format and web
+typecheck also passed.
+
+The static renderer now documents its required synchronous, hook-free dependency
+contract. Its tests reload the module before each case, including a repeated
+content string in consecutive cases, so cache state cannot depend on test order.
+No production-only test reset API is needed. The performance table above records
+`449491c73`; the follow-up preserves its observer-backed browser path.
+
+Post-follow-up browser validation rebuilt through
+`pnpm e2e:run --host --project chromium tests/task/large-file-tree-virtualization.spec.ts`
+(three passed), then ran the same fresh assets with strict WebSocket accounting
+through `pnpm e2e:raw` for the Firefox desktop suite and the mobile Chrome
+`mobile-large-file-tree-virtualization.spec.ts` suite (four passed). Specification
+catalog/lint checks and normal commit hooks also validate the follow-up.
