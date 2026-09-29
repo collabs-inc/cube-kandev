@@ -98,6 +98,7 @@ test.describe("Mobile workspace repository sets", () => {
 
     const surface = testPage.getByTestId("repository-set-editor-surface");
     await expect(surface).toBeVisible();
+    await waitForFiniteAnimations(surface);
     await expect(surface).toHaveClass(/h-\[100dvh\]/);
     await expect.poll(async () => (await surface.boundingBox())?.height).toBeCloseTo(844, 0);
     await expect(testPage.getByTestId("repository-set-editor-form")).toHaveClass(
