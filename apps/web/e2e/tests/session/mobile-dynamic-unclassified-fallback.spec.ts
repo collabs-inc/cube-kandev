@@ -23,12 +23,14 @@ test.describe("mobile: dynamic unclassified fallback", () => {
     const releaseFeature = await backend.useEnv({
       KANDEV_FEATURES_DYNAMIC_AGENT_ROUTING: "true",
     });
+    const dynamicProfileIds = new Set<string>();
 
     try {
       const profile = await createDynamicFallbackProfile(apiClient, seedData, {
         name: `Unclassified mobile ${Date.now().toString(36)}`,
         enabled: true,
       });
+      dynamicProfileIds.add(profile.dynamicProfile.id);
       const attempt = await startDynamicFallbackSession(testPage, apiClient, seedData, {
         title: "Unclassified mobile repeated failure",
         prompt: "/e2e:dynamic-unclassified:same:3",
@@ -107,10 +109,19 @@ test.describe("mobile: dynamic unclassified fallback", () => {
       expect(afterReload?.route_generation).toBe(switched?.route_generation);
       await assertNoDocumentHorizontalOverflow(testPage);
     } finally {
-      await apiClient.updateWorkflowStep(seedData.startStepId, {
-        disable_unclassified_fallback: false,
-      });
-      await releaseFeature();
+      try {
+        await apiClient.updateWorkflowStep(seedData.startStepId, {
+          disable_unclassified_fallback: false,
+        });
+      } finally {
+        try {
+          for (const profileId of dynamicProfileIds) {
+            await apiClient.deleteAgentProfile(profileId, true);
+          }
+        } finally {
+          await releaseFeature();
+        }
+      }
     }
   });
 });

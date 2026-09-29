@@ -95,16 +95,18 @@ test.describe("File tree chat context", () => {
     await session.waitForLoad();
     await session.waitForChatIdle({ timeout: 45_000 });
     await session.clickTab("Files");
-    await session.fileTree.waitForFileTreeNode(filePath, 30_000);
-    await session.fileTree.waitForFileTreeNode(directoryPath, 30_000);
 
     const addNodeToContext = async (nodePath: string) => {
+      // File-tree rows are virtualized. Reveal each row immediately before
+      // interacting so a later reveal cannot recycle its DOM node.
+      await session.fileTree.waitForFileTreeNode(nodePath, 30_000);
       await session.fileTreeNode(nodePath).click({ button: "right" });
       await expect(session.fileTreeAddToChatContextMenuItem()).toBeVisible();
       await session.fileTreeAddToChatContextMenuItem().click();
     };
 
     await addNodeToContext(filePath);
+    await session.fileTree.waitForFileTreeNode(directoryPath, 30_000);
     await session.fileTreeNode(directoryPath).click({ button: "right" });
     await expect(session.fileTreeAddToChatContextMenuItem()).toBeVisible();
     await prCapture.screenshot("desktop-file-tree-menu", {

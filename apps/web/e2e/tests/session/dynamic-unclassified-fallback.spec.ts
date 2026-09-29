@@ -22,9 +22,19 @@ test.describe("dynamic unclassified fallback", () => {
     const releaseFeature = await backend.useEnv({
       KANDEV_FEATURES_DYNAMIC_AGENT_ROUTING: "true",
     });
+    const dynamicProfileIds = new Set<string>();
+    const createTrackedProfile = async (options: {
+      name: string;
+      enabled: boolean;
+      threshold?: number;
+    }) => {
+      const created = await createDynamicFallbackProfile(apiClient, seedData, options);
+      dynamicProfileIds.add(created.dynamicProfile.id);
+      return created;
+    };
 
     try {
-      const enabled = await createDynamicFallbackProfile(apiClient, seedData, {
+      const enabled = await createTrackedProfile({
         name: "Unclassified desktop core",
         enabled: true,
       });
@@ -121,7 +131,7 @@ test.describe("dynamic unclassified fallback", () => {
         manualRetries?: number;
         veto?: boolean;
       }) => {
-        const profile = await createDynamicFallbackProfile(apiClient, seedData, {
+        const profile = await createTrackedProfile({
           name: `Unclassified desktop ${options.suffix}`,
           enabled: options.enabled,
         });
@@ -187,10 +197,19 @@ test.describe("dynamic unclassified fallback", () => {
         enabled: true,
       });
     } finally {
-      await apiClient.updateWorkflowStep(seedData.startStepId, {
-        disable_unclassified_fallback: false,
-      });
-      await releaseFeature();
+      try {
+        await apiClient.updateWorkflowStep(seedData.startStepId, {
+          disable_unclassified_fallback: false,
+        });
+      } finally {
+        try {
+          for (const profileId of dynamicProfileIds) {
+            await apiClient.deleteAgentProfile(profileId, true);
+          }
+        } finally {
+          await releaseFeature();
+        }
+      }
     }
   });
 });

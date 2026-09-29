@@ -111,18 +111,14 @@ test.describe("Agent survival across backend restart", () => {
       await kanban.goto();
       const card = kanban.taskCard(task.id);
       const sidebarLoadError = testPage.getByTestId("sidebar-task-load-error");
-      await expect
-        .poll(
-          async () => {
-            if (await card.isVisible()) return "loaded";
-            if (await sidebarLoadError.isVisible()) return "refresh-error";
-            return "pending";
-          },
-          { timeout: 20_000, message: "The task board did not load the completed task" },
-        )
-        .not.toBe("pending");
+      // Wait on the UI state transition itself. Polling is enough to miss a
+      // refresh error that renders at the end of the board's load window.
+      await expect(card.or(sidebarLoadError).first()).toBeVisible({ timeout: 20_000 });
       if (await sidebarLoadError.isVisible()) {
-        await sidebarLoadError.getByRole("button", { name: "Retry" }).click();
+        const retry = sidebarLoadError.getByRole("button", { name: "Retry" });
+        await expect(retry).toBeEnabled();
+        await retry.click();
+        await expect(sidebarLoadError).toHaveCount(0, { timeout: 20_000 });
         await expect(card).toBeVisible({ timeout: 20_000 });
       }
       await expect(card).toBeVisible({ timeout: 20_000 });
