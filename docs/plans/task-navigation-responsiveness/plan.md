@@ -14,9 +14,11 @@ legacy_specs: []
 
 Repair overview hydration, repeated session reads, and blocking file-tree
 restoration. Then measure the repaired task switch and investigate the remaining
-memory/debug questions in an isolated runtime. Execute four work orders
+memory/debug questions in an isolated runtime. Execute the work orders
 sequentially in the primary session. Implementation was explicitly requested
-after the design checkpoint and is complete.
+after the design checkpoint. Tasks 01-06 are complete; the user's follow-up
+[Task 06](task-06-firefox-task-paint.md) removes measured Firefox rendering work
+and records the remaining latency and desktop/phone verification.
 
 ## Evidence and confirmed causes
 
@@ -207,8 +209,10 @@ browser still exhibits a problem after deterministic regressions pass.
 - [x] [Task 02: Share session read ownership](task-02-shared-session-reads.md)
 - [x] [Task 03: Restore file trees progressively](task-03-progressive-file-trees.md)
 - [x] [Task 04: Verify navigation and investigate retained memory](task-04-navigation-evidence.md)
+- [x] [Task 05: Immediate task route presentation](task-05-immediate-task-route.md)
+- [x] [Task 06: Remove unnecessary work before task-switch paint](task-06-firefox-task-paint.md)
 
-The sequence is 01 -> 02 -> 03 -> 04. It does not authorize parallel agents.
+The sequence is 01 -> 02 -> 03 -> 04 -> 05 -> 06. It does not authorize parallel agents.
 Install fresh-worktree dependencies once before implementation checks:
 `(cd apps && pnpm install --frozen-lockfile)`. Each work order supplies complete
 targeted commands; desktop/mobile suites run sequentially with managed limits.

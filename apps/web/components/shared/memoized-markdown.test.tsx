@@ -1,5 +1,5 @@
 import { createContext, useState } from "react";
-import { fireEvent, render } from "@testing-library/react";
+import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const markdownSpy = vi.fn();
@@ -21,6 +21,7 @@ vi.mock("@/components/shared/markdown-components", () => ({
 }));
 
 import { MemoizedMarkdown } from "./memoized-markdown";
+import { markdownComponents } from "./markdown-components";
 import { __resetMarkdownCounters } from "@/lib/markdown/normalize-cache";
 
 function Parent({ content }: { content: string }) {
@@ -35,6 +36,7 @@ function Parent({ content }: { content: string }) {
 
 describe("MemoizedMarkdown", () => {
   afterEach(() => {
+    cleanup();
     markdownSpy.mockClear();
     __resetMarkdownCounters();
   });
@@ -51,6 +53,53 @@ describe("MemoizedMarkdown", () => {
     const { rerender } = render(<MemoizedMarkdown content="first" />);
     expect(markdownSpy).toHaveBeenCalledTimes(1);
     rerender(<MemoizedMarkdown content="second" />);
+    expect(markdownSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it("reuses unchanged Markdown after a task transcript unmounts and returns", () => {
+    const first = render(<MemoizedMarkdown content="A completed delivery review" />);
+    first.unmount();
+    const second = render(<MemoizedMarkdown content="A completed delivery review" />);
+
+    expect(second.getByText("A completed delivery review")).toBeTruthy();
+    expect(markdownSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("reuses user prompts that explicitly pass the standard renderers", () => {
+    const props = { content: "A prompt without entity mentions", components: markdownComponents };
+    const first = render(<MemoizedMarkdown {...props} />);
+    first.unmount();
+    const second = render(<MemoizedMarkdown {...props} />);
+    expect(second.getByText(props.content)).toBeTruthy();
+    expect(markdownSpy).toHaveBeenCalledOnce();
+  });
+
+  it("evicts old renderings when many distinct messages have been visited", () => {
+    const content = "Old delivery rendering with bounded retention";
+    const view = render(<MemoizedMarkdown content={content} />);
+    for (let index = 0; index < 256; index++) {
+      view.rerender(<MemoizedMarkdown content={`Other delivery rendering ${index}`} />);
+    }
+    markdownSpy.mockClear();
+    view.rerender(<MemoizedMarkdown content={content} />);
+    expect(markdownSpy).toHaveBeenCalledOnce();
+  });
+
+  it("bounds retained content size as well as entry count", () => {
+    const content = `First large message ${"a".repeat(200_000)}`;
+    const view = render(<MemoizedMarkdown content={content} />);
+    view.rerender(<MemoizedMarkdown content={"b".repeat(200_000)} />);
+    view.rerender(<MemoizedMarkdown content={"c".repeat(200_000)} />);
+    markdownSpy.mockClear();
+    view.rerender(<MemoizedMarkdown content={content} />);
+    expect(markdownSpy).toHaveBeenCalledOnce();
+  });
+
+  it("does not retain an individual oversized message", () => {
+    const content = "Oversized delivery message ".repeat(25_000);
+    const first = render(<MemoizedMarkdown content={content} />);
+    first.unmount();
+    render(<MemoizedMarkdown content={content} />);
     expect(markdownSpy).toHaveBeenCalledTimes(2);
   });
 });
