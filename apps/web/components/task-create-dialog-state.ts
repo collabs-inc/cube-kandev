@@ -67,7 +67,13 @@ function useFormResetEffects({
     const previous = prevDialogRef.current;
     (prevDialogRef as React.MutableRefObject<typeof previous>).current = { open, workspaceId };
 
-    if (!open || (previous.open && previous.workspaceId === workspaceId)) return;
+    // A locked workflow can receive its workspace and workflow after an
+    // asynchronous wrapper finishes setup. Do not clear text the user entered
+    // while that context was loading; useLockedFieldSync updates the locked
+    // workflow and repository values separately.
+    if (!open || (previous.open && (previous.workspaceId === workspaceId || lockedWorkflow))) {
+      return;
+    }
 
     setOpenCycle((c) => c + 1);
 

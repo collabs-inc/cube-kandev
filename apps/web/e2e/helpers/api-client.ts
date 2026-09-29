@@ -1458,18 +1458,29 @@ export class ApiClient {
   ): Promise<void> {
     const cascade = options?.cascade ?? false;
     const discardWorktreeChanges = options?.discardWorktreeChanges ?? false;
-    const preview = await this.request<{ confirmation_id: string }>(
-      "POST",
-      "/api/v1/tasks/delete-preflight",
-      { task_ids: [taskId], cascade, discard_worktree_changes: discardWorktreeChanges },
-    );
     const query = new URLSearchParams();
     if (cascade) query.set("cascade", "true");
     if (discardWorktreeChanges) query.set("discard_worktree_changes", "true");
     const queryString = query.toString() ? `?${query.toString()}` : "";
-    await this.request("DELETE", `/api/v1/tasks/${taskId}${queryString}`, undefined, {
-      "X-Kandev-Task-Delete-Confirmation": preview.confirmation_id,
-    });
+
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const preview = await this.request<{ confirmation_id: string }>(
+        "POST",
+        "/api/v1/tasks/delete-preflight",
+        { task_ids: [taskId], cascade, discard_worktree_changes: discardWorktreeChanges },
+      );
+      try {
+        await this.request("DELETE", `/api/v1/tasks/${taskId}${queryString}`, undefined, {
+          "X-Kandev-Task-Delete-Confirmation": preview.confirmation_id,
+        });
+        return;
+      } catch (error) {
+        const stalePreview =
+          error instanceof Error &&
+          error.message.includes("task deletion preview is no longer current");
+        if (!stalePreview || attempt === 2) throw error;
+      }
+    }
   }
 
   async archiveTask(taskId: string): Promise<void> {

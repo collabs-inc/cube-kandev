@@ -49,6 +49,53 @@ describe("ApiClient.createAgentProfile", () => {
   });
 });
 
+describe("ApiClient.deleteTask", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("refreshes a deletion preview when concurrent task updates invalidate it", async () => {
+    let previewCount = 0;
+    let deleteCount = 0;
+    const confirmationIds: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = new URL(String(input));
+        if (url.pathname === "/api/v1/app-state") {
+          return Response.json({ interimSettingsInterlockToken: "test-token" });
+        }
+        if (url.pathname === "/api/v1/tasks/delete-preflight") {
+          previewCount += 1;
+          return Response.json({ confirmation_id: `confirmation-${previewCount}` });
+        }
+        if (url.pathname === "/api/v1/tasks/task-1" && init?.method === "DELETE") {
+          deleteCount += 1;
+          confirmationIds.push(
+            new Headers(init.headers).get("X-Kandev-Task-Delete-Confirmation") ?? "",
+          );
+          if (deleteCount === 1) {
+            return Response.json(
+              { error: "task deletion preview is no longer current" },
+              { status: 409 },
+            );
+          }
+          return Response.json({ success: true });
+        }
+        throw new Error(`unexpected request: ${url}`);
+      }),
+    );
+
+    await new ApiClient("http://backend.test").deleteTask("task-1", {
+      discardWorktreeChanges: true,
+    });
+
+    expect(previewCount).toBe(2);
+    expect(deleteCount).toBe(2);
+    expect(confirmationIds).toEqual(["confirmation-1", "confirmation-2"]);
+  });
+});
+
 describe("ApiClient user settings", () => {
   afterEach(() => {
     vi.unstubAllGlobals();

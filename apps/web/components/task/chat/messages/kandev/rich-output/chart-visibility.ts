@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 
+const CHART_PREWARM_MARGIN_PX = 200;
 // i18n-exempt: IntersectionObserver geometry, not user-facing copy.
-const CHART_PREWARM_MARGIN = "200px 0px";
+const CHART_PREWARM_MARGIN = `${CHART_PREWARM_MARGIN_PX}px 0px`;
 
 export function useChartPlotVisibility() {
   const plotRef = useRef<HTMLDivElement | null>(null);
@@ -24,8 +25,27 @@ export function useChartPlotVisibility() {
       },
       { rootMargin: CHART_PREWARM_MARGIN },
     );
+    const checkViewport = () => {
+      const bounds = plot.getBoundingClientRect();
+      const isNearViewport =
+        bounds.bottom >= -CHART_PREWARM_MARGIN_PX &&
+        bounds.top <= window.innerHeight + CHART_PREWARM_MARGIN_PX &&
+        bounds.right >= 0 &&
+        bounds.left <= window.innerWidth;
+      if (!isNearViewport) return;
+      setIsNearViewport(true);
+      observer.disconnect();
+    };
+
     observer.observe(plot);
-    return () => observer.disconnect();
+    document.addEventListener("scroll", checkViewport, true);
+    window.addEventListener("resize", checkViewport);
+    checkViewport();
+    return () => {
+      observer.disconnect();
+      document.removeEventListener("scroll", checkViewport, true);
+      window.removeEventListener("resize", checkViewport);
+    };
   }, [canObserveIntersection, shouldMountPlot]);
 
   useEffect(() => {
