@@ -118,6 +118,7 @@ type ChatInputContainerProps = {
   isCompleted?: boolean;
   sessionErrorMessage?: string;
   uncertainDelivery?: boolean;
+  deliveryRecoveryPhase?: "reconnecting" | "uncertain";
   needsRecovery?: boolean;
   /** The task-owned launch card renders the failed-start recovery. */
   launchErrorOwned?: boolean;
@@ -333,7 +334,7 @@ export const ChatInputContainer = forwardRef<ChatInputContainerHandle, ChatInput
     const isMoving = props.isMoving ?? false;
     const executorUnavailable = props.executorUnavailable ?? false;
     const isBusyVisual = isStarting || isMoving;
-    const useUncertainDeliveryControls = props.uncertainDelivery && p.isFailed;
+    const useUncertainDeliveryControls = props.uncertainDelivery && !p.isCompleted;
 
     const s = useChatInputContainer({
       ref,
@@ -381,6 +382,7 @@ export const ChatInputContainer = forwardRef<ChatInputContainerHandle, ChatInput
       shouldHideChatInputForLaunchError({
         isFailed: p.isFailed,
         launchErrorOwned: p.launchErrorOwned,
+        uncertainDelivery: useUncertainDeliveryControls,
       })
     ) {
       return null;
@@ -413,6 +415,7 @@ export const ChatInputContainer = forwardRef<ChatInputContainerHandle, ChatInput
         isCompleted: p.isCompleted,
         executorUnavailable,
         launchErrorOwned: p.launchErrorOwned,
+        uncertainDelivery: useUncertainDeliveryControls,
       })
     ) {
       return (
@@ -424,6 +427,7 @@ export const ChatInputContainer = forwardRef<ChatInputContainerHandle, ChatInput
           sessionId={sessionId}
           workspaceId={props.workspaceId}
           uncertainDelivery={props.uncertainDelivery}
+          deliveryRecoveryPhase={props.deliveryRecoveryPhase}
           recoveryActions={recoveryActions}
           {...buildStoppedBannerProps(props)}
         />

@@ -2261,7 +2261,9 @@ func (sm *SessionManager) callAgentctlPrompt(
 		}
 	}
 	if err == nil {
-		execution.setDeliverySubmissionID(client.LastDeliverySubmissionID())
+		acknowledgedID := client.LastDeliverySubmissionID()
+		activeID := deliverySubmissionIdentityForPrompt(submissionID, acknowledgedID)
+		execution.setDeliverySubmissionID(activeID)
 	}
 	return err
 }
