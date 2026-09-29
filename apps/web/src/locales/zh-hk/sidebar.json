@@ -130,5 +130,6 @@
   "nextPage": "下一頁",
   "pageLoadFailed": "無法載入此頁面。",
   "pageStatus": "第 {{page}} 頁，共 {{total}} 頁",
-  "previousPage": "上一頁"
+  "previousPage": "上一頁",
+  "filtersActive": "篩選已啓用"
 }

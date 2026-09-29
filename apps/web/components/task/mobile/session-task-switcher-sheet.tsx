@@ -17,7 +17,7 @@ import { useTaskSheetSelectionController } from "./task-sheet-selection-context"
 export { useTaskSheetSelectionController } from "./task-sheet-selection-context";
 import type { TaskSheetSelectionController } from "./session-task-switcher-sheet-selection";
 import { useTaskReadStatus } from "./session-task-switcher-sheet-read-status";
-import { TaskPickerSurface, InlineTaskHeader } from "./task-picker-surface";
+import { TaskPickerSurface, InlineTaskHeader, useTaskSheetOpener } from "./task-picker-surface";
 import { Button } from "@kandev/ui/button";
 import { QuickChatSheetButton } from "./quick-chat-sheet-button";
 import { TaskSwitcher } from "../task-switcher";
@@ -57,21 +57,9 @@ type SessionTaskSwitcherSheetProps = {
   navigate?: (taskId: string, sessionId?: string) => void;
   onCloseAutoFocus?: (event: Event) => void;
   renderInline?: (body: ReactNode) => ReactNode;
+  showInlineNewTask?: boolean;
   selection?: TaskSheetSelectionController;
 };
-function useTaskSheetOpener(open: boolean) {
-  const [opener, setOpener] = useState({ open: false, current: null as HTMLElement | null });
-  if (opener.open !== open) {
-    setOpener({
-      open,
-      current:
-        open && document.activeElement instanceof HTMLElement
-          ? document.activeElement
-          : opener.current,
-    });
-  }
-  return opener;
-}
 
 export function useMobileTaskLinking(workspaceId: string | null) {
   const store = useAppStoreApi();
@@ -347,6 +335,7 @@ type TaskSwitcherSurfaceContentProps = {
   onQuickChat: () => void;
   onNewTask: () => void;
   inline?: boolean;
+  showInlineNewTask?: boolean;
   expanded: boolean;
   onExpandedChange: (expanded: boolean) => void;
   onCreateSubtask: (taskId: string, taskTitle: string) => void;
@@ -385,6 +374,7 @@ function TaskSwitcherSurfaceContent({
   edit,
   linking,
   inline = false,
+  showInlineNewTask = true,
   expanded,
   onExpandedChange,
 }: TaskSwitcherSurfaceContentProps) {
@@ -419,6 +409,7 @@ function TaskSwitcherSurfaceContent({
     <>
       {inline ? (
         <InlineTaskHeader
+          showNewTask={showInlineNewTask}
           expanded={expanded}
           onExpandedChange={onExpandedChange}
           onNewTask={onNewTask}
@@ -533,6 +524,7 @@ export const SessionTaskSwitcherSheet = memo(function SessionTaskSwitcherSheet({
   navigate,
   onCloseAutoFocus,
   renderInline,
+  showInlineNewTask,
   selection,
 }: SessionTaskSwitcherSheetProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -568,6 +560,7 @@ export const SessionTaskSwitcherSheet = memo(function SessionTaskSwitcherSheet({
     <TaskSwitcherSurfaceContent
       open={open}
       inline={!!renderInline}
+      showInlineNewTask={showInlineNewTask}
       expanded={expanded}
       onExpandedChange={setExpanded}
       presentation={presentation}

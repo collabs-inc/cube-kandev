@@ -130,5 +130,6 @@
   "nextPage": "Next",
   "pageLoadFailed": "Could not load this page.",
   "pageStatus": "Page {{page}} of {{total}}",
-  "previousPage": "Previous"
+  "previousPage": "Previous",
+  "filtersActive": "Filters active"
 }

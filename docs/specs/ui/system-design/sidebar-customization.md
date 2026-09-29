@@ -11,6 +11,13 @@ requirements:
 
 # Sidebar Customization Design
 
+## Navigation hierarchy revision
+
+The [navigation hierarchy design](navigation-hierarchy.md) updates default action order,
+phone tool placement, and primary creation presentation. Existing controller, routing,
+provider eligibility, persistence, and focus ownership remain authoritative.
+
+
 ## Ownership and existing boundaries
 
 UI owns navigation composition and personal layout. Automation activity,
@@ -120,7 +127,7 @@ states. A failed catalog load is not treated as an empty resource collection.
 
 Apply layout ordering as a surface-specific projection after destination
 resolution. Leave command palette ordering, feature eligibility, startup page,
-brand links, and settings navigation unchanged. Defaults preserve existing order.
+brand links, and settings navigation unchanged. Canonical defaults put New Task before Home; saved desktop order remains authoritative.
 Newly registered plugin destinations append in their canonical location until
 customized. Retain hidden entries rather than treating omission as hidden.
 Unknown future node kinds must not be written back by an older editor.

@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 
 type AppSidebarSectionProps = {
   id: string;
+  presentation?: "section" | "navigation";
   label: string;
   collapsed: boolean;
   icon: DestinationIcon;
@@ -55,12 +56,12 @@ function SectionHeader({
   const showHeaderAction = !!headerAction && (expanded || headerActionVisibility === "always");
 
   return (
-    <div className="group/section flex items-center px-2 h-7 shrink-0">
+    <div className="group/section flex items-center px-2 min-h-9 shrink-0 [@media(pointer:coarse)]:min-h-11">
       <button
         ref={headerRef}
         type="button"
         onClick={onToggle}
-        className="flex min-w-0 flex-1 items-center gap-1.5 text-left cursor-pointer text-foreground/70 hover:text-foreground transition-colors"
+        className="flex min-h-7 [@media(pointer:coarse)]:min-h-11 min-w-0 flex-1 items-center gap-1.5 text-left cursor-pointer text-foreground/70 hover:text-foreground transition-colors"
         aria-expanded={expanded}
       >
         <span className="text-[11px] font-semibold uppercase tracking-wider truncate">{label}</span>
@@ -89,8 +90,53 @@ function SectionHeader({
   );
 }
 
+function NavigationSectionHeader({
+  label,
+  expanded,
+  onToggle,
+  headerRef,
+  headerAction,
+  headerActionVisibility,
+  collapsedSummary,
+  icon: Icon,
+  id,
+}: SectionHeaderProps & { icon: DestinationIcon; id: string }) {
+  return (
+    <div className="flex min-w-0 items-center gap-1">
+      <button
+        ref={headerRef}
+        type="button"
+        onClick={onToggle}
+        aria-expanded={expanded}
+        aria-controls={`sidebar-section-${id}`}
+        className="flex h-9 min-w-0 flex-1 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-left text-[13px] font-medium text-foreground/80 transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:min-h-11"
+      >
+        <Icon className="size-4 shrink-0" aria-hidden="true" />
+        <span className="flex-1 truncate">{label}</span>
+        {!expanded && collapsedSummary != null && (
+          <span
+            data-testid="sidebar-section-collapsed-summary"
+            className="text-[11px] tabular-nums text-muted-foreground"
+          >
+            {collapsedSummary}
+          </span>
+        )}
+        <IconChevronRight
+          className={cn(
+            "size-3.5 shrink-0 text-muted-foreground transition-transform",
+            expanded && "rotate-90",
+          )}
+          aria-hidden="true"
+        />
+      </button>
+      {headerAction && (expanded || headerActionVisibility === "always") && headerAction}
+    </div>
+  );
+}
+
 export function AppSidebarSection({
   id,
+  presentation = "section",
   label,
   collapsed,
   icon: Icon,
@@ -112,7 +158,7 @@ export function AppSidebarSection({
         <button
           ref={headerRef}
           type="button"
-          className="flex h-9 w-9 mx-auto items-center justify-center rounded-md text-foreground/70 hover:bg-muted/60 cursor-pointer"
+          className="flex h-9 w-9 [@media(pointer:coarse)]:size-11 mx-auto items-center justify-center rounded-md text-foreground/70 hover:bg-muted/60 cursor-pointer"
           onClick={() => {
             setCollapsed(false);
             if (!expanded) toggleSection(id, defaultExpanded);
@@ -130,6 +176,21 @@ export function AppSidebarSection({
 
   const handleToggle = () => toggleSection(id, defaultExpanded);
 
+  const Header = presentation === "navigation" ? NavigationSectionHeader : SectionHeader;
+  const header = (
+    <Header
+      id={id}
+      icon={Icon}
+      label={label}
+      expanded={expanded}
+      headerAction={headerAction}
+      headerActionVisibility={headerActionVisibility}
+      collapsedSummary={collapsedSummary}
+      onToggle={handleToggle}
+      headerRef={headerRef}
+    />
+  );
+
   // The grow section (Tasks) absorbs remaining vertical space and scrolls
   // internally, so it stays flex-driven rather than animating to content
   // height like the fixed-size sections below.
@@ -142,20 +203,13 @@ export function AppSidebarSection({
   // React preserves it instead of remounting.
   if (grow) {
     return (
-      <div className={cn(!collapsed && expanded && "flex-1 min-h-0 flex flex-col")}>
-        {collapsed ? (
-          railButton
-        ) : (
-          <SectionHeader
-            label={label}
-            expanded={expanded}
-            headerAction={headerAction}
-            headerActionVisibility={headerActionVisibility}
-            collapsedSummary={collapsedSummary}
-            onToggle={handleToggle}
-            headerRef={headerRef}
-          />
+      <div
+        className={cn(
+          !collapsed && "border-t border-border/60 pt-2",
+          !collapsed && expanded && "flex-1 min-h-0 flex flex-col",
         )}
+      >
+        {collapsed ? railButton : header}
         {expanded && (
           <div
             className={cn(
@@ -172,17 +226,11 @@ export function AppSidebarSection({
 
   return (
     <Collapsible open={expanded}>
-      <SectionHeader
-        label={label}
-        expanded={expanded}
-        headerAction={headerAction}
-        headerActionVisibility={headerActionVisibility}
-        collapsedSummary={collapsedSummary}
-        onToggle={handleToggle}
-        headerRef={headerRef}
-      />
-      <CollapsibleContent className="sidebar-section-content">
-        <div className="flex flex-col gap-0.5">{children}</div>
+      {header}
+      <CollapsibleContent id={`sidebar-section-${id}`} className="sidebar-section-content">
+        <div className={cn("flex flex-col gap-0.5", presentation === "navigation" && "ml-4 pl-2")}>
+          {children}
+        </div>
       </CollapsibleContent>
     </Collapsible>
   );

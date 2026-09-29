@@ -120,6 +120,7 @@ test.describe("Improve Kandev dialog", () => {
     await mockImproveKandevApis(testPage, seedData);
     await testPage.goto("/");
 
+    await testPage.getByTestId("sidebar-footer-more-button").click();
     await testPage.getByTestId("sidebar-improve-kandev-button").click();
     const introDialog = testPage.getByRole("dialog", { name: "Improve Kandev" });
     const dismissPreference = introDialog.getByTestId("improve-kandev-skip-intro");
@@ -141,6 +142,7 @@ test.describe("Improve Kandev dialog", () => {
       .getByRole("button", { name: "Cancel", exact: true })
       .click();
     await expect(testPage.getByTestId("create-task-dialog")).toBeHidden();
+    await testPage.getByTestId("sidebar-footer-more-button").click();
     await testPage.getByTestId("sidebar-improve-kandev-button").click();
 
     await expect(testPage.getByTestId("create-task-dialog")).toBeVisible({ timeout: 10_000 });
@@ -167,6 +169,7 @@ test.describe("Improve Kandev dialog", () => {
     await apiClient.saveUserSettings({ agent_generated_task_titles: false });
     await mockImproveKandevApis(testPage, seedData, { issueWorkflowId: issueWorkflow.id });
     await testPage.goto("/");
+    await testPage.getByTestId("sidebar-footer-more-button").click();
     await testPage.getByTestId("sidebar-improve-kandev-button").click();
     const contribute = testPage.getByTestId("improve-kandev-proceed");
     await expect(contribute).toBeEnabled({ timeout: 10_000 });
@@ -233,6 +236,7 @@ test.describe("Improve Kandev dialog", () => {
     });
 
     await testPage.goto("/");
+    await testPage.getByTestId("sidebar-footer-more-button").click();
     await testPage.getByTestId("sidebar-improve-kandev-button").click();
     const contribute = testPage.getByTestId("improve-kandev-proceed");
     await expect(contribute).toBeEnabled({ timeout: 10_000 });
@@ -380,6 +384,7 @@ test.describe("Improve Kandev dialog", () => {
     await testPage.goto("/");
 
     // Post-overhaul: the Improve Kandev opener moved to the AppSidebar footer.
+    await testPage.getByTestId("sidebar-footer-more-button").click();
     await testPage.getByTestId("sidebar-improve-kandev-button").click();
 
     // Intro screen
@@ -434,6 +439,7 @@ test.describe("Improve Kandev dialog", () => {
 
     await testPage.goto("/");
     // Post-overhaul: the Improve Kandev opener moved to the AppSidebar footer.
+    await testPage.getByTestId("sidebar-footer-more-button").click();
     await testPage.getByTestId("sidebar-improve-kandev-button").click();
 
     const contribute = testPage.getByTestId("improve-kandev-proceed");
@@ -464,6 +470,7 @@ test.describe("Improve Kandev dialog", () => {
 
     await testPage.goto("/");
     // Post-overhaul: the Improve Kandev opener moved to the AppSidebar footer.
+    await testPage.getByTestId("sidebar-footer-more-button").click();
     await testPage.getByTestId("sidebar-improve-kandev-button").click();
 
     const contribute = testPage.getByTestId("improve-kandev-proceed");
@@ -498,6 +505,7 @@ test.describe("Improve Kandev dialog", () => {
     });
 
     await testPage.goto("/");
+    await testPage.getByTestId("sidebar-footer-more-button").click();
     await testPage.getByTestId("sidebar-improve-kandev-button").click();
     await testPage.getByTestId("improve-kandev-proceed").click();
 
@@ -531,6 +539,7 @@ test.describe("Improve Kandev dialog", () => {
 
     await testPage.goto("/");
     // Post-overhaul: the Improve Kandev opener moved to the AppSidebar footer.
+    await testPage.getByTestId("sidebar-footer-more-button").click();
     await testPage.getByTestId("sidebar-improve-kandev-button").click();
 
     const contribute = testPage.getByTestId("improve-kandev-proceed");
@@ -569,6 +578,7 @@ test.describe("Improve Kandev dialog", () => {
 
     await testPage.goto("/");
     // Post-overhaul: the Improve Kandev opener moved to the AppSidebar footer.
+    await testPage.getByTestId("sidebar-footer-more-button").click();
     await testPage.getByTestId("sidebar-improve-kandev-button").click();
 
     const contribute = testPage.getByTestId("improve-kandev-proceed");
@@ -631,6 +641,7 @@ test.describe("Improve Kandev dialog", () => {
     await mockImproveKandevApis(testPage, seedData);
     await testPage.goto("/");
 
+    await testPage.getByTestId("sidebar-footer-more-button").click();
     await testPage.getByTestId("sidebar-improve-kandev-button").click();
     const introDialog = testPage.getByRole("dialog", { name: "Improve Kandev" });
     const choice = introDialog.getByTestId("improve-kandev-create-workspace");
@@ -660,6 +671,7 @@ test.describe("Improve Kandev dialog", () => {
     );
     await testPage.goto("/");
 
+    await testPage.getByTestId("sidebar-footer-more-button").click();
     await testPage.getByTestId("sidebar-improve-kandev-button").click();
 
     // The dedicated workspace does not exist: the choice panel gates the
@@ -726,6 +738,7 @@ test.describe("Improve Kandev dialog", () => {
     });
 
     await testPage.goto("/");
+    await testPage.getByTestId("sidebar-footer-more-button").click();
     await testPage.getByTestId("sidebar-improve-kandev-button").click();
 
     await expect(testPage.getByRole("dialog", { name: "Improve Kandev" })).toBeVisible();
@@ -757,6 +770,7 @@ test.describe("Improve Kandev dialog", () => {
     });
 
     await testPage.goto("/");
+    await testPage.getByTestId("sidebar-footer-more-button").click();
     await testPage.getByTestId("sidebar-improve-kandev-button").click();
 
     const dialog = testPage.getByRole("dialog", { name: "Improve Kandev" });
