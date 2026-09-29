@@ -83,6 +83,7 @@ func (s *Service) handleAgentStreamEvent(ctx context.Context, payload *lifecycle
 	taskID := payload.TaskID
 	sessionID := payload.SessionID
 	terminalCompleteStream := false
+	var observedOutput, observedEffect bool
 
 	if eventType == agentEventComplete {
 		if marker, ok := s.terminalExecutionMarker(sessionID, payload.ExecutionID); ok {
@@ -121,6 +122,7 @@ func (s *Service) handleAgentStreamEvent(ctx context.Context, payload *lifecycle
 				payload.Data.Text,
 			)
 		} else {
+			observedOutput = strings.TrimSpace(payload.Data.Text) != ""
 			s.observePromptAttempt(
 				payload.SessionID,
 				eventExecutionID,
@@ -130,6 +132,7 @@ func (s *Service) handleAgentStreamEvent(ctx context.Context, payload *lifecycle
 			)
 		}
 	case "thinking_streaming":
+		observedOutput = strings.TrimSpace(payload.Data.Text) != ""
 		s.observePromptAttempt(
 			payload.SessionID,
 			eventExecutionID,
@@ -138,6 +141,7 @@ func (s *Service) handleAgentStreamEvent(ctx context.Context, payload *lifecycle
 			false,
 		)
 	case agentEventToolCall, agentEventToolUpdate:
+		observedEffect = true
 		s.observePromptAttempt(
 			payload.SessionID,
 			eventExecutionID,
@@ -145,6 +149,12 @@ func (s *Service) handleAgentStreamEvent(ctx context.Context, payload *lifecycle
 			false,
 			true,
 		)
+	}
+	if observedOutput || observedEffect {
+		s.clearDynamicUnclassifiedStreakForEvent(ctx, watcher.AgentEventData{
+			TaskID: taskID, SessionID: sessionID, OwnerKind: string(payload.OwnerKind),
+			AgentExecutionID: eventExecutionID, PromptGeneration: payload.Data.PromptGeneration,
+		}, true)
 	}
 	if eventType == agentEventComplete {
 		defer s.clearPromptAttemptEvidence(
@@ -467,6 +477,7 @@ func (s *Service) handleAgentErrorEvent(ctx context.Context, payload *lifecycle.
 		failure := watcher.AgentEventData{
 			TaskID:           taskID,
 			SessionID:        sessionID,
+			OwnerKind:        string(payload.OwnerKind),
 			AgentExecutionID: executionID,
 			AgentID:          payload.AgentID,
 			AgentProfileID:   payload.AgentProfileID,
@@ -478,7 +489,10 @@ func (s *Service) handleAgentErrorEvent(ctx context.Context, payload *lifecycle.
 			failure.ErrorMessage = payload.Data.Text
 		}
 		failure = s.withPromptAttemptEvidence(failure)
-		if s.routeDynamicAgentFailure(ctx, failure, classifyKanbanFailure(failure)) {
+		result := s.routeDynamicAgentFailureWithEvidence(
+			ctx, failure, classifyKanbanFailure(failure), nil, true,
+		)
+		if result.handled && !result.manualRecovery {
 			return
 		}
 	}
@@ -4697,9 +4711,31 @@ func (s *Service) handleSessionTodosEvent(ctx context.Context, payload *lifecycl
 
 // persistTodoMessage creates a "todo" message with the todo entries as metadata.
 // Empty entries are persisted too — they represent the agent clearing all todos.
+//
+// Todo reports never start a conversational turn. Inside an active or reserved
+// prompt turn the message attaches to that turn; outside one it is stored in an
+// already-completed lifecycle-only turn, so the latest list remains durable
+// without leaving a turn for a later prompt to adopt.
 func (s *Service) persistTodoMessage(ctx context.Context, taskID, sessionID string, entries []streams.PlanEntry) {
 	if s.messageCreator == nil {
 		return
+	}
+	turnID := s.reservedPromptTurnID(sessionID)
+	lifecycleOnly := false
+	if turnID == "" {
+		if s.turnService == nil {
+			return
+		}
+		var err error
+		turnID, err = s.peekActiveTurnID(ctx, sessionID)
+		if err != nil {
+			s.logger.Warn("failed to inspect active turn for todo message",
+				zap.String("task_id", taskID),
+				zap.String("session_id", sessionID),
+				zap.Error(err))
+			return
+		}
+		lifecycleOnly = turnID == ""
 	}
 	todos := make([]map[string]interface{}, len(entries))
 	for i, e := range entries {
@@ -4710,10 +4746,15 @@ func (s *Service) persistTodoMessage(ctx context.Context, taskID, sessionID stri
 		}
 	}
 	metadata := map[string]interface{}{"todos": todos}
-	if err := s.messageCreator.CreateSessionMessage(
-		ctx, taskID, "Updated Todos", sessionID,
-		string(models.MessageTypeTodo), s.getActiveTurnID(sessionID), metadata, false,
-	); err != nil {
+	content := "Updated Todos"
+	messageType := string(models.MessageTypeTodo)
+	var err error
+	if lifecycleOnly {
+		err = s.messageCreator.CreateLifecycleSessionMessage(ctx, taskID, content, sessionID, messageType, metadata)
+	} else {
+		err = s.messageCreator.CreateSessionMessage(ctx, taskID, content, sessionID, messageType, turnID, metadata, false)
+	}
+	if err != nil {
 		s.logger.Warn("failed to create todo message",
 			zap.String("session_id", sessionID),
 			zap.Error(err))
