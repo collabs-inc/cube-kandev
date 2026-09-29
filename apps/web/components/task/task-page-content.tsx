@@ -35,6 +35,7 @@ import {
 } from "@/components/task/task-page-content-helpers";
 import { TaskPageInner } from "@/components/task/task-page-inner";
 import { TaskRemovalBoundary } from "@/components/task/task-removal-boundary";
+import { useTaskRouteSessionHydrated } from "@/components/task/task-route-session-hydration";
 import { GridSpinner } from "@/components/grid-spinner";
 
 type TaskPageContentProps = {
@@ -184,10 +185,12 @@ export function TaskLoadErrorState() {
 }
 
 export function useTaskDetails(activeTaskId: string | null, initialTask: Task | null) {
-  const [taskDetails, setTaskDetails] = useState<Task | null>(initialTask);
+  const routeDataReady = useTaskRouteSessionHydrated();
+  const [taskDetails, setTaskDetails] = useState<Task | null>(null);
   const [taskLoadError, setTaskLoadError] = useState<unknown | null>(null);
   const connectionStatus = useAppStore((state) => state.connection.status);
   const previousConnectionStatus = useRef(connectionStatus);
+  const reconnectRefreshPending = useRef(false);
   const effectiveTaskId = initialTask?.id ?? activeTaskId ?? null;
   const effectiveTaskIdRef = useRef(effectiveTaskId);
   const taskDetailsRequestIdRef = useRef(0);
@@ -234,22 +237,35 @@ export function useTaskDetails(activeTaskId: string | null, initialTask: Task | 
   );
 
   useEffect(() => {
-    if (!effectiveTaskId || taskDetails?.id === effectiveTaskId) {
+    if (
+      !routeDataReady ||
+      !effectiveTaskId ||
+      taskDetails?.id === effectiveTaskId ||
+      initialTask?.id === effectiveTaskId
+    ) {
       setTaskLoadError(null);
       return;
     }
     setTaskLoadError(null);
-    void loadTaskDetails(effectiveTaskId);
-  }, [effectiveTaskId, taskDetails?.id, loadTaskDetails]);
+    void loadTaskDetails();
+  }, [routeDataReady, effectiveTaskId, taskDetails?.id, initialTask?.id, loadTaskDetails]);
 
   useEffect(() => {
     const reconnected =
       previousConnectionStatus.current !== "connected" && connectionStatus === "connected";
     previousConnectionStatus.current = connectionStatus;
-    if (reconnected) void loadTaskDetails();
-  }, [connectionStatus, loadTaskDetails]);
+    if (reconnected) reconnectRefreshPending.current = true;
+    if (connectionStatus === "connected" && routeDataReady && reconnectRefreshPending.current) {
+      reconnectRefreshPending.current = false;
+      void loadTaskDetails();
+    }
+  }, [connectionStatus, routeDataReady, loadTaskDetails]);
 
-  useForegroundRefresh(loadTaskDetails, Boolean(effectiveTaskId), effectiveTaskId);
+  useForegroundRefresh(
+    loadTaskDetails,
+    routeDataReady && Boolean(effectiveTaskId),
+    effectiveTaskId,
+  );
 
   const onTaskUnarchived = useCallback(
     (taskId: string) => {
@@ -274,6 +290,7 @@ function useTaskPageData(
   sessionId: string | null,
   initialRepositories: Repository[],
 ) {
+  const routeDataReady = useTaskRouteSessionHydrated();
   const activeTaskId = useAppStore((state) => state.tasks.activeTaskId);
   const setActiveSessionAuto = useAppStore((state) => state.setActiveSessionAuto);
   const setActiveTask = useAppStore((state) => state.setActiveTask);
@@ -299,13 +316,16 @@ function useTaskPageData(
   );
 
   const agent = useSessionAgent(task);
-  const ensureSession = useEnsureTaskSession({
-    id: task?.id,
-    isArchived: task?.archived_at != null,
-    archiveStateKnown: task !== null,
-    workflowStepId: task?.workflow_step_id,
-    workflowId: task?.workflow_id,
-  });
+  const ensureSession = useEnsureTaskSession(
+    {
+      id: task?.id,
+      isArchived: task?.archived_at != null,
+      archiveStateKnown: task !== null,
+      workflowStepId: task?.workflow_step_id,
+      workflowId: task?.workflow_id,
+    },
+    { enabled: routeDataReady },
+  );
   const initialSessionId = sessionId ?? agent.taskSessionId ?? null;
   const effectiveSessionId = validatedActiveSessionId ?? initialSessionId;
 
