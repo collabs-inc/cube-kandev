@@ -27,6 +27,7 @@ export function useChartPlotVisibility() {
     );
     const checkViewport = () => {
       const bounds = plot.getBoundingClientRect();
+      if (bounds.width <= 0 || bounds.height <= 0) return;
       const isNearViewport =
         bounds.bottom >= -CHART_PREWARM_MARGIN_PX &&
         bounds.top <= window.innerHeight + CHART_PREWARM_MARGIN_PX &&

@@ -17,8 +17,12 @@ test.describe("MCP-created task agent profile default", () => {
     expect(startStep?.agent_profile_id).toBeFalsy();
 
     const { agents } = await apiClient.listAgents();
+    const seededAgent = agents.find((agent) =>
+      agent.profiles?.some((profile) => profile.id === seedData.agentProfileId),
+    );
+    if (!seededAgent) throw new Error("seeded agent profile owner unavailable");
     const workspaceProfile = await apiClient.createAgentProfile(
-      agents[0].id,
+      seededAgent.id,
       "MCP Workspace Default E2E",
       { model: "mock-slow" },
     );

@@ -123,6 +123,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
   if (visibilityDescriptor) {
     Object.defineProperty(document, "visibilityState", visibilityDescriptor);
@@ -140,6 +141,19 @@ describe("ChartBlock plot scheduling", () => {
     expect(observerRecords[0].options?.rootMargin).toBe("200px 0px");
 
     intersect();
+    expect(screen.getByTestId(MOCK_LINE_CHART)).not.toBeNull();
+  });
+
+  it("uses scroll geometry when the intersection observer has not reported visibility", () => {
+    let bounds = new DOMRect(0, 1_000, 400, 208);
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(() => bounds);
+
+    render(<ChartBlock block={BLOCK} />);
+    expect(screen.queryByTestId(MOCK_LINE_CHART)).toBeNull();
+
+    bounds = new DOMRect(0, 500, 400, 208);
+    act(() => document.dispatchEvent(new Event("scroll")));
+
     expect(screen.getByTestId(MOCK_LINE_CHART)).not.toBeNull();
   });
 
