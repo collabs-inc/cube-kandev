@@ -475,7 +475,7 @@ data. Evidence and screenshots:
 ## PR publication verification (2026-09-29)
 
 The user requested committing, pushing, and opening a PR for the completed
-implementation. Final verification passed 480 focused frontend tests across 40
+implementation. Final verification passed 481 focused frontend tests across 41
 files, six desktop browser scenarios, five phone browser scenarios, and the Go
 sidebar-layout model/service tests. Type checking, the production frontend build,
 localization checks, harness validation, specification validation, and whitespace
@@ -488,3 +488,8 @@ hint; it supersedes the initial preview above. Tasks use plain rows, subtle acti
 states, indentation without vertical guides, and compact group spacing. Footer
 utilities and plugins share the labelled menu, while settings/theme/account remain
 in one row. Existing saved layouts and the owned comparison data remain intact.
+
+Integrated main at `ccaa7c0a8d80ef4f2f089b1f416bd1230417da0a` before publication.
+The seven locale conflicts were independent additions: retained the upstream
+query/filter validation copy and this change's active-filter label in every
+locale, with duplicate-key and localization validation.
