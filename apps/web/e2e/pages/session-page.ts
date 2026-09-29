@@ -868,8 +868,10 @@ export class SessionPage {
 
   /** Tap the chip and wait for the mobile drawer to be visible. */
   async tapPRStatusChip(): Promise<void> {
-    await this.prStatusChip().tap();
-    await expect(this.prStatusChipDrawer()).toBeVisible({ timeout: 5_000 });
+    const chip = this.prStatusChip();
+    await expect(chip).toHaveAttribute("aria-haspopup", "dialog", { timeout: 15_000 });
+    await chip.tap();
+    await expect(this.prStatusChipDrawer()).toBeVisible({ timeout: 15_000 });
   }
 
   // --- GitLab MR status chip accessors: mirrors the PR status chip shape

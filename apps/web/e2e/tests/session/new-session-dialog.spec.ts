@@ -215,15 +215,9 @@ test.describe("New session dialog", () => {
       )
       .toBe(true);
 
-    // 3. Navigate to the task
-    const kanban = new KanbanPage(testPage);
-    await kanban.goto();
-
-    const card = kanban.taskCardByTitle("Second Session Tab Task");
-    await expect(card).toBeVisible({ timeout: 10_000 });
-    await card.click();
-    await expect(testPage).toHaveURL(/\/t\//, { timeout: 15_000 });
-
+    // 3. Navigate directly to the task. The session flow does not depend on
+    // the Kanban board's filtered card projection.
+    await testPage.goto(`/t/${task.id}`);
     const session = new SessionPage(testPage);
     await session.waitForLoad();
 

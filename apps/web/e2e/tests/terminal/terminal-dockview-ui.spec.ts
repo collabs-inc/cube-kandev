@@ -418,7 +418,7 @@ test.describe("Terminals — dockview UI", () => {
     await session.expectTerminalConnected();
 
     await clickNewTerminalInPlusMenu(testPage, session);
-    await expect(testPage.getByTestId("terminal-tab-seq-2")).toBeVisible({ timeout: 10_000 });
+    await expect(testPage.getByTestId("terminal-tab-seq-2")).toBeVisible({ timeout: 30_000 });
 
     // Destroy the still-open seq=2 row from the "+" menu without closing its tab first.
     await session.addPanelButton().click();

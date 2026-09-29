@@ -23,8 +23,11 @@ async function seedTaskWithSession(
   title: string,
 ): Promise<void> {
   const { agents } = await apiClient.listAgents();
-  if (agents.length === 0) throw new Error("no agents registered in this e2e profile");
-  const profile = await apiClient.createAgentProfile(agents[0].id, `${title} profile`, {
+  const agent = agents.find((candidate) =>
+    candidate.profiles?.some((profile) => profile.id === seedData.agentProfileId),
+  );
+  if (!agent) throw new Error("the seeded agent profile has no launchable agent family");
+  const profile = await apiClient.createAgentProfile(agent.id, `${title} profile`, {
     model: "mock-fast",
     auto_approve: true,
     cli_passthrough: true,

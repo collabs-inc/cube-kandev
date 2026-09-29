@@ -26,9 +26,11 @@ test.describe("mobile agent goal visibility", () => {
     const chip = dialog.getByTestId("agent-goal-chip");
     await expect(chip).toBeVisible({ timeout: 30_000 });
     await expect(
-      dialog.getByText("The provider goal remains active after the thread becomes idle.", {
-        exact: false,
-      }),
+      dialog
+        .getByText("The provider goal remains active after the thread becomes idle.", {
+          exact: false,
+        })
+        .last(),
     ).toBeVisible({ timeout: 30_000 });
     const bounds = await chip.boundingBox();
     expect(bounds).not.toBeNull();

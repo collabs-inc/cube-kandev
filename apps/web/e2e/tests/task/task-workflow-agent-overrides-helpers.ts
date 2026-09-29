@@ -26,8 +26,10 @@ export async function seedWorkflowAgentOverrideFixture(
   suffix: string,
 ): Promise<WorkflowAgentOverrideFixture> {
   const { agents } = await apiClient.listAgents();
-  const agent = agents.find((candidate) => candidate.id !== "dynamic") ?? agents[0];
-  if (!agent) throw new Error("the mock-agent fixture has no launchable agent family");
+  const agent = agents.find((candidate) =>
+    candidate.profiles?.some((profile) => profile.id === seedData.agentProfileId),
+  );
+  if (!agent) throw new Error("the seeded agent profile has no launchable agent family");
 
   const [profileA, profileB, profileC] = await Promise.all([
     apiClient.createAgentProfile(agent.id, `${suffix} Initial A`, { model: "mock-fast" }),
