@@ -3,6 +3,7 @@ import { waitForLatestSessionDone } from "../../helpers/session";
 import { SessionPage } from "../../pages/session-page";
 import type { ApiClient } from "../../helpers/api-client";
 import type { SeedData } from "../../fixtures/test-base";
+import { getMockAgent } from "../../helpers/agent-fixtures";
 
 /**
  * Config management via the dedicated config-chat endpoint.
@@ -295,7 +296,7 @@ test.describe("Config-mode MCP — agent management", () => {
     seedData,
   }) => {
     const { agents } = await apiClient.listAgents();
-    const agent = agents[0];
+    const agent = getMockAgent(agents);
     const initialProfileCount = (agent.profiles ?? []).length;
 
     // Create a new profile via MCP tool
@@ -304,7 +305,7 @@ test.describe("Config-mode MCP — agent management", () => {
       seedData,
       [
         'e2e:message("Creating profile...")',
-        `e2e:mcp:kandev:create_agent_profile_kandev({"agent_id":"${agent.id}","name":"E2E Created Profile","model":"claude-sonnet-4-5-20250514"})`,
+        `e2e:mcp:kandev:create_agent_profile_kandev({"agent_id":"${agent.id}","name":"E2E Created Profile","model":"mock-fast"})`,
         'e2e:message("Profile created")',
       ].join("\n"),
     );
@@ -318,7 +319,7 @@ test.describe("Config-mode MCP — agent management", () => {
       (p) => p.name === "E2E Created Profile",
     );
     expect(newProfiles.length).toBe(1);
-    expect(newProfiles[0].model).toBe("claude-sonnet-4-5-20250514");
+    expect(newProfiles[0].model).toBe("mock-fast");
 
     // Delete the profile via MCP tool
     const newProfileId = newProfiles[0].id;
@@ -661,7 +662,7 @@ test.describe("Config-mode MCP — multi-tool workflow", () => {
   }) => {
     const workflow = await apiClient.createWorkflow(seedData.workspaceId, "Full Setup Workflow");
     const { agents } = await apiClient.listAgents();
-    const agent = agents[0];
+    const agent = getMockAgent(agents);
 
     const session = await startConfigSession(
       apiClient,
@@ -671,7 +672,7 @@ test.describe("Config-mode MCP — multi-tool workflow", () => {
         // Create a workflow step
         `e2e:mcp:kandev:create_workflow_step_kandev({"workflow_id":"${workflow.id}","name":"Build","position":0,"color":"#3b82f6"})`,
         // Create a new agent profile
-        `e2e:mcp:kandev:create_agent_profile_kandev({"agent_id":"${agent.id}","name":"CI Profile","model":"claude-sonnet-4-5-20250514"})`,
+        `e2e:mcp:kandev:create_agent_profile_kandev({"agent_id":"${agent.id}","name":"CI Profile","model":"mock-fast"})`,
         // Update MCP config on the test profile
         `e2e:mcp:kandev:update_mcp_config_kandev({"profile_id":"${seedData.agentProfileId}","enabled":true,"servers":{"ci-tools":{"command":"npx","args":["-y","@ci/tools"]}}})`,
         'e2e:message("Full setup complete")',

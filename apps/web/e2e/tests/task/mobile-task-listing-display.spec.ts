@@ -83,7 +83,9 @@ test.describe("Mobile task listing display preferences", () => {
     await testPage.getByTestId("mobile-topbar-page-context").tap();
     const tasksMenu = testPage.getByRole("dialog", { name: "View options" });
     await expandDisplaySettingsGroup(testPage, "list-rows", "mobile");
-    await tasksMenu.getByText("Show task details", { exact: true }).click();
+    const taskDetailsToggle = tasksMenu.getByTestId("mobile-display-task-details-toggle");
+    await taskDetailsToggle.tap();
+    await expect(taskDetailsToggle).toHaveAttribute("aria-checked", "true");
     await expect
       .poll(async () => (await apiClient.getUserSettings()).settings.tasks_list_show_details, {
         message: "task detail preference was not persisted",

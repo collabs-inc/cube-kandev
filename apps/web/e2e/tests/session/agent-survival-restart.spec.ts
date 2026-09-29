@@ -110,6 +110,21 @@ test.describe("Agent survival across backend restart", () => {
       const kanban = new KanbanPage(testPage);
       await kanban.goto();
       const card = kanban.taskCard(task.id);
+      const sidebarLoadError = testPage.getByTestId("sidebar-task-load-error");
+      await expect
+        .poll(
+          async () => {
+            if (await card.isVisible()) return "loaded";
+            if (await sidebarLoadError.isVisible()) return "refresh-error";
+            return "pending";
+          },
+          { timeout: 20_000, message: "The task board did not load the completed task" },
+        )
+        .not.toBe("pending");
+      if (await sidebarLoadError.isVisible()) {
+        await sidebarLoadError.getByRole("button", { name: "Retry" }).click();
+        await expect(card).toBeVisible({ timeout: 20_000 });
+      }
       await expect(card).toBeVisible({ timeout: 20_000 });
       await expect(card.getByTestId("task-state-interrupted")).toHaveCount(0);
     } finally {
