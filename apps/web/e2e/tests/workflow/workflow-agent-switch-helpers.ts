@@ -3,10 +3,13 @@ import type { ApiClient } from "../../helpers/api-client";
 
 export type WorkflowTaskSessions = Awaited<ReturnType<ApiClient["listTaskSessions"]>>["sessions"];
 
-export async function createWorkflowAgentProfiles(apiClient: ApiClient) {
+export async function createWorkflowAgentProfiles(apiClient: ApiClient, seedProfileId: string) {
   const { agents } = await apiClient.listAgents();
-  if (agents.length === 0) throw new Error("no agents available in test fixtures");
-  const agentId = agents[0].id;
+  const agent = agents.find((candidate) =>
+    candidate.profiles?.some((profile) => profile.id === seedProfileId),
+  );
+  if (!agent) throw new Error("the seeded agent profile has no launchable agent family");
+  const agentId = agent.id;
   const profileA = await apiClient.createAgentProfile(agentId, "Profile A (fast)", {
     model: "mock-fast",
   });

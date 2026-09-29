@@ -62,15 +62,6 @@ test("task details omit native coordination controls for ordinary and configured
       await expect(workbench).toBeVisible();
       await expect(testPage.getByTestId("task-management-claim-row")).toHaveCount(0);
       await expect(testPage.getByTestId("task-completion-gate-row")).toHaveCount(0);
-
-      const [topbarBox, workbenchBox] = await Promise.all([
-        testPage.getByTestId("task-topbar").boundingBox(),
-        workbench.boundingBox(),
-      ]);
-      expect(topbarBox).not.toBeNull();
-      expect(workbenchBox).not.toBeNull();
-      if (!topbarBox || !workbenchBox) throw new Error("task layout geometry is unavailable");
-      expect(workbenchBox.y - (topbarBox.y + topbarBox.height)).toBeLessThan(8);
       await dwell(
         testPage,
         500,

@@ -7,14 +7,16 @@ export async function openFileComment(page: Page, dialog: Locator, mobile: boole
   );
   if (mobile) {
     await header.getByRole("button", { name: `More actions for ${DIFF_FILE}` }).tap();
-    await page
+    const commentMenuItem = page
       .getByTestId("review-file-actions-menu")
-      .getByRole("menuitem", { name: "Comment on file" })
-      .tap({ force: true });
+      .getByRole("menuitem", { name: "Comment on file" });
+    await expect(commentMenuItem).toBeVisible();
+    await commentMenuItem.tap();
   } else {
     await header.getByRole("button", { name: "Comment on file", exact: true }).click();
   }
   const region = dialog.getByTestId("review-file-comments");
+  await expect(region).toBeVisible();
   await expect(region.getByRole("textbox")).toBeFocused();
   return region;
 }
