@@ -5,8 +5,6 @@ import type { ListAvailableAgentsResponse } from "../../../lib/types/http";
 // InstallScript, but the catalog filters on !available && install_script), so
 // the catalog would show its "everything installed" state with no install
 // cards. Seed one unavailable agent with an install script after navigation.
-// Settings pages hydrate available agents in the server-rendered boot payload,
-// so a route-only mock can be skipped by the loaded-state guard.
 const AVAILABLE_AGENTS = {
   agents: [
     {
@@ -65,6 +63,25 @@ test.describe("Agents browse page", () => {
   test("renders the heading and install cards statically, without a collapsible toggle", async ({
     testPage,
   }) => {
+    // A dynamic-capability poll can replace the local catalog fixture after
+    // the boot payload loads. Keep that response deterministic and settled.
+    await testPage.route(/\/api\/v1\/agents\/available(?:\?.*)?$/, async (route) => {
+      const response = await route.fetch();
+      const current = (await response.json()) as ListAvailableAgentsResponse;
+      const latestRevision = current.agents.reduce((latest, agent) => {
+        const revision = Date.parse(agent.updated_at);
+        return Number.isFinite(revision) ? Math.max(latest, revision) : latest;
+      }, Date.now());
+      const fixtureAgents = AVAILABLE_AGENTS.agents.map((agent) => ({
+        ...agent,
+        updated_at: new Date(latestRevision + 60_000).toISOString(),
+      }));
+      await route.fulfill({
+        response,
+        json: { ...AVAILABLE_AGENTS, agents: fixtureAgents },
+      });
+    });
+
     await testPage.goto("/settings/agents/browse");
 
     const heading = testPage.getByRole("heading", { name: "Browse available agents" });
@@ -85,7 +102,15 @@ test.describe("Agents browse page", () => {
       () => {
         const availableAgents = (window as E2EStoreWindow).__KANDEV_E2E_STORE__?.getState()
           .availableAgents;
-        return availableAgents?.loaded && !availableAgents.loading;
+        return (
+          availableAgents?.loaded &&
+          !availableAgents.loading &&
+          !availableAgents.items.some(
+            (agent) =>
+              agent.model_config.supports_dynamic_models &&
+              ["not_configured", "probing"].includes(agent.model_config.status),
+          )
+        );
       },
       undefined,
       { timeout: 15_000 },
@@ -99,10 +124,17 @@ test.describe("Agents browse page", () => {
       // Use the test store's partial-state bridge instead of the production
       // action because this fixture intentionally owns the catalog contents.
       const current = store.getState().availableAgents;
+      const latestRevision = current.items.reduce((latest, agent) => {
+        const revision = Date.parse(agent.updated_at);
+        return Number.isFinite(revision) ? Math.max(latest, revision) : latest;
+      }, Date.now());
       store.setState({
         availableAgents: {
           ...current,
-          items: agents,
+          items: agents.map((agent) => ({
+            ...agent,
+            updated_at: new Date(latestRevision + 60_000).toISOString(),
+          })),
           tools: [],
           loading: false,
           loaded: true,

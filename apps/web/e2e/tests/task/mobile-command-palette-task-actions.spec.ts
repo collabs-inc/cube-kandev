@@ -79,15 +79,18 @@ test("opens the shared change workflow form from the phone command palette", asy
   seedData,
 }) => {
   await testPage.setViewportSize({ width: 360, height: 780 });
-  const fixture = await seedMoveOverrideFixture(
-    testPage,
-    apiClient,
-    seedData,
-    "Phone palette change workflow",
-  );
-  const destination = await apiClient.createWorkflow(seedData.workspaceId, "Phone destination");
-  const destinationStep = await apiClient.createWorkflowStep(destination.id, "Incoming", 0);
-  await testPage.reload();
+  const [task, destination] = await Promise.all([
+    apiClient.createTask(seedData.workspaceId, "Phone palette change workflow", {
+      workflow_id: seedData.workflowId,
+      workflow_step_id: seedData.startStepId,
+    }),
+    (async () => {
+      const workflow = await apiClient.createWorkflow(seedData.workspaceId, "Phone destination");
+      const step = await apiClient.createWorkflowStep(workflow.id, "Incoming", 0);
+      return { workflow, step };
+    })(),
+  ]);
+  await testPage.goto(`/t/${task.id}`);
 
   await testPage.keyboard.press("Control+k");
   const palette = testPage.getByRole("dialog").filter({ has: testPage.getByRole("combobox") });
@@ -102,13 +105,13 @@ test("opens the shared change workflow form from the phone command palette", asy
 
   const form = new ChangeWorkflowPage(testPage, true);
   await expect(form.phoneDrawer).toBeVisible();
-  await form.chooseWorkflow(destination.id);
-  await form.chooseStep(destinationStep.id);
+  await form.chooseWorkflow(destination.workflow.id);
+  await form.chooseStep(destination.step.id);
   const submit = form.form.getByTestId("change-workflow-submit");
   await submit.scrollIntoViewIfNeeded();
   expect((await submit.boundingBox())!.height).toBeGreaterThanOrEqual(44);
   await assertNoDocumentHorizontalOverflow(testPage, "phone command palette change workflow");
   await form.form.getByTestId("change-workflow-cancel").tap();
 
-  expect((await apiClient.getTask(fixture.taskId)).workflow_id).toBe(fixture.workflowId);
+  expect((await apiClient.getTask(task.id)).workflow_id).toBe(seedData.workflowId);
 });
