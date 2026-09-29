@@ -23,11 +23,12 @@ async function setupDesktopContextTask(
     makeGitEnv(backend.tmpDir),
   );
   git.exec("git checkout main");
+  git.exec("git pull --ff-only origin main");
   git.createFile(filePath, "# Context file\n");
   git.createFile(`${directoryPath}/nested.txt`, "directory content\n");
   git.stageAll();
   git.commit(`add chat context fixtures ${suffix}`);
-  git.exec("git push origin main");
+  git.pushMainWithRetry();
 
   const task = await apiClient.createTaskWithAgent(
     seedData.workspaceId,

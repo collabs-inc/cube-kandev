@@ -29,6 +29,22 @@ export class GitHelper {
     throw new Error(`git exec failed after 3 attempts: ${cmd}`);
   }
 
+  pushMainWithRetry(): void {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        this.exec("git push origin main");
+        return;
+      } catch (error) {
+        const stderr =
+          (error as NodeJS.ErrnoException & { stderr?: Buffer }).stderr?.toString() ?? "";
+        const details = `${(error as Error).message}\n${stderr}`;
+        if (attempt === 2 || !/(fetch first|non-fast-forward|rejected)/i.test(details)) throw error;
+        this.exec("git fetch origin main");
+        this.exec("git rebase origin/main");
+      }
+    }
+  }
+
   createFile(name: string, content: string | Buffer) {
     const filePath = path.join(this.repoDir, name);
     fs.mkdirSync(path.dirname(filePath), { recursive: true });

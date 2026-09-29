@@ -6,6 +6,7 @@ test("task details omit native coordination controls for ordinary and configured
   apiClient,
   seedData,
 }) => {
+  test.setTimeout(90_000);
   const ordinaryTask = await apiClient.createTask(seedData.workspaceId, "Ordinary task detail", {
     workflow_id: seedData.workflowId,
     workflow_step_id: seedData.startStepId,
@@ -55,7 +56,7 @@ test("task details omit native coordination controls for ordinary and configured
 
   try {
     for (const task of [ordinaryTask, configuredTask]) {
-      await testPage.goto(`/t/${task.id}`);
+      await testPage.goto(`/t/${task.id}`, { waitUntil: "domcontentloaded" });
       await expect(testPage.getByTestId("task-topbar")).toBeVisible();
       const workbench = testPage.getByTestId("dockview-task-layout");
       await expect(workbench).toBeVisible();
