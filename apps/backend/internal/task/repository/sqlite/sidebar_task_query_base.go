@@ -11,22 +11,24 @@ import (
 )
 
 type sidebarBaseNeeds struct {
-	state, activity, repository, executor      bool
+	state, activity, executor                  bool
+	repositoryGroup, repositoryFilter          bool
 	diff, pullRequest, reviewWatch, issueWatch bool
 	workflowNames, summary                     bool
 }
 
 func sidebarBaseNeedsFor(query models.SidebarTaskViewQuery) sidebarBaseNeeds {
 	needs := sidebarBaseNeeds{
-		state:         query.Group == sidebarStateKey || query.Sort.Key == sidebarStateKey || sidebarQueryHasFilter(query, sidebarStateKey),
-		activity:      query.Sort.Key == sidebarActivitySortField,
-		repository:    query.Group == sidebarRepositoryKey || sidebarQueryHasFilter(query, sidebarRepositoryKey),
-		executor:      query.Group == "executorType" || sidebarQueryHasFilter(query, "executorType"),
-		diff:          sidebarQueryHasFilter(query, "hasDiff"),
-		pullRequest:   sidebarQueryHasFilter(query, "hasPR"),
-		reviewWatch:   sidebarQueryHasFilter(query, "isPRReview"),
-		issueWatch:    sidebarQueryHasFilter(query, "isIssueWatch"),
-		workflowNames: query.Group == sidebarWorkflowKey || query.Group == "workflowStep",
+		state:            query.Group == sidebarStateKey || query.Sort.Key == sidebarStateKey || sidebarQueryHasFilter(query, sidebarStateKey),
+		activity:         query.Sort.Key == sidebarActivitySortField,
+		repositoryGroup:  query.Group == sidebarRepositoryKey,
+		repositoryFilter: sidebarQueryHasFilter(query, sidebarRepositoryKey),
+		executor:         query.Group == "executorType" || sidebarQueryHasFilter(query, "executorType"),
+		diff:             sidebarQueryHasFilter(query, "hasDiff"),
+		pullRequest:      sidebarQueryHasFilter(query, "hasPR"),
+		reviewWatch:      sidebarQueryHasFilter(query, "isPRReview"),
+		issueWatch:       sidebarQueryHasFilter(query, "isIssueWatch"),
+		workflowNames:    query.Group == sidebarWorkflowKey || query.Group == sidebarWorkflowStepKey,
 	}
 	needs.summary = needs.state || needs.activity || needs.diff || needs.pullRequest
 	return needs
@@ -36,6 +38,7 @@ func sidebarBaseCTE(driver, groupExpr, groupLabelExpr, scopeSQL string, query mo
 	needs := sidebarBaseNeedsFor(query)
 	summaryJoin, workflowJoins := sidebarBaseJoins(needs)
 	candidateFields := sidebarBaseCandidateFields(driver, needs)
+	repositoryCTEs, repositoryJoin := sidebarRepositoryCTEs(driver, needs)
 	projectionFields := []string{"candidate_raw.*", groupExpr + " AS group_key", groupLabelExpr + " AS group_label"}
 	if needs.activity {
 		projectionFields = append(projectionFields, sidebarActivitySortKey(driver, "activity_source")+" AS activity_at")
@@ -51,10 +54,10 @@ func sidebarBaseCTE(driver, groupExpr, groupLabelExpr, scopeSQL string, query mo
 			AND COALESCE(t.origin, '') <> 'automation_run'
 			AND ` + excludeConfigModePredicate(driver, "t.metadata") + `
 			AND ` + scopeSQL + `
-	), candidate_raw AS ` + rawMaterialization + ` (
+	)` + repositoryCTEs + `, candidate_raw AS ` + rawMaterialization + ` (
 		SELECT ` + strings.Join(candidateFields, ",\n\t\t\t") + `
 		FROM scoped_tasks t
-		` + workflowJoins + summaryJoin + `
+		` + workflowJoins + summaryJoin + repositoryJoin + `
 	), candidate AS (
 		SELECT ` + strings.Join(projectionFields, ", ") + `
 		FROM candidate_raw
@@ -77,7 +80,7 @@ func sidebarBaseCandidateFields(driver string, needs sidebarBaseNeeds) []string 
 	fields = append(fields, sidebarStateFields(driver, needs)...)
 	fields = append(fields, sidebarActivityFields(driver, needs)...)
 	fields = append(fields, sidebarWorkflowFields(needs)...)
-	fields = append(fields, sidebarRepositoryFields(driver, needs)...)
+	fields = append(fields, sidebarRepositoryFields(needs)...)
 	fields = append(fields, sidebarExecutorFields(needs)...)
 	fields = append(fields, sidebarDiffFields(driver, needs)...)
 	fields = append(fields, sidebarPullRequestFields(driver, needs)...)
@@ -119,45 +122,6 @@ func sidebarWorkflowFields(needs sidebarBaseNeeds) []string {
 		`COALESCE(NULLIF(w.name, ''), 'undefined') AS workflow_name`,
 		`COALESCE(NULLIF(ws.name, ''), 'undefined') AS workflow_step_name`,
 	}
-}
-
-func sidebarRepositoryFields(driver string, needs sidebarBaseNeeds) []string {
-	if !needs.repository {
-		return nil
-	}
-	repoName := `COALESCE((SELECT CASE
-		WHEN COALESCE(r.provider_owner, '') <> '' AND COALESCE(r.provider_name, '') <> ''
-		THEN r.provider_owner || '/' || r.provider_name
-		ELSE r.name END
-		FROM task_repositories tr JOIN repositories r ON r.id = tr.repository_id
-		WHERE tr.task_id = t.id ORDER BY tr.position ASC, tr.id ASC LIMIT 1), 'undefined')`
-	repositoryCount := `(SELECT COUNT(DISTINCT tr.repository_id) FROM task_repositories tr WHERE tr.task_id = t.id)`
-	resolvedRepositoryCount := `(SELECT COUNT(DISTINCT tr.repository_id) FROM task_repositories tr JOIN repositories r ON r.id = tr.repository_id WHERE tr.task_id = t.id)`
-	repositorySlug := `CASE
-		WHEN COALESCE(r.provider_owner, '') <> '' AND COALESCE(r.provider_name, '') <> ''
-		THEN r.provider_owner || '/' || r.provider_name
-		ELSE r.name END`
-	repositorySlugs := `(SELECT json_group_array(repo_slug) FROM (
-		SELECT ` + repositorySlug + ` AS repo_slug, MIN(tr.position) AS position, MIN(tr.id) AS id
-		FROM task_repositories tr JOIN repositories r ON r.id = tr.repository_id
-		WHERE tr.task_id = t.id GROUP BY tr.repository_id, repo_slug ORDER BY position, id))`
-	repositoryLabels := `(SELECT group_concat(repo_slug, ', ') FROM (
-		SELECT ` + repositorySlug + ` AS repo_slug, MIN(tr.position) AS position, MIN(tr.id) AS id
-		FROM task_repositories tr JOIN repositories r ON r.id = tr.repository_id
-		WHERE tr.task_id = t.id GROUP BY tr.repository_id, repo_slug ORDER BY position, id))`
-	if dialect.IsPostgres(driver) {
-		repositorySlugs = `(SELECT COALESCE(array_to_json(array_agg(repo_slug ORDER BY position, id))::text, '[]') FROM (
-			SELECT ` + repositorySlug + ` AS repo_slug, MIN(tr.position) AS position, MIN(tr.id) AS id
-			FROM task_repositories tr JOIN repositories r ON r.id = tr.repository_id
-			WHERE tr.task_id = t.id GROUP BY tr.repository_id, repo_slug) ordered_repositories)`
-		repositoryLabels = `(SELECT string_agg(repo_slug, ', ' ORDER BY position, id) FROM (
-			SELECT ` + repositorySlug + ` AS repo_slug, MIN(tr.position) AS position, MIN(tr.id) AS id
-			FROM task_repositories tr JOIN repositories r ON r.id = tr.repository_id
-			WHERE tr.task_id = t.id GROUP BY tr.repository_id, repo_slug) ordered_repositories)`
-	}
-	return []string{repoName + " AS repository_name", repositoryCount + " AS repository_count",
-		resolvedRepositoryCount + " AS resolved_repository_count", "COALESCE(" + repositorySlugs + ", '[]') AS repository_slugs",
-		"COALESCE(" + repositoryLabels + ", 'undefined') AS repository_labels"}
 }
 
 func sidebarExecutorFields(needs sidebarBaseNeeds) []string {
@@ -269,7 +233,7 @@ func sidebarGroupExpressions(group string) (string, string) {
 	switch group {
 	case sidebarWorkflowKey:
 		return `COALESCE(NULLIF(workflow_id, ''), '__unassigned__')`, `workflow_name`
-	case "workflowStep":
+	case sidebarWorkflowStepKey:
 		return `COALESCE(NULLIF(workflow_step_id, ''), '__unassigned__')`, `workflow_step_name`
 	case "executorType":
 		return `COALESCE(NULLIF(executor_type, 'undefined'), '__unassigned__')`, `executor_type`
@@ -321,7 +285,7 @@ func sidebarVisibleCTE(query models.SidebarTaskViewQuery) (string, []any) {
 func sidebarPartitionFilters(filters []models.SidebarTaskViewClause) (scope, projection []models.SidebarTaskViewClause) {
 	for _, filter := range filters {
 		switch filter.Dimension {
-		case sidebarArchivedKey, sidebarWorkflowKey, "workflowStep", "titleMatch":
+		case sidebarArchivedKey, sidebarWorkflowKey, sidebarWorkflowStepKey, "titleMatch":
 			scope = append(scope, filter)
 		default:
 			projection = append(projection, filter)
@@ -357,17 +321,17 @@ func sidebarFilterSQL(driver string, filters []models.SidebarTaskViewClause, def
 
 func sidebarFilterColumn(driver, dimension string) (string, bool) {
 	columns := map[string]string{
-		sidebarArchivedKey:   `CASE WHEN archived_at IS NULL THEN 'false' ELSE 'true' END`,
-		sidebarStateKey:      `state_bucket`,
-		sidebarWorkflowKey:   `COALESCE(NULLIF(workflow_id, ''), 'undefined')`,
-		"workflowStep":       `COALESCE(NULLIF(workflow_step_id, ''), 'undefined')`,
-		"executorType":       `executor_type`,
-		sidebarRepositoryKey: `repository_name`,
-		"hasDiff":            `has_diff`,
-		"hasPR":              `has_pr`,
-		"isPRReview":         `is_pr_review`,
-		"isIssueWatch":       `is_issue_watch`,
-		"titleMatch":         `COALESCE(title, '')`,
+		sidebarArchivedKey:     `CASE WHEN archived_at IS NULL THEN 'false' ELSE 'true' END`,
+		sidebarStateKey:        `state_bucket`,
+		sidebarWorkflowKey:     `COALESCE(NULLIF(workflow_id, ''), 'undefined')`,
+		sidebarWorkflowStepKey: `COALESCE(NULLIF(workflow_step_id, ''), 'undefined')`,
+		"executorType":         `executor_type`,
+		sidebarRepositoryKey:   `repository_name`,
+		"hasDiff":              `has_diff`,
+		"hasPR":                `has_pr`,
+		"isPRReview":           `is_pr_review`,
+		"isIssueWatch":         `is_issue_watch`,
+		"titleMatch":           `COALESCE(title, '')`,
 	}
 	value, ok := columns[dimension]
 	return value, ok

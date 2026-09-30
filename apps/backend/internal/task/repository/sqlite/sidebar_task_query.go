@@ -22,6 +22,7 @@ const (
 	sidebarActivitySortField = "lastActivityAt"
 	sidebarRepositoryKey     = "repository"
 	sidebarWorkflowKey       = "workflow"
+	sidebarWorkflowStepKey   = "workflowStep"
 	sidebarArchivedKey       = "archived"
 	sidebarNotMatchesOp      = "not_matches"
 	sidebarNotInOp           = "not_in"
