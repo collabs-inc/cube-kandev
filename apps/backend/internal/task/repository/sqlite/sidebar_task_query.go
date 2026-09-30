@@ -160,12 +160,17 @@ func sidebarTaskBaseSQL(driver, workspaceID string, query models.SidebarTaskView
 
 func sidebarTaskCandidateSQL(driver, workspaceID string, query models.SidebarTaskViewQuery) (string, []any, error) {
 	groupExpr, groupLabelExpr := sidebarGroupExpressions(query.Group)
-	baseSQL := sidebarBaseCTE(driver, groupExpr, groupLabelExpr, query)
-	baseArgs := []any{workspaceID}
-	filterSQL, filterArgs, err := sidebarFilterSQL(driver, query.Filters)
+	scopeFilters, projectionFilters := sidebarPartitionFilters(query.Filters)
+	scopeSQL, scopeArgs, err := sidebarFilterSQL(driver, scopeFilters, true)
 	if err != nil {
 		return "", nil, err
 	}
+	filterSQL, filterArgs, err := sidebarFilterSQL(driver, projectionFilters, false)
+	if err != nil {
+		return "", nil, err
+	}
+	baseSQL := sidebarBaseCTE(driver, groupExpr, groupLabelExpr, scopeSQL, query)
+	baseArgs := append([]any{workspaceID}, scopeArgs...)
 	baseSQL += ", filtered AS MATERIALIZED (SELECT * FROM candidate WHERE " + filterSQL + ")"
 	baseArgs = append(baseArgs, filterArgs...)
 	return baseSQL, baseArgs, nil

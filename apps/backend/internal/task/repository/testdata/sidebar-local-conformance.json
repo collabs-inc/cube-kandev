@@ -3296,6 +3296,273 @@
           }
         }
       ]
+    },
+    {
+      "name": "scope-and-projection-intersection",
+      "tasks": [
+        {
+          "workspace_id": "conformance",
+          "workflow_id": "wf-a",
+          "workflow_step_id": "step-a",
+          "state": "TODO",
+          "position": 5,
+          "created_at": "2026-09-29T12:00:03Z",
+          "updated_at": "2026-09-29T12:00:01Z",
+          "metadata": {},
+          "origin": "",
+          "id": "a",
+          "title": "Alpha",
+          "repository_ids": [
+            "repo-a"
+          ],
+          "executor_type": "local",
+          "summary": {
+            "last_activity_at": "2026-09-29T13:00:00.000000002+01:00"
+          },
+          "queued_for_step_id": "step-a",
+          "priority": "low"
+        },
+        {
+          "workspace_id": "conformance",
+          "workflow_id": "wf-b",
+          "workflow_step_id": "step-b",
+          "state": "COMPLETED",
+          "position": 0,
+          "created_at": "2026-09-29T12:00:01Z",
+          "updated_at": "2026-09-29T12:00:03Z",
+          "metadata": {
+            "review_watch_id": "review"
+          },
+          "origin": "",
+          "id": "b",
+          "title": "beta",
+          "repository_ids": [
+            "repo-b"
+          ],
+          "executor_type": "ssh",
+          "summary": {
+            "last_activity_at": "2026-09-29T12:00:00.999999999Z",
+            "pull_request": {
+              "count": 1
+            },
+            "git": {
+              "additions": 3
+            },
+            "primary_session": {
+              "state": "COMPLETED"
+            }
+          },
+          "archived_at": "2026-09-29T14:00:00Z"
+        },
+        {
+          "workspace_id": "conformance",
+          "workflow_id": "wf-a",
+          "workflow_step_id": "step-a",
+          "state": "IN_PROGRESS",
+          "position": 2,
+          "created_at": "2026-09-29T12:00:04Z",
+          "updated_at": "2026-09-29T12:00:02Z",
+          "metadata": {
+            "issue_watch_id": "issue"
+          },
+          "origin": "",
+          "id": "c",
+          "title": "Ä",
+          "repository_ids": [
+            "repo-a",
+            "repo-b"
+          ],
+          "executor_type": "local",
+          "summary": {
+            "last_activity_at": "2026-09-29T12:00:00.000000001Z",
+            "primary_session": {
+              "state": "RUNNING"
+            }
+          },
+          "queued_for_step_id": "step-a",
+          "priority": "high"
+        },
+        {
+          "workspace_id": "conformance",
+          "workflow_id": "wf-b",
+          "workflow_step_id": "step-b",
+          "state": "TODO",
+          "position": 0,
+          "created_at": "2026-09-29T12:00:02Z",
+          "updated_at": "2026-09-29T12:00:04Z",
+          "metadata": {},
+          "origin": "",
+          "id": "d",
+          "title": "ä",
+          "summary": {
+            "last_activity_at": "malformed"
+          }
+        }
+      ],
+      "cases": [
+        {
+          "name": "default-active-excludes-matching-archive",
+          "query": {
+            "filters": [
+              {
+                "dimension": "titleMatch",
+                "op": "matches",
+                "value": "beta"
+              },
+              {
+                "dimension": "state",
+                "op": "is",
+                "value": "review"
+              }
+            ],
+            "sort": {
+              "key": "title",
+              "direction": "asc"
+            },
+            "group": "none",
+            "collapsed_group_keys": [],
+            "collapsed_task_ids": [],
+            "page": 1,
+            "page_size": 100,
+            "locale": "en"
+          },
+          "expected_task_ids": []
+        },
+        {
+          "name": "explicit-archive-keeps-derived-state",
+          "query": {
+            "filters": [
+              {
+                "dimension": "state",
+                "op": "is",
+                "value": "review"
+              },
+              {
+                "dimension": "titleMatch",
+                "op": "matches",
+                "value": "beta"
+              },
+              {
+                "dimension": "archived",
+                "op": "is",
+                "value": true
+              }
+            ],
+            "sort": {
+              "key": "title",
+              "direction": "asc"
+            },
+            "group": "none",
+            "collapsed_group_keys": [],
+            "collapsed_task_ids": [],
+            "page": 1,
+            "page_size": 100,
+            "locale": "en"
+          },
+          "expected_task_ids": [
+            "b"
+          ]
+        },
+        {
+          "name": "workflow-step-and-state",
+          "query": {
+            "filters": [
+              {
+                "dimension": "workflow",
+                "op": "is",
+                "value": "wf-a"
+              },
+              {
+                "dimension": "state",
+                "op": "is",
+                "value": "in_progress"
+              },
+              {
+                "dimension": "workflowStep",
+                "op": "is",
+                "value": "step-a"
+              }
+            ],
+            "sort": {
+              "key": "title",
+              "direction": "asc"
+            },
+            "group": "none",
+            "collapsed_group_keys": [],
+            "collapsed_task_ids": [],
+            "page": 1,
+            "page_size": 100,
+            "locale": "en"
+          },
+          "expected_task_ids": [
+            "c"
+          ]
+        },
+        {
+          "name": "title-and-state-disjoint",
+          "query": {
+            "filters": [
+              {
+                "dimension": "titleMatch",
+                "op": "in",
+                "value": [
+                  "Alpha",
+                  "beta"
+                ]
+              },
+              {
+                "dimension": "state",
+                "op": "is",
+                "value": "in_progress"
+              }
+            ],
+            "sort": {
+              "key": "title",
+              "direction": "asc"
+            },
+            "group": "none",
+            "collapsed_group_keys": [],
+            "collapsed_task_ids": [],
+            "page": 1,
+            "page_size": 100,
+            "locale": "en"
+          },
+          "expected_task_ids": []
+        },
+        {
+          "name": "both-archive-values",
+          "query": {
+            "filters": [
+              {
+                "dimension": "hasPR",
+                "op": "is",
+                "value": true
+              },
+              {
+                "dimension": "archived",
+                "op": "in",
+                "value": [
+                  true,
+                  false
+                ]
+              }
+            ],
+            "sort": {
+              "key": "title",
+              "direction": "asc"
+            },
+            "group": "none",
+            "collapsed_group_keys": [],
+            "collapsed_task_ids": [],
+            "page": 1,
+            "page_size": 100,
+            "locale": "en"
+          },
+          "expected_task_ids": [
+            "b"
+          ]
+        }
+      ]
     }
   ]
 }

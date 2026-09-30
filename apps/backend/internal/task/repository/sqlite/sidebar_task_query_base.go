@@ -32,17 +32,20 @@ func sidebarBaseNeedsFor(query models.SidebarTaskViewQuery) sidebarBaseNeeds {
 	return needs
 }
 
-func sidebarBaseCTE(driver, groupExpr, groupLabelExpr string, query models.SidebarTaskViewQuery) string {
+func sidebarBaseCTE(driver, groupExpr, groupLabelExpr, scopeSQL string, query models.SidebarTaskViewQuery) string {
 	needs := sidebarBaseNeedsFor(query)
 	summaryJoin, workflowJoins := sidebarBaseJoins(needs)
 	candidateFields := sidebarBaseCandidateFields(driver, needs)
-	return `WITH RECURSIVE candidate_raw AS MATERIALIZED (
-		SELECT ` + strings.Join(candidateFields, ",\n\t\t\t") + `
-		FROM tasks t
-		` + workflowJoins + summaryJoin + `
+	return `WITH RECURSIVE scoped_tasks AS NOT MATERIALIZED (
+		SELECT t.* FROM tasks t
 		WHERE t.workspace_id = ? AND (t.is_ephemeral = 0 OR t.is_ephemeral IS NULL)
 			AND COALESCE(t.origin, '') <> 'automation_run'
 			AND ` + excludeConfigModePredicate(driver, "t.metadata") + `
+			AND ` + scopeSQL + `
+	), candidate_raw AS MATERIALIZED (
+		SELECT ` + strings.Join(candidateFields, ",\n\t\t\t") + `
+		FROM scoped_tasks t
+		` + workflowJoins + summaryJoin + `
 	), candidate AS (
 		SELECT candidate_raw.*, ` + groupExpr + ` AS group_key, ` + groupLabelExpr + ` AS group_label
 		FROM candidate_raw
@@ -300,7 +303,19 @@ func sidebarVisibleCTE(query models.SidebarTaskViewQuery) (string, []any) {
 	return ", " + strings.Join(ctes, ", "), args
 }
 
-func sidebarFilterSQL(driver string, filters []models.SidebarTaskViewClause) (string, []any, error) {
+func sidebarPartitionFilters(filters []models.SidebarTaskViewClause) (scope, projection []models.SidebarTaskViewClause) {
+	for _, filter := range filters {
+		switch filter.Dimension {
+		case sidebarArchivedKey, sidebarWorkflowKey, "workflowStep", "titleMatch":
+			scope = append(scope, filter)
+		default:
+			projection = append(projection, filter)
+		}
+	}
+	return scope, projection
+}
+
+func sidebarFilterSQL(driver string, filters []models.SidebarTaskViewClause, defaultActive bool) (string, []any, error) {
 	parts := []string{"1=1"}
 	args := make([]any, 0, len(filters)*2)
 	hasArchivedFilter := false
@@ -319,7 +334,7 @@ func sidebarFilterSQL(driver string, filters []models.SidebarTaskViewClause) (st
 		parts = append(parts, condition)
 		args = append(args, values...)
 	}
-	if !hasArchivedFilter {
+	if defaultActive && !hasArchivedFilter {
 		parts = append(parts, "archived_at IS NULL")
 	}
 	return strings.Join(parts, " AND "), args, nil
