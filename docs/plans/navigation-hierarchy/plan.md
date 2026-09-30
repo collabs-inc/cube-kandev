@@ -603,3 +603,18 @@ temporary reproduction file was removed. No product behavior or timeout changed.
 
 Main advanced without file conflicts; validation of the final combined result
 and exact-head external CI will follow publication of this test-only fixup.
+
+
+## Fourth CI remediation (2026-09-30)
+
+The third fixup cleared browser shard 6, including the nesting and isolated PR
+scenarios. Shard 3 exposed a matching rounded-corner hover in the diff-summary
+scenario and a shared seeded profile referenced by soft-deleted dynamic profiles.
+Both failures reproduced locally. The diff-summary and remaining PR-summary
+corner hovers now target the actual title. The settings scenario creates its own
+Mock profile, exercises disabling and re-enabling, and removes that owned profile.
+
+Four targeted browser checks passed without retries, including a reproduction
+with a deleted dynamic profile referencing the shared fixture. The temporary
+reproduction was removed. No product behavior, protection policy, timeout, or
+assertion was weakened. External checks will rerun after publication.

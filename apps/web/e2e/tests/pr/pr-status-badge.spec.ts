@@ -913,9 +913,8 @@ test.describe("PR status badge", () => {
     const icon = taskRow.getByTestId(`pr-task-icon-${task.id}`);
     await expect(icon).toHaveAttribute("data-pr-ready-to-merge", "true");
     const taskActions = taskRow.getByRole("button", { name: "Task actions" });
-    // Keep the pointer on the row's fixed left edge while the trailing slot
-    // grows, so the expanding actions do not move the hover target.
-    await taskRow.hover({ position: { x: 1, y: 1 } });
+    // The title stays clear of the trailing actions while their slot expands.
+    await taskRow.getByText(taskTitle, { exact: true }).hover();
     await expect(taskActions).toBeVisible();
     const menuSlot = taskRow.getByTestId("sidebar-task-change-request-menu-slot");
     await expect(trailingActions).toHaveCSS("gap", "4px");
