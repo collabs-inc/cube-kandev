@@ -36,9 +36,13 @@ func sidebarBaseNeedsFor(query models.SidebarTaskViewQuery) sidebarBaseNeeds {
 
 func sidebarBaseCTE(driver, groupExpr, groupLabelExpr, scopeSQL string, query models.SidebarTaskViewQuery) string {
 	needs := sidebarBaseNeedsFor(query)
+	if needs.repositoryGroup {
+		// Repository group identity is only needed after filtering identifies display roots.
+		needs.repositoryGroup = false
+		groupExpr, groupLabelExpr = sidebarGroupExpressions(sidebarGroupNone)
+	}
 	summaryJoin, workflowJoins := sidebarBaseJoins(needs)
 	candidateFields := sidebarBaseCandidateFields(driver, needs)
-	repositoryCTEs, repositoryJoin := sidebarRepositoryCTEs(driver, needs)
 	projectionFields := []string{"candidate_raw.*", groupExpr + " AS group_key", groupLabelExpr + " AS group_label"}
 	if needs.activity {
 		projectionFields = append(projectionFields, sidebarActivitySortKey(driver, "activity_source")+" AS activity_at")
@@ -60,10 +64,10 @@ func sidebarBaseCTE(driver, groupExpr, groupLabelExpr, scopeSQL string, query mo
 			AND COALESCE(t.origin, '') <> 'automation_run'
 			AND ` + excludeConfigModePredicate(driver, "t.metadata") + `
 			AND ` + scopeSQL + `
-	)` + repositoryCTEs + `, candidate_raw AS MATERIALIZED (
+	), candidate_raw AS MATERIALIZED (
 		SELECT ` + strings.Join(candidateFields, ",\n\t\t\t") + `
 		FROM scoped_tasks t
-		` + workflowJoins + summaryJoin + repositoryJoin + `
+		` + workflowJoins + summaryJoin + `
 	), ` + projectionName + ` AS ` + projectionMaterialization + ` (
 		SELECT ` + strings.Join(projectionFields, ", ") + `
 		FROM candidate_raw

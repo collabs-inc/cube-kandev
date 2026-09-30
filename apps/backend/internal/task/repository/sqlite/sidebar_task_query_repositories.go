@@ -1,6 +1,10 @@
 package sqlite
 
-import "github.com/kandev/kandev/internal/db/dialect"
+import (
+	"strings"
+
+	"github.com/kandev/kandev/internal/db/dialect"
+)
 
 const sidebarRepositoryLabel = `CASE
 	WHEN COALESCE(r.provider_owner, '') <> '' AND COALESCE(r.provider_name, '') <> ''
@@ -29,21 +33,24 @@ func sidebarRepositoryFields(needs sidebarBaseNeeds) []string {
 	return fields
 }
 
-func sidebarRepositoryCTEs(driver string, needs sidebarBaseNeeds) (string, string) {
-	if !needs.repositoryGroup {
-		return "", ""
-	}
+func sidebarRepositoryCTEs(driver string) string {
 	slugs := `json_group_array(repo_slug ORDER BY position, link_id) FILTER (WHERE resolved = 1)`
 	labels := `group_concat(repo_slug, ', ' ORDER BY position, link_id) FILTER (WHERE resolved = 1)`
 	if dialect.IsPostgres(driver) {
 		slugs = `array_to_json(array_agg(repo_slug ORDER BY position, link_id) FILTER (WHERE resolved = 1))::text`
 		labels = `string_agg(repo_slug, ', ' ORDER BY position, link_id) FILTER (WHERE resolved = 1)`
 	}
-	return `, sidebar_repository_members AS MATERIALIZED (
+	groupKey, groupLabel := sidebarGroupExpressions(sidebarRepositoryKey)
+	fields := sidebarRepositoryFields(sidebarBaseNeeds{repositoryGroup: true})
+	return `, sidebar_repository_roots AS (
+		SELECT v.id FROM filtered v LEFT JOIN filtered parent ON parent.id = v.parent_id
+		LEFT JOIN cycle_roots cycle_root ON cycle_root.root_key = v.id
+		WHERE parent.id IS NULL OR cycle_root.root_key IS NOT NULL
+	), sidebar_repository_members AS MATERIALIZED (
 		SELECT tr.task_id, tr.repository_id, ` + sidebarRepositoryLabel + ` AS repo_slug,
 			MIN(tr.position) AS position, MIN(tr.id) AS link_id,
 			MAX(CASE WHEN r.id IS NOT NULL THEN 1 ELSE 0 END) AS resolved
-		FROM scoped_tasks t JOIN task_repositories tr ON tr.task_id = t.id
+		FROM sidebar_repository_roots t JOIN task_repositories tr ON tr.task_id = t.id
 		LEFT JOIN repositories r ON r.id = tr.repository_id
 		GROUP BY tr.task_id, tr.repository_id, repo_slug
 	), sidebar_repository_projection AS NOT MATERIALIZED (
@@ -51,5 +58,8 @@ func sidebarRepositoryCTEs(driver string, needs sidebarBaseNeeds) (string, strin
 			MAX(repo_slug) AS repository_name,
 			` + slugs + ` AS repository_slugs, ` + labels + ` AS repository_labels
 		FROM sidebar_repository_members GROUP BY task_id
-	)`, ` LEFT JOIN sidebar_repository_projection repository_projection ON repository_projection.task_id = t.id`
+	), sidebar_repository_groups AS (
+		SELECT task_id, ` + groupKey + ` AS group_key, ` + groupLabel + ` AS group_label
+		FROM (SELECT task_id, ` + strings.Join(fields, ", ") + ` FROM sidebar_repository_projection repository_projection) projected
+	)`
 }

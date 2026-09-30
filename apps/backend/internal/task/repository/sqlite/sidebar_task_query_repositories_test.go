@@ -59,3 +59,38 @@ func TestSidebarRepositoryProjectionDeduplicatesBranchesAndKeepsPrimaryFilter(t 
 		})
 	}
 }
+
+func TestSidebarRepositoryProjectionFollowsFilteredRoots(t *testing.T) {
+	for _, backend := range []string{"sqlite", "postgres"} {
+		t.Run(backend, func(t *testing.T) {
+			repo := newRepoForSidebarConformance(t, backend)
+			seedWorkspace(t, repo, "repository-roots")
+			for index, id := range []string{"parent", "child"} {
+				require.NoError(t, repo.CreateRepository(t.Context(), &models.Repository{
+					ID: id, WorkspaceID: "repository-roots", Name: id, LocalPath: "/fixture/" + id,
+				}))
+				parent := ""
+				if index > 0 {
+					parent = "parent"
+				}
+				require.NoError(t, repo.CreateTask(t.Context(), &models.Task{
+					ID: id, WorkspaceID: "repository-roots", Title: id, ParentID: parent,
+				}))
+				require.NoError(t, repo.CreateTaskRepository(t.Context(), &models.TaskRepository{
+					ID: id, TaskID: id, RepositoryID: id,
+				}))
+			}
+			query := sidebarTaskQuery(1)
+			query.Group = "repository"
+			page, err := repo.QuerySidebarTaskPage(t.Context(), "repository-roots", query, models.SidebarTaskViewPreferences{})
+			require.NoError(t, err)
+			require.Equal(t, []string{"parent", "child"}, sidebarTaskIDs(page.Tasks))
+			require.Equal(t, "parent", page.Entries[0].GroupKey)
+			query.Filters = []models.SidebarTaskViewClause{{Dimension: "titleMatch", Op: "matches", Value: json.RawMessage(`"child"`)}}
+			page, err = repo.QuerySidebarTaskPage(t.Context(), "repository-roots", query, models.SidebarTaskViewPreferences{})
+			require.NoError(t, err)
+			require.Equal(t, []string{"child"}, sidebarTaskIDs(page.Tasks))
+			require.Equal(t, "child", page.Entries[0].GroupKey)
+		})
+	}
+}

@@ -140,14 +140,14 @@ func sidebarPageTreeCTEs(page sidebarPageBuildContext) string {
 		), cycle_roots(root_key) AS (
 			SELECT DISTINCT min_key FROM cycle_probe WHERE closed_by_key = start_key
 		)`
-	return cycleCTEs + page.ancestorCTEs + page.stateCTEs + page.activityCTEs + `, ranked_ordered AS (
+	return cycleCTEs + page.repositoryCTEs + page.ancestorCTEs + page.stateCTEs + page.activityCTEs + `, ranked_ordered AS (
 		SELECT v.id, v.workflow_id, v.workflow_step_id, CAST(NULL AS TEXT) AS display_parent_id,
 			` + page.groupKey + ` AS task_group_key, ` + page.groupLabel + ` AS task_group_label,
 			ROW_NUMBER() OVER (ORDER BY ` + page.rootOrder + `) AS global_root_sort_order,
 			` + page.rootPinExpr + ` AS root_pin_order
 		FROM filtered v LEFT JOIN filtered parent ON parent.id = v.parent_id
 		LEFT JOIN cycle_roots cycle_root ON cycle_root.root_key = v.id
-		` + page.activityJoin + page.stateJoin + `
+		` + page.activityJoin + page.stateJoin + page.repositoryJoin + `
 		WHERE ` + page.rootCondition + `
 	), ranked AS (
 		SELECT ranked_ordered.*, global_root_sort_order AS sibling_order,
@@ -162,6 +162,7 @@ type sidebarPageBuildContext struct {
 	wipAdmittedFalse, order, rootOrder, groupKey, groupLabel string
 	stateJoin, rootCondition, stateCTEs                      string
 	ancestorCTEs, activityCTEs, activityJoin                 string
+	repositoryCTEs, repositoryJoin                           string
 	args, childArgs                                          []any
 }
 
@@ -197,6 +198,13 @@ func sidebarPageBuildContextFor(driver string, query models.SidebarTaskViewQuery
 
 	groupKey := "v.group_key"
 	groupLabel := "v.group_label"
+	repositoryCTEs, repositoryJoin := "", ""
+	if query.Group == sidebarRepositoryKey {
+		repositoryCTEs = sidebarRepositoryCTEs(driver)
+		repositoryJoin = ` LEFT JOIN sidebar_repository_groups repository_group ON repository_group.task_id = v.id`
+		groupKey = `COALESCE(repository_group.group_key, '__unassigned__')`
+		groupLabel = `COALESCE(repository_group.group_label, '__unassigned__')`
+	}
 	stateJoin := ""
 	if query.Group == sidebarStateKey {
 		groupKey = `COALESCE(effective_state.effective_group_key, '__not_started__')`
@@ -214,6 +222,7 @@ func sidebarPageBuildContextFor(driver string, query models.SidebarTaskViewQuery
 		cycleProbeGuard:  cycleProbeGuard,
 		wipAdmittedFalse: wipAdmittedFalse, order: order, rootOrder: rootOrder, groupKey: groupKey, groupLabel: groupLabel,
 		stateJoin: stateJoin, rootCondition: rootCondition, stateCTEs: stateCTEs,
+		repositoryCTEs: repositoryCTEs, repositoryJoin: repositoryJoin,
 		ancestorCTEs: sidebarAncestorCTE(driver, query), activityCTEs: activityCTEs, activityJoin: activityJoin, args: args, childArgs: childArgs,
 	}
 }
