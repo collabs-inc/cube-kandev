@@ -10,10 +10,8 @@ import { KanbanPage } from "../../pages/kanban-page";
  *   the row, and re-enabling restores the profile to task creation. The list has
  *   no toggle of its own: the header toggle is the single control.
  *
- * Uses the seeded default profile (like agent-profile-acp.spec.ts) rather
- * than creating one — the profile editor page reads from the agents list
- * that is hydrated on the server, and a freshly POSTed profile
- * race-conditions with SSR.
+ * Each flow uses a disposable profile so parallel settings tests cannot edit
+ * the same seeded profile at the same time.
  */
 test.describe("Agent profile — enable/disable", () => {
   test("header toggle persists and disabled profile is hidden from task creation", async ({
@@ -23,15 +21,25 @@ test.describe("Agent profile — enable/disable", () => {
     test.setTimeout(120_000);
 
     const { agents } = await apiClient.listAgents();
-    const agent = agents[0];
-    const profile = agent.profiles[0];
+    const agent = agents.find((item) => item.name === "mock-agent") ?? agents[0];
+    const profile = await apiClient.createAgentProfile(
+      agent.id,
+      `Disable flow ${test.info().testId}`,
+      { model: "mock-fast" },
+    );
     const otherProfiles = agents
       .flatMap((a) => a.profiles ?? [])
       .filter((p) => p.id !== profile.id && !p.workspaceId && p.enabled !== false);
 
     try {
       // 1. Disable via the profile settings header toggle and save.
-      await testPage.goto(`/settings/agents/${agent.name}/profiles/${profile.id}`);
+      await testPage.goto("/settings/agents");
+      const profileRow = testPage
+        .getByTestId("agent-profile-row")
+        .filter({ has: testPage.getByRole("link", { name: profile.name, exact: true }) });
+      await expect(profileRow).toBeVisible({ timeout: 15_000 });
+      await profileRow.getByTestId("agent-profile-row-link").click();
+      await expect(testPage).toHaveURL(new RegExp(`/settings/agents/.+/profiles/${profile.id}$`));
       const headerToggle = testPage.getByTestId("profile-enabled-toggle");
       await expect(headerToggle).toBeVisible({ timeout: 15_000 });
       await expect(headerToggle).toHaveAttribute("data-state", "checked");
@@ -96,8 +104,7 @@ test.describe("Agent profile — enable/disable", () => {
         );
       }
     } finally {
-      // Always restore so worker-scoped seedData stays valid for later tests.
-      await apiClient.updateAgentProfile(profile.id, { enabled: true }).catch(() => {});
+      await apiClient.deleteAgentProfile(profile.id, true);
     }
   });
 
@@ -108,8 +115,12 @@ test.describe("Agent profile — enable/disable", () => {
     test.setTimeout(90_000);
 
     const { agents } = await apiClient.listAgents();
-    const agent = agents[0];
-    const profile = agent.profiles[0];
+    const agent = agents.find((item) => item.name === "mock-agent") ?? agents[0];
+    const profile = await apiClient.createAgentProfile(
+      agent.id,
+      `Disable list flow ${test.info().testId}`,
+      { model: "mock-fast" },
+    );
 
     // The list row is a card whose whole surface is an overlay link named by
     // the profile; matching the card through that link keeps the row unique
@@ -182,7 +193,7 @@ test.describe("Agent profile — enable/disable", () => {
         await expect(testPage.getByTestId("agent-profile-empty-state")).toHaveCount(0);
       }
     } finally {
-      await apiClient.updateAgentProfile(profile.id, { enabled: true }).catch(() => {});
+      await apiClient.deleteAgentProfile(profile.id, true);
     }
   });
 });

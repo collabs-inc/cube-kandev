@@ -178,7 +178,14 @@ test.describe("sidebar scrolling", () => {
     }));
     expect(overflow.scrollWidth).toBeGreaterThan(overflow.clientWidth);
 
-    await titleViewport.hover();
+    // The page may retain a pointer location from layout changes after the
+    // navigation. Move clear of the row first so the title receives a real
+    // mouse-enter event, then target visible text inside the clipped viewport.
+    await testPage.mouse.move(0, 0);
+    await titleViewport.hover({ position: { x: 4, y: 8 } });
+    await expect
+      .poll(() => titleViewport.evaluate((element) => element.matches(":hover")))
+      .toBe(true);
     await expect
       .poll(() => titleText.evaluate((element) => element.style.transform))
       .toMatch(/^translateX\(-/);
