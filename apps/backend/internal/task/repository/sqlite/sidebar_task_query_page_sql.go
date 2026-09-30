@@ -341,6 +341,15 @@ func sidebarStateCTEs(query models.SidebarTaskViewQuery) string {
 	if query.Group != sidebarStateKey && query.Sort.Key != sidebarStateKey {
 		return ""
 	}
+	rootFilter := ""
+	if query.Sort.Key != sidebarStateKey {
+		// Group identity belongs to display roots; state sorting also needs child states.
+		rootFilter = ` WHERE member.ancestor_key IN (
+			SELECT root.id FROM filtered root LEFT JOIN filtered parent ON parent.id = root.parent_id
+			LEFT JOIN cycle_roots cycle_root ON cycle_root.root_key = root.id
+			WHERE parent.id IS NULL OR cycle_root.root_key IS NOT NULL
+		)`
+	}
 	return `, state_aggregate AS (
 		SELECT member.ancestor_key AS task_id,
 			MAX(CASE WHEN member.state = 'IN_PROGRESS' OR member.primary_session_state = 'RUNNING' THEN 1 ELSE 0 END) AS has_active,
@@ -350,7 +359,7 @@ func sidebarStateCTEs(query models.SidebarTaskViewQuery) string {
 			MAX(CASE WHEN member.state <> 'COMPLETED' THEN member.state END) AS last_state,
 			MIN(CASE WHEN member.state <> 'COMPLETED' THEN member.state_bucket END) AS first_bucket,
 			MAX(CASE WHEN member.state <> 'COMPLETED' THEN member.state_bucket END) AS last_bucket
-		FROM ancestor_walk member
+		FROM ancestor_walk member` + rootFilter + `
 		GROUP BY member.ancestor_key
 	), state_candidates AS (
 		SELECT member.ancestor_key AS task_id, member.state, member.state_bucket,

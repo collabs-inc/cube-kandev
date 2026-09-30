@@ -43,10 +43,16 @@ func sidebarBaseCTE(driver, groupExpr, groupLabelExpr, scopeSQL string, query mo
 	if needs.activity {
 		projectionFields = append(projectionFields, sidebarActivitySortKey(driver, "activity_source")+" AS activity_at")
 	}
-	rawMaterialization := "MATERIALIZED"
+	projectionName, identityProjection := "candidate", ""
+	projectionMaterialization := "NOT MATERIALIZED"
 	if dialect.IsPostgres(driver) {
-		// Preserve base-table uniqueness and statistics through recursive joins.
-		rawMaterialization = "NOT MATERIALIZED"
+		projectionName = "candidate_projection"
+		projectionMaterialization = "MATERIALIZED"
+		// Keep base-table identity statistics without repeating derived projections.
+		identityProjection = `, candidate AS NOT MATERIALIZED (
+			SELECT identity.id, candidate_projection.* FROM candidate_projection
+			JOIN tasks identity ON identity.id = candidate_projection.projection_id
+		)`
 	}
 	return `WITH RECURSIVE scoped_tasks AS NOT MATERIALIZED (
 		SELECT t.* FROM tasks t
@@ -54,14 +60,14 @@ func sidebarBaseCTE(driver, groupExpr, groupLabelExpr, scopeSQL string, query mo
 			AND COALESCE(t.origin, '') <> 'automation_run'
 			AND ` + excludeConfigModePredicate(driver, "t.metadata") + `
 			AND ` + scopeSQL + `
-	)` + repositoryCTEs + `, candidate_raw AS ` + rawMaterialization + ` (
+	)` + repositoryCTEs + `, candidate_raw AS MATERIALIZED (
 		SELECT ` + strings.Join(candidateFields, ",\n\t\t\t") + `
 		FROM scoped_tasks t
 		` + workflowJoins + summaryJoin + repositoryJoin + `
-	), candidate AS (
+	), ` + projectionName + ` AS ` + projectionMaterialization + ` (
 		SELECT ` + strings.Join(projectionFields, ", ") + `
 		FROM candidate_raw
-	)`
+	)` + identityProjection
 }
 
 func sidebarBaseJoins(needs sidebarBaseNeeds) (string, string) {
@@ -77,6 +83,9 @@ func sidebarBaseJoins(needs sidebarBaseNeeds) (string, string) {
 
 func sidebarBaseCandidateFields(driver string, needs sidebarBaseNeeds) []string {
 	fields := []string{"t.id", "t.workspace_id", "t.workflow_id", "t.workflow_step_id", "t.title", "t.parent_id", "t.archived_at", "t.created_at", "t.updated_at"}
+	if dialect.IsPostgres(driver) {
+		fields[0] = "t.id AS projection_id"
+	}
 	fields = append(fields, sidebarStateFields(driver, needs)...)
 	fields = append(fields, sidebarActivityFields(driver, needs)...)
 	fields = append(fields, sidebarWorkflowFields(needs)...)
