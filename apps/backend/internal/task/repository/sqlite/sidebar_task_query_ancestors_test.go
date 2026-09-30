@@ -93,6 +93,44 @@ func TestSidebarTreeActivityKeepsNewerParentActivity(t *testing.T) {
 	}
 }
 
+func TestSidebarTreeStateKeepsDescendantsWhenFilteringPromotesARoot(t *testing.T) {
+	for _, backend := range []string{"sqlite", "postgres"} {
+		t.Run(backend, func(t *testing.T) {
+			repo := newRepoForSidebarConformance(t, backend)
+			const workspace = "state-forest"
+			seedWorkspace(t, repo, workspace)
+			for _, row := range []struct{ id, title, parent, state string }{
+				{"root", "Excluded root", "", "TODO"},
+				{"middle", "Middle", "root", "TODO"},
+				{"leaf", "Leaf", "middle", "REVIEW"},
+				{"peer", "Peer", "", "TODO"},
+			} {
+				require.NoError(t, repo.CreateTask(t.Context(), &models.Task{
+					ID: row.id, WorkspaceID: workspace, Title: row.title,
+					ParentID: row.parent, State: v1.TaskState(row.state),
+				}))
+			}
+			query := sidebarTaskQuery(1)
+			query.Group = "state"
+			query.Sort = models.SidebarTaskViewSort{Key: "title", Direction: "asc"}
+			query.Filters = []models.SidebarTaskViewClause{{
+				Dimension: "titleMatch", Op: "not_matches", Value: []byte(`"Excluded root"`),
+			}}
+			page, err := repo.QuerySidebarTaskPage(t.Context(), workspace, query, models.SidebarTaskViewPreferences{})
+			require.NoError(t, err)
+			require.Equal(t, []string{"peer", "middle", "leaf"}, sidebarTaskIDs(page.Tasks))
+			require.Equal(t, 3, page.TotalVisibleTasks)
+			for _, entry := range page.Entries {
+				if entry.TaskID == "middle" {
+					require.Equal(t, "REVIEW", entry.GroupKey)
+					require.Equal(t, 1, entry.SubtaskCount)
+					require.Zero(t, entry.Depth)
+				}
+			}
+		})
+	}
+}
+
 func TestSidebarUniformAndMixedTreeStates(t *testing.T) {
 	for _, backend := range []string{"sqlite", "postgres"} {
 		t.Run(backend, func(t *testing.T) {

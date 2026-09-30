@@ -42,15 +42,11 @@ func sidebarRepositoryCTEs(driver string) string {
 	}
 	groupKey, groupLabel := sidebarGroupExpressions(sidebarRepositoryKey)
 	fields := sidebarRepositoryFields(sidebarBaseNeeds{repositoryGroup: true})
-	return `, sidebar_repository_roots AS (
-		SELECT v.id FROM filtered v LEFT JOIN filtered parent ON parent.id = v.parent_id
-		LEFT JOIN cycle_roots cycle_root ON cycle_root.root_key = v.id
-		WHERE parent.id IS NULL OR cycle_root.root_key IS NOT NULL
-	), sidebar_repository_members AS MATERIALIZED (
+	return `, sidebar_repository_members AS MATERIALIZED (
 		SELECT tr.task_id, tr.repository_id, ` + sidebarRepositoryLabel + ` AS repo_slug,
 			MIN(tr.position) AS position, MIN(tr.id) AS link_id,
 			MAX(CASE WHEN r.id IS NOT NULL THEN 1 ELSE 0 END) AS resolved
-		FROM sidebar_repository_roots t JOIN task_repositories tr ON tr.task_id = t.id
+		FROM display_roots t JOIN task_repositories tr ON tr.task_id = t.id
 		LEFT JOIN repositories r ON r.id = tr.repository_id
 		GROUP BY tr.task_id, tr.repository_id, repo_slug
 	), sidebar_repository_projection AS NOT MATERIALIZED (

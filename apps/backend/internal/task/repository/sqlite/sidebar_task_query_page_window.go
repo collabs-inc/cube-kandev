@@ -6,6 +6,21 @@ import (
 	"github.com/kandev/kandev/internal/task/models"
 )
 
+func sidebarRootMembershipCTEs() string {
+	return `, display_roots AS MATERIALIZED (
+		SELECT v.* FROM filtered v LEFT JOIN filtered parent ON parent.id = v.parent_id
+		LEFT JOIN cycle_roots cycle_root ON cycle_root.root_key = v.id
+		WHERE parent.id IS NULL OR cycle_root.root_key IS NOT NULL
+	), root_members(id, root_id) AS (
+		SELECT id, id FROM display_roots
+		UNION ALL
+		SELECT child.id, member.root_id FROM root_members member
+		JOIN filtered child ON child.parent_id = member.id
+		LEFT JOIN cycle_roots cycle_root ON cycle_root.root_key = child.id
+		WHERE cycle_root.root_key IS NULL
+	)`
+}
+
 func sidebarRootWindowCTEs(query models.SidebarTaskViewQuery, treeRootSQL string, page *sidebarPageBuildContext) string {
 	visible := ""
 	if len(query.CollapsedTaskIDs) > 0 {
@@ -19,14 +34,7 @@ func sidebarRootWindowCTEs(query models.SidebarTaskViewQuery, treeRootSQL string
 		}
 	}
 	// Counts use the complete forest; only intersecting trees need child ordering.
-	return `, root_members(id, root_id) AS (
-		SELECT id AS member_id, id AS root_id FROM ranked
-		UNION ALL
-		SELECT child.id, member.root_id FROM root_members member
-		JOIN filtered child ON child.parent_id = member.id
-		LEFT JOIN cycle_roots cycle_root ON cycle_root.root_key = child.id
-		WHERE cycle_root.root_key IS NULL
-	), root_visible_counts AS (
+	return `, root_visible_counts AS (
 		SELECT root_id, COUNT(*) AS visible_count FROM root_members` + visible + ` GROUP BY root_id
 	), root_display_rows AS (` + treeRootSQL + `
 	), group_task_counts AS (
