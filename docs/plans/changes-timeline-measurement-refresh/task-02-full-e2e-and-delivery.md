@@ -173,3 +173,13 @@ visible indices and checks every visible adjacency. Offscreen retained focus
 rows remain excluded by the existing viewport intersection filter. A comment
 also states why estimated offsets are rebuilt before restoring mounted sizes.
 These scoped review fixes are awaiting CI validation; no local tests were run.
+
+Opt-in auth CI run 36760556845 tested PR head 2e96bc3cd with one worker and
+retries disabled: 23 passed, two failed, one skipped, and six did not run.
+The screenshot setup test displayed the login form, while share authorization
+received setup HTTP 409. The worker-scoped fixture preserves its SQLite data
+across backend restarts, so the preceding lifecycle suite had already consumed
+single-shot auth setup. Both failing suites now use their own database paths,
+matching the existing auth test isolation pattern. Assertions and production
+auth behavior remain unchanged. Routing passed in the same CI run. The new
+auth fixture repairs require fresh current-head CI; no local replay was run.
