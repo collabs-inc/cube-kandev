@@ -41,6 +41,10 @@ func (s *sidebarQuerySnapshot) prepare(
 	ctx context.Context, driverName, workspaceID string, query models.SidebarTaskViewQuery,
 ) (string, []any, error) {
 	if !s.sqlite {
+		// Interactive reads cannot amortize compilation of each recursive query shape.
+		if _, err := s.tx.ExecContext(ctx, "SET LOCAL jit = off"); err != nil {
+			return "", nil, fmt.Errorf("configure sidebar query execution: %w", err)
+		}
 		return sidebarTaskBaseSQL(driverName, workspaceID, query)
 	}
 	candidateSQL, candidateArgs, err := sidebarTaskCandidateSQL(driverName, workspaceID, query)

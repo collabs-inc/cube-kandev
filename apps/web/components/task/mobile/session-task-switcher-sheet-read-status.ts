@@ -9,6 +9,9 @@ export function useTaskReadStatus(data: ReturnType<typeof useSheetData>) {
       ? t("sidebar:workspaceContextAccessDenied")
       : t("sidebar:workspaceContextRefreshFailed");
   }
-  const retryTaskLoad = data.workspaceContextError ? data.retryWorkspaceContext : data.page.retry;
+  let retryTaskLoad: (() => void) | undefined;
+  if (!data.workspaceContextAccessDenied) {
+    retryTaskLoad = data.workspaceContextError ? data.retryWorkspaceContext : data.page.retry;
+  }
   return { taskLoadError, retryTaskLoad };
 }

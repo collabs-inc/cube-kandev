@@ -30,20 +30,20 @@ const (
 )
 
 type sidebarPageRow struct {
-	taskID        string
-	groupKey      string
-	groupLabel    string
-	workflowName  string
-	stepName      string
-	stepColor     string
-	parentID      string
-	parentTitle   string
-	groupCount    int
-	depth         int
-	groupPosition int
-	wipPosition   int
-	wipTotal      int
-	subtaskCount  int
+	taskID         string
+	groupKey       string
+	groupLabel     string
+	workflowName   string
+	stepName       string
+	stepColor      string
+	parentID       string
+	parentTitle    string
+	groupCount     int
+	depth          int
+	continuesGroup bool
+	wipPosition    int
+	wipTotal       int
+	subtaskCount   int
 }
 
 type sidebarPageQueryResult struct {
@@ -265,7 +265,7 @@ func scanSidebarPageRows(rows *sql.Rows) (sidebarPageQueryResult, error) {
 	for rows.Next() {
 		var row sidebarPageRow
 		if err := rows.Scan(&row.taskID, &row.groupKey, &row.groupLabel, &row.workflowName, &row.stepName, &row.stepColor,
-			&row.parentID, &row.parentTitle, &row.groupCount, &row.depth, &row.groupPosition,
+			&row.parentID, &row.parentTitle, &row.groupCount, &row.depth, &row.continuesGroup,
 			&row.wipPosition, &row.wipTotal, &row.subtaskCount,
 			&result.totalTasks, &result.totalVisible, &result.totalGroups, &result.page); err != nil {
 			return sidebarPageQueryResult{}, fmt.Errorf("scan sidebar task row: %w", err)
@@ -337,7 +337,7 @@ func buildSidebarTaskPageResult(
 	emittedContinuations := make(map[string]struct{})
 	for _, header := range headerRows {
 		groupRows := rowsByGroup[header.groupKey]
-		continuation := len(groupRows) > 0 && groupRows[0].groupPosition > 1
+		continuation := len(groupRows) > 0 && groupRows[0].continuesGroup
 		entries = append(entries, models.SidebarTaskPageEntry{
 			Kind: "group", GroupKey: header.groupKey, GroupLabel: header.groupLabel,
 			Continuation: continuation, MatchingCount: header.count,

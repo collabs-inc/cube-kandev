@@ -457,12 +457,12 @@ func sidebarPageSelectSQL(groupNone bool) string {
 	return ` SELECT tree.id, tree.root_group_key, tree.root_group_label,
 		COALESCE(NULLIF(w.name, ''), 'undefined'), COALESCE(NULLIF(ws.name, ''), 'undefined'), COALESCE(ws.color, ''),
 		COALESCE(tree.parent_id, ''), COALESCE(parent.title, ''),
-		` + groupCountExpr + `, tree.depth, tree.group_position,
+		` + groupCountExpr + `, tree.depth, tree.order_path > group_start.first_order_path,
 		COALESCE(queue_status.queue_position, 0), COALESCE(queue_status.queue_total, 0),
 		COALESCE(subtask_counts.subtask_count, 0),
 		page_summary.total_tasks, page_summary.total_visible_tasks, page_summary.total_groups, page_options.page
-	FROM page_window page
-	JOIN page_ordered_tree tree ON tree.id = page.id
+	FROM page_window tree
+	JOIN page_group_starts group_start ON group_start.group_order = tree.group_order
 	CROSS JOIN page_summary
 	CROSS JOIN page_options
 	LEFT JOIN tasks parent ON parent.id = tree.parent_id

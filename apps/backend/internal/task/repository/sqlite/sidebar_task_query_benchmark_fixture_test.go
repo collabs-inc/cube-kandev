@@ -2,6 +2,7 @@ package sqlite
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -46,4 +47,36 @@ func benchmarkSidebarColdRead(b *testing.B, repo *Repository, workspaceID string
 	b.Logf("cold_preparation_and_candidates=%s cold_page_execution=%s cold_headers=%s cold_hydration=%s dialect=%s",
 		stages["created"]+stages["indexed"]+stages["preferences"], stages["page"], stages["headers"], stages["hydrated"], repo.ro.DriverName())
 	return result, err
+}
+
+func logSidebarPostgresJITCost(b *testing.B, repo *Repository, workspaceID string, query models.SidebarTaskViewQuery) {
+	b.Helper()
+	ctx, cancel := context.WithTimeout(b.Context(), 30*time.Second)
+	defer cancel()
+	snapshot, err := beginSidebarQuerySnapshot(ctx, repo.ro)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer snapshot.close()
+	baseSQL, baseArgs, err := snapshot.prepare(ctx, repo.ro.DriverName(), workspaceID, query)
+	if err != nil {
+		b.Fatal(err)
+	}
+	if _, err := snapshot.tx.ExecContext(ctx, "SET LOCAL jit = on"); err != nil {
+		b.Fatal(err)
+	}
+	ctes, args := sidebarPageCTEs(repo.ro.DriverName(), query, models.SidebarTaskViewPreferences{})
+	statement := "EXPLAIN (ANALYZE, FORMAT JSON) " + baseSQL + ctes + sidebarPageSelectSQL(query.Group == sidebarGroupNone)
+	var raw []byte
+	if err := snapshot.tx.QueryRowContext(ctx, repo.ro.Rebind(statement), append(baseArgs, args...)...).Scan(&raw); err != nil {
+		b.Fatal(err)
+	}
+	var plans []struct {
+		JIT       json.RawMessage `json:"JIT"`
+		Execution float64         `json:"Execution Time"`
+	}
+	if err := json.Unmarshal(raw, &plans); err != nil || len(plans) != 1 {
+		b.Fatalf("read sidebar JIT timing: plans=%d error=%v", len(plans), err)
+	}
+	b.Logf("postgres_jit_baseline_execution_ms=%f jit=%s", plans[0].Execution, plans[0].JIT)
 }

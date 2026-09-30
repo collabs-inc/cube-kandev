@@ -58,3 +58,63 @@ func TestSidebarTreeActivityAndStateShareCompleteAncestors(t *testing.T) {
 		})
 	}
 }
+
+func TestSidebarUniformAndMixedTreeStates(t *testing.T) {
+	for _, backend := range []string{"sqlite", "postgres"} {
+		t.Run(backend, func(t *testing.T) {
+			repo := newRepoForSidebarConformance(t, backend)
+			for _, item := range []struct {
+				name, primary, expected string
+				parent, child           v1.TaskState
+			}{
+				{"uniform", "", "TODO", "TODO", "TODO"},
+				{"completed-child", "", "TODO", "TODO", "COMPLETED"},
+				{"completed-tree", "", "COMPLETED", "COMPLETED", "COMPLETED"},
+				{"mixed-state", "", "REVIEW", "TODO", "REVIEW"},
+				{"mixed-bucket", "WAITING_FOR_INPUT", "TODO", "BLOCKED", "TODO"},
+				{"scheduling", "", "SCHEDULING", "TODO", "SCHEDULING"},
+				{"active-primary", "RUNNING", "IN_PROGRESS", "TODO", "COMPLETED"},
+			} {
+				t.Run(item.name, func(t *testing.T) {
+					seedWorkspace(t, repo, item.name)
+					parentID, childID := item.name+"-parent", item.name+"-child"
+					require.NoError(t, repo.CreateTask(t.Context(), &models.Task{
+						ID: parentID, WorkspaceID: item.name, Title: parentID, State: item.parent,
+					}))
+					require.NoError(t, repo.CreateTask(t.Context(), &models.Task{
+						ID: childID, WorkspaceID: item.name, Title: childID, ParentID: parentID, State: item.child,
+					}))
+					if item.primary != "" {
+						_, err := repo.db.ExecContext(t.Context(), repo.db.Rebind(`INSERT INTO task_status_summaries
+							(task_id, workspace_id, revision, summary, updated_at) VALUES (?, ?, 1, ?, ?)`),
+							childID, item.name, fmt.Sprintf(`{"primary_session":{"state":%q}}`, item.primary), time.Now())
+						require.NoError(t, err)
+					}
+					query := sidebarTaskQuery(1)
+					query.Group = "state"
+					page, err := repo.QuerySidebarTaskPage(t.Context(), item.name, query, models.SidebarTaskViewPreferences{})
+					require.NoError(t, err)
+					require.Equal(t, []string{parentID, childID}, sidebarTaskIDs(page.Tasks))
+					require.Equal(t, item.expected, page.Entries[0].GroupKey)
+				})
+			}
+		})
+	}
+}
+
+func TestSidebarPostgresJITSettingIsTransactionLocal(t *testing.T) {
+	repo := newRepoForSidebarConformance(t, "postgres")
+	_, err := repo.db.ExecContext(t.Context(), "SET jit = on")
+	require.NoError(t, err)
+	snapshot, err := beginSidebarQuerySnapshot(t.Context(), repo.ro)
+	require.NoError(t, err)
+	defer snapshot.close()
+	_, _, err = snapshot.prepare(t.Context(), repo.ro.DriverName(), "workspace", sidebarTaskQuery(1))
+	require.NoError(t, err)
+	var setting string
+	require.NoError(t, snapshot.tx.QueryRowContext(t.Context(), "SHOW jit").Scan(&setting))
+	require.Equal(t, "off", setting)
+	require.NoError(t, snapshot.tx.Rollback())
+	require.NoError(t, snapshot.conn.QueryRowContext(t.Context(), "SHOW jit").Scan(&setting))
+	require.Equal(t, "on", setting)
+}

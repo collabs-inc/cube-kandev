@@ -332,6 +332,8 @@ func benchmarkSidebarPage(b *testing.B, repo *Repository, workspaceID string, qu
 	b.ReportMetric(float64(rss-baselineRSS), "rss-delta-B")
 	if !dialect.IsPostgres(repo.ro.DriverName()) {
 		logSidebarTaskPageQueryPlan(b, repo, workspaceID, query)
+	} else if query.Group == sidebarGroupNone && query.Page == 1 {
+		logSidebarPostgresJITCost(b, repo, workspaceID, query)
 	}
 }
 
