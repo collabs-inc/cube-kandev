@@ -36,18 +36,27 @@ func sidebarBaseCTE(driver, groupExpr, groupLabelExpr, scopeSQL string, query mo
 	needs := sidebarBaseNeedsFor(query)
 	summaryJoin, workflowJoins := sidebarBaseJoins(needs)
 	candidateFields := sidebarBaseCandidateFields(driver, needs)
+	projectionFields := []string{"candidate_raw.*", groupExpr + " AS group_key", groupLabelExpr + " AS group_label"}
+	if needs.activity {
+		projectionFields = append(projectionFields, sidebarActivitySortKey(driver, "activity_source")+" AS activity_at")
+	}
+	rawMaterialization := "MATERIALIZED"
+	if dialect.IsPostgres(driver) {
+		// Preserve base-table uniqueness and statistics through recursive joins.
+		rawMaterialization = "NOT MATERIALIZED"
+	}
 	return `WITH RECURSIVE scoped_tasks AS NOT MATERIALIZED (
 		SELECT t.* FROM tasks t
 		WHERE t.workspace_id = ? AND (t.is_ephemeral = 0 OR t.is_ephemeral IS NULL)
 			AND COALESCE(t.origin, '') <> 'automation_run'
 			AND ` + excludeConfigModePredicate(driver, "t.metadata") + `
 			AND ` + scopeSQL + `
-	), candidate_raw AS MATERIALIZED (
+	), candidate_raw AS ` + rawMaterialization + ` (
 		SELECT ` + strings.Join(candidateFields, ",\n\t\t\t") + `
 		FROM scoped_tasks t
 		` + workflowJoins + summaryJoin + `
 	), candidate AS (
-		SELECT candidate_raw.*, ` + groupExpr + ` AS group_key, ` + groupLabelExpr + ` AS group_label
+		SELECT ` + strings.Join(projectionFields, ", ") + `
 		FROM candidate_raw
 	)`
 }
@@ -99,7 +108,7 @@ func sidebarActivityFields(driver string, needs sidebarBaseNeeds) []string {
 		return nil
 	}
 	value := `COALESCE(NULLIF(` + dialect.JSONExtract(driver, "summary.summary", "last_activity_at") + `, ''), CAST(t.updated_at AS TEXT), CAST(t.created_at AS TEXT))`
-	return []string{sidebarActivitySortKey(driver, value) + " AS activity_at"}
+	return []string{value + " AS activity_source"}
 }
 
 func sidebarWorkflowFields(needs sidebarBaseNeeds) []string {
@@ -204,7 +213,10 @@ func sidebarActivitySortKey(driver, value string) string {
 			WHEN 4 THEN 30 WHEN 6 THEN 30 WHEN 9 THEN 30 WHEN 11 THEN 30 ELSE 31 END`
 		return `CASE WHEN (` + value + `) ~ '` + validRFC3339 + `' AND SUBSTRING((` + value + `), 1, 4) <> '0000' THEN
 			CASE WHEN ` + day + ` <= ` + maxDay + `
-				THEN ` + utcSecond + ` || '.' || ` + fraction + ` ELSE (` + value + `) END
+				THEN CASE WHEN LENGTH((` + value + `)) = 20 AND SUBSTRING((` + value + `), 20, 1) = 'Z'
+					AND SUBSTRING((` + value + `), 11, 1) = 'T'
+					THEN SUBSTRING((` + value + `), 1, 19) || '.000000000'
+					ELSE ` + utcSecond + ` || '.' || ` + fraction + ` END ELSE (` + value + `) END
 			ELSE (` + value + `) END`
 	}
 	tail := `SUBSTR((` + value + `), INSTR((` + value + `), '.') + 1)`
@@ -236,7 +248,10 @@ func sidebarActivitySortKey(driver, value string) string {
 			AND SUBSTR(` + zone + `, 5, 2) BETWEEN '00' AND '59')
 		OR (SUBSTR((` + value + `), 11, 1) = ' ' AND LENGTH(` + zone + `) = 3 AND SUBSTR(` + zone + `, 1, 1) IN ('+', '-')
 			AND SUBSTR(` + zone + `, 2, 2) BETWEEN '00' AND '23'))`
-	return `CASE WHEN ` + utcSecond + ` IS NOT NULL AND ` + validCalendarDate + ` AND ` + validClock + `
+	return `CASE WHEN LENGTH((` + value + `)) = 20 AND SUBSTR((` + value + `), 20, 1) = 'Z'
+		AND STRFTIME('%Y-%m-%dT%H:%M:%SZ', (` + value + `), '+0 seconds') = (` + value + `)
+		THEN SUBSTR((` + value + `), 1, 19) || '.000000000'
+		WHEN ` + utcSecond + ` IS NOT NULL AND ` + validCalendarDate + ` AND ` + validClock + `
 		AND ` + validFraction + ` AND ` + validZone + `
 		THEN ` + utcSecond + ` || '.' || ` + normalizedFraction + ` ELSE (` + value + `) END`
 }

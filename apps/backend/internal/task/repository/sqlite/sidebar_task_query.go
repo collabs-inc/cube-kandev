@@ -11,6 +11,7 @@ import (
 	"sort"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/kandev/kandev/internal/db/dialect"
 	"github.com/kandev/kandev/internal/task/models"
 )
 
@@ -171,7 +172,11 @@ func sidebarTaskCandidateSQL(driver, workspaceID string, query models.SidebarTas
 	}
 	baseSQL := sidebarBaseCTE(driver, groupExpr, groupLabelExpr, scopeSQL, query)
 	baseArgs := append([]any{workspaceID}, scopeArgs...)
-	baseSQL += ", filtered AS MATERIALIZED (SELECT * FROM candidate WHERE " + filterSQL + ")"
+	materialization := "MATERIALIZED"
+	if dialect.IsPostgres(driver) {
+		materialization = "NOT MATERIALIZED"
+	}
+	baseSQL += ", filtered AS " + materialization + " (SELECT * FROM candidate WHERE " + filterSQL + ")"
 	baseArgs = append(baseArgs, filterArgs...)
 	return baseSQL, baseArgs, nil
 }
