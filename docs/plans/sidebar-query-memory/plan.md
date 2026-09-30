@@ -202,7 +202,7 @@ Historical companion results remain unchanged; their earlier statements no longe
 
 ## Verification results
 
-Implementation: pending. No production or permanent test changes were made in this design turn.
+Design checkpoint: no production or permanent test changes were made during the design turn.
 Documentation catalog validation passed: 332 decisions and 1249 specifications.
 Full specification lint and its 36 tests passed.
 The documentation-coverage preflight accepted all four work orders against the planned runtime change.
@@ -211,6 +211,19 @@ No product suites ran in this design turn. The isolated prototype is recorded se
 Kandev task-plan and completion tools were unavailable in this turn's tool catalog.
 The repository files hold the handoff; no platform completion signal is claimed.
 Exact product commands are in the four work orders.
+
+Implementation is in progress in PR #4062. Complete current-workspace overviews
+render and paginate through Zustand without sidebar queries or refresh announcements.
+Cold, incomplete, and archived views retain bounded server reads. First successful
+safe responses survive ordinary live invalidations; queued updates share one trailing
+refresh. Workspace switching prevents the old task route from rehydrating its scope.
+
+CI run `36692999006`, timing job `109815402966`, passed the SQLite/PostgreSQL
+semantic matrix at `b8c343d8b`. On AMD EPYC 7763 with GOMAXPROCS=4, populated
+100K warm pages took 1.20–2.00s on SQLite and 2.95–4.18s on PostgreSQL.
+These measurements still miss the one-second criterion. Subsequent changes reuse
+display-root forests, preserve parent statistics, and expose the validated page
+bound to the PostgreSQL planner. Final timings and browser counts remain required.
 
 ## Risks
 

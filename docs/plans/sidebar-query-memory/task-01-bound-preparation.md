@@ -135,4 +135,7 @@ bounded context, and discards uncertain connections, including failed commits.
 New synthetic production-pool tests cover native allocation, repeated concurrent
 reads, stage failures, cancellation, cleanup expiry, snapshot consistency, and workspace
 isolation. Tests are authored for CI and have not run locally, per the user.
-CI results and the remaining maximum-input/benchmark matrix are pending.
+Scratch preparation now adds a unique ID index and analyzes only the temporary
+candidate relation. Cleanup regressions check that its statistics retain no rows
+for the next borrower. The main reader remains read-only. Current CI results and
+the remaining maximum-input/benchmark matrix are pending.

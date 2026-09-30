@@ -165,3 +165,12 @@ Desktop and phone regression cases now cover State-grouped repeated child activi
 The initial CI resource job (run `36652869598`, job `109692202303`, artifact `11072014218`) passed all 144 preparation cases, five maximum-input cases, and 73 pooled cases (72 shapes plus alternating workspaces). Native peaks were 18,930,240 bytes for preparation, 36,382,240 bytes for maximum inputs, and 74,777,464 bytes for pooled reads. The pooled retained-native maximum was 96,192 bytes and RSS delta maximum 156,868,608 bytes. These satisfy the resource budgets.
 
 The same run exposed a remaining timing failure on Linux/amd64, AMD EPYC 7763, Go 1.26.0, SQLite 3.51.1, and GOMAXPROCS=4: 100,000-task warm queries took 10.76–15.74 seconds on SQLite and 4.37–12.71 seconds on PostgreSQL. A successful benchmark process does not meet the one-second target. Query-plan remediation now uses parent adjacency for page descendant counts, narrower intermediate rows, existing SQLite scratch indexes, and a planner-visible ephemeral predicate. Repeat CI measurements and browser counts remain required before completion.
+
+At `b8c343d8b`, timing job `109815402966` in run `36692999006` passed the
+two-engine semantic matrix. Populated 100K warm pages on AMD EPYC 7763 with
+GOMAXPROCS=4 took 1.20–1.22s (None), 1.98–2.00s (State), and 1.50–1.55s
+(Repository) on SQLite; PostgreSQL took 2.95–3.20s, 3.73–4.18s, and 3.05–3.25s.
+These remain above the criterion. Execution plans exposed inflated recursive/page
+cardinality and repeated ordering. Followups retain parent-relationship statistics,
+bound planner-visible page rows, share display-root memberships for grouping/counts,
+and add scratch statistics cleanup checks. Final exact-head evidence remains pending.

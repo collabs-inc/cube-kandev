@@ -164,3 +164,10 @@ The local evaluator and actual SQLite queries consume `repository/testdata/sideb
 The page controller accepts safe first responses despite soft invalidations, merges live journal changes, excludes known deletions/ineligible archives, and schedules one trailing refresh. Provisional responses cannot enter reusable cache. Workspace/account/access/view/page/reconnect/overflow guards remain hard barriers. Existing translated server-refresh announcements remain limited to server-backed views and do not move the list.
 
 Desktop, phone, and app-navigation lists use the same controller. CI regression cases cover zero-request complete views, local pagination, bounded cold archive ownership, first-response progress after three live invalidations, repeated workspace changes, and reconnect recovery. No tests ran locally. Exact CI conformance and surface results remain pending.
+
+CI followups debounce queued invalidations after a slow response and cancel redundant
+scheduled reads when that trailing read starts. Workspace-list failures retain manual
+recovery; a denied task-page read clears its data and offers no unchanged-scope retry.
+Changing workspace while a task route remains open cannot restart that old route and
+restore its previous workspace. The 101-task fixture searches its virtualized anchor
+before opening it, while retaining complete shared coverage and zero sidebar queries.
