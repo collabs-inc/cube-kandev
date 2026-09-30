@@ -189,7 +189,7 @@ test.describe("Mobile file viewer panel", () => {
   }) => {
     test.setTimeout(90_000);
 
-    const { filePath } = await setupMobileFileViewerTest({
+    const { session, filePath } = await setupMobileFileViewerTest({
       testPage,
       apiClient,
       seedData,
@@ -199,8 +199,7 @@ test.describe("Mobile file viewer panel", () => {
 
     await testPage.getByRole("button", { name: "Files", exact: true }).tap();
 
-    const fileNode = testPage.locator(`[data-testid="file-tree-node"][data-path="${filePath}"]`);
-    await expect(fileNode).toBeVisible({ timeout: 15_000 });
+    const fileNode = await session.fileTree.waitForFileTreeNode(filePath, 15_000);
     await fileNode.tap();
 
     const viewer = testPage.getByTestId("mobile-file-viewer-panel");
@@ -318,7 +317,7 @@ test.describe("Mobile file viewer panel", () => {
   }) => {
     test.setTimeout(90_000);
 
-    const { filePath } = await setupMobileFileViewerTest({
+    const { session, filePath } = await setupMobileFileViewerTest({
       testPage,
       apiClient,
       seedData,
@@ -329,8 +328,7 @@ test.describe("Mobile file viewer panel", () => {
 
     await testPage.getByRole("button", { name: "Files", exact: true }).tap();
 
-    const fileNode = testPage.locator(`[data-testid="file-tree-node"][data-path="${filePath}"]`);
-    await expect(fileNode).toBeVisible({ timeout: 15_000 });
+    const fileNode = await session.fileTree.waitForFileTreeNode(filePath, 15_000);
     await fileNode.tap();
 
     const viewer = testPage.getByTestId("mobile-file-viewer-panel");

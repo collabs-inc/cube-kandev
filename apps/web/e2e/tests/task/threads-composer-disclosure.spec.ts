@@ -1,4 +1,4 @@
-import type { Locator } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import { test, expect } from "../../fixtures/test-base";
 import { dwell, watchWs } from "../../helpers/causal-waits";
 import { seedSecondaryClarificationTask } from "../../helpers/clarification";
@@ -21,6 +21,40 @@ import {
 } from "./threads-presentation-helpers";
 
 let original: ThreadPresentationSettings;
+
+async function waitForThreadModelCatalog(
+  page: Page,
+  taskId: string,
+  sessionId: string,
+): Promise<void> {
+  await page.waitForFunction(
+    ({ taskId: targetTaskId, sessionId: targetSessionId }) => {
+      const store = (
+        window as Window & {
+          __KANDEV_E2E_STORE__?: {
+            getState: () => {
+              taskSessionsByTask: { loadedByTaskId: Record<string, boolean> };
+              sessionModels: {
+                bySessionId: Record<string, { currentModelId: string; models: unknown[] }>;
+              };
+            };
+          };
+        }
+      ).__KANDEV_E2E_STORE__;
+      if (!store) return false;
+      const state = store.getState();
+      const modelCatalog = state.sessionModels.bySessionId[targetSessionId];
+      return (
+        state.taskSessionsByTask.loadedByTaskId[targetTaskId] === true &&
+        modelCatalog !== undefined &&
+        modelCatalog.currentModelId !== "" &&
+        modelCatalog.models.length > 0
+      );
+    },
+    { taskId, sessionId },
+    { timeout: 30_000 },
+  );
+}
 
 for (const zoom of [1, 0.9]) {
   for (const autoHideComposer of [false, true]) {
@@ -528,8 +562,13 @@ test("keeps the native model picker and attachment-only draft available after po
   const task = await startPresentationThread(testPage, apiClient, seedData, "Composer controls");
   await seedThreadPresentation(apiClient, { layout: "columns", autoHideComposer: true });
   await testPage.goto("/threads");
+  await expect(testPage.getByTestId("threads-board")).toBeVisible({ timeout: 15_000 });
   const tile = testPage.getByTestId(`thread-column-${task.id}`);
+  await expect(tile).toBeVisible({ timeout: 15_000 });
   const editor = tile.getByTestId("chat-input-editor");
+  await expect(editor).toBeVisible({ timeout: 15_000 });
+  if (!task.session_id) throw new Error("Presentation task did not return a session ID");
+  await waitForThreadModelCatalog(testPage, task.id, task.session_id);
   await tile.locator("header").hover();
   const model = tile.getByRole("button", { name: "Session model settings" });
   await model.click();

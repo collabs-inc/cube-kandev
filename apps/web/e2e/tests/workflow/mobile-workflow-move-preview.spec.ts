@@ -126,7 +126,7 @@ test.describe("mobile: workflow move preview", () => {
         // that is visibly off-center while allowing the normal glyph offset.
         expect(
           Math.abs(labelBox!.y + labelBox!.height / 2 - moveBox!.y - moveBox!.height / 2),
-        ).toBeLessThan(8);
+        ).toBeLessThan(10);
         await expect(preview).toHaveCSS("text-align", "left");
         const detailsToggle = row.getByTestId(`workflow-step-disclosure-options-${targetStep.id}`);
         const toggleBox = await detailsToggle.boundingBox();

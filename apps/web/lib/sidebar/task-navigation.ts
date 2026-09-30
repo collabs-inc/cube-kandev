@@ -71,20 +71,34 @@ function isInsideViewport(row: HTMLElement, viewport: HTMLElement): boolean {
   );
 }
 
+function scrollRowIntoViewport(row: HTMLElement, viewport: HTMLElement): void {
+  const rowRect = row.getBoundingClientRect();
+  const viewportRect = viewport.getBoundingClientRect();
+  let topDelta = 0;
+  if (rowRect.top < viewportRect.top) {
+    topDelta = rowRect.top - viewportRect.top;
+  } else if (rowRect.bottom > viewportRect.bottom) {
+    topDelta = rowRect.bottom - viewportRect.bottom;
+  }
+  let leftDelta = 0;
+  if (rowRect.left < viewportRect.left) {
+    leftDelta = rowRect.left - viewportRect.left;
+  } else if (rowRect.right > viewportRect.right) {
+    leftDelta = rowRect.right - viewportRect.right;
+  }
+  const maxTop = Math.max(0, viewport.scrollHeight - viewport.clientHeight);
+  const maxLeft = Math.max(0, viewport.scrollWidth - viewport.clientWidth);
+
+  viewport.scrollTop = Math.min(maxTop, Math.max(0, viewport.scrollTop + topDelta));
+  viewport.scrollLeft = Math.min(maxLeft, Math.max(0, viewport.scrollLeft + leftDelta));
+}
+
 function defaultRequestFrame(callback: () => void): void {
   if (typeof requestAnimationFrame === "function") {
     requestAnimationFrame(callback);
   } else {
     setTimeout(callback, 16);
   }
-}
-
-function prefersReducedMotion(): boolean {
-  return (
-    typeof window !== "undefined" &&
-    typeof window.matchMedia === "function" &&
-    window.matchMedia("(prefers-reduced-motion: reduce)").matches
-  );
 }
 
 /** Restarts the short-lived cue on the latest command-selected row. */
@@ -137,11 +151,7 @@ export function revealSidebarTask(
           return;
         }
         if (!isInsideViewport(match.row, match.viewport)) {
-          match.row.scrollIntoView({
-            behavior: prefersReducedMotion() ? "auto" : "smooth",
-            block: "nearest",
-            inline: "nearest",
-          });
+          scrollRowIntoViewport(match.row, match.viewport);
         }
         cueTaskRow(match.row);
         resolve(true);

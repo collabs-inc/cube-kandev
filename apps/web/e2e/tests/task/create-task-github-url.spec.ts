@@ -239,6 +239,9 @@ test.describe("Task creation from GitHub URL", () => {
       await expect(session.chat.getByText("simple mock response", { exact: false })).toBeVisible();
       await expect(session.idleInput()).toBeVisible();
 
+      await session.clickTab("Terminal", { force: true });
+      await expect(session.terminal).toBeVisible({ timeout: 15_000 });
+      await session.expectTerminalConnected();
       await expectForkPRLaunchState(testPage, session, apiClient, fixture, taskId);
       await expect(session.prTopbarButton()).toContainText("#3879", { timeout: 15_000 });
     } finally {

@@ -178,7 +178,9 @@ test.describe("sidebar scrolling", () => {
     }));
     expect(overflow.scrollWidth).toBeGreaterThan(overflow.clientWidth);
 
-    await titleViewport.hover();
+    // ScrollOnOverflow listens on the title wrapper. Hover its left edge so
+    // the translating text cannot carry the pointer out of the hit target.
+    await titleViewport.hover({ position: { x: 1, y: 1 } });
     await expect
       .poll(() => titleText.evaluate((element) => element.style.transform))
       .toMatch(/^translateX\(-/);
@@ -537,20 +539,18 @@ test.describe("sidebar scrolling", () => {
       "aria-current",
       "true",
     );
+    await expect(targetRow).toHaveClass(/task-sidebar-row-reveal/, { timeout: 1_000 });
     await expect
       .poll(
-        async () => {
-          const [containerBox, rowBox] = await Promise.all([
-            scrollContainer.boundingBox(),
-            targetRow.boundingBox(),
-          ]);
-          if (!containerBox || !rowBox) return false;
-          return (
-            rowBox.y >= containerBox.y - 1 &&
-            rowBox.y + rowBox.height <= containerBox.y + containerBox.height + 1
-          );
-        },
-        { timeout: 10_000 },
+        () =>
+          scrollContainer.evaluate((viewport, taskId) => {
+            const row = viewport.querySelector<HTMLElement>(`[data-task-row-id='${taskId}']`);
+            if (!row || viewport.getClientRects().length === 0) return false;
+            const viewportRect = viewport.getBoundingClientRect();
+            const rowRect = row.getBoundingClientRect();
+            return rowRect.top >= viewportRect.top - 1 && rowRect.bottom <= viewportRect.bottom + 1;
+          }, targetTask.id),
+        { timeout: 10_000, message: "command selection should reveal its task row" },
       )
       .toBe(true);
 
