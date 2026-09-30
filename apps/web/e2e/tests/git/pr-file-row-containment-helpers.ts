@@ -1,6 +1,7 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 import { waitForFiniteAnimations } from "../../helpers/animations";
-import type { SeedData } from "../../fixtures/test-base";
+import { resetSeedRepositoryCheckout, type SeedData } from "../../fixtures/test-base";
+import type { BackendContext } from "../../fixtures/backend";
 import type { ApiClient } from "../../helpers/api-client";
 
 export const LONG_PR_PATH =
@@ -12,7 +13,13 @@ const PR_OWNER = "testorg";
 const PR_REPO = "testrepo";
 const PR_NUMBER = 4242;
 
-export async function seedLongPRFileTask(apiClient: ApiClient, seedData: SeedData, title: string) {
+export async function seedLongPRFileTask(
+  apiClient: ApiClient,
+  seedData: SeedData,
+  backend: BackendContext,
+  title: string,
+) {
+  resetSeedRepositoryCheckout(seedData, backend.tmpDir);
   const checkoutBranch = "main";
 
   await apiClient.mockGitHubReset();

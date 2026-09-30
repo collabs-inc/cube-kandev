@@ -15,9 +15,15 @@ test.describe("Mobile PR file row containment", () => {
     testPage,
     apiClient,
     seedData,
+    backend,
   }) => {
     test.setTimeout(120_000);
-    const task = await seedLongPRFileTask(apiClient, seedData, "Mobile PR Row Containment");
+    const task = await seedLongPRFileTask(
+      apiClient,
+      seedData,
+      backend,
+      "Mobile PR Row Containment",
+    );
 
     await testPage.goto(`/t/${task.id}`);
     const session = new SessionPage(testPage);

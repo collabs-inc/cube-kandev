@@ -1,9 +1,10 @@
-import { test, expect } from "../../fixtures/test-base";
+import { test, expect, resetSeedRepositoryCheckout } from "../../fixtures/test-base";
 import { dwell } from "../../helpers/causal-waits";
 import { SessionPage } from "../../pages/session-page";
 import type { ApiClient } from "../../helpers/api-client";
 import type { SeedData } from "../../fixtures/test-base";
 import type { Page } from "@playwright/test";
+import type { BackendContext } from "../../fixtures/backend";
 
 /**
  * Seed a task using the diff-expansion-setup mock scenario and navigate to
@@ -17,7 +18,9 @@ async function seedExpansionTask(
   testPage: Page,
   apiClient: ApiClient,
   seedData: SeedData,
+  backend: BackendContext,
 ): Promise<SessionPage> {
+  resetSeedRepositoryCheckout(seedData, backend.tmpDir);
   const task = await apiClient.createTaskWithAgent(
     seedData.workspaceId,
     "Diff Expansion E2E",
@@ -145,8 +148,9 @@ test.describe("Diff expansion — Pierre Diffs provider", () => {
     testPage,
     apiClient,
     seedData,
+    backend,
   }) => {
-    await seedExpansionTask(testPage, apiClient, seedData);
+    await seedExpansionTask(testPage, apiClient, seedData, backend);
     await openChangesTab(testPage);
     await openExpansionFileDiff(testPage);
 
@@ -185,8 +189,9 @@ test.describe("Diff expansion — Pierre Diffs provider", () => {
     testPage,
     apiClient,
     seedData,
+    backend,
   }) => {
-    await seedExpansionTask(testPage, apiClient, seedData);
+    await seedExpansionTask(testPage, apiClient, seedData, backend);
     await openChangesTab(testPage);
     await openExpansionFileDiff(testPage);
 
@@ -220,8 +225,9 @@ test.describe("Diff expansion — Pierre Diffs provider", () => {
     testPage,
     apiClient,
     seedData,
+    backend,
   }) => {
-    await seedExpansionTask(testPage, apiClient, seedData);
+    await seedExpansionTask(testPage, apiClient, seedData, backend);
     await openChangesTab(testPage);
     await openExpansionFileDiff(testPage);
 
@@ -249,8 +255,9 @@ test.describe("Diff expansion — Pierre Diffs provider", () => {
     testPage,
     apiClient,
     seedData,
+    backend,
   }) => {
-    await seedExpansionTask(testPage, apiClient, seedData);
+    await seedExpansionTask(testPage, apiClient, seedData, backend);
     await openChangesTab(testPage);
     await openExpansionFileDiff(testPage);
 
@@ -268,8 +275,9 @@ test.describe("Diff expansion — Pierre Diffs provider", () => {
     testPage,
     apiClient,
     seedData,
+    backend,
   }) => {
-    await seedExpansionTask(testPage, apiClient, seedData);
+    await seedExpansionTask(testPage, apiClient, seedData, backend);
     await openChangesTab(testPage);
     await openExpansionFileDiff(testPage);
 
@@ -309,8 +317,9 @@ test.describe("Diff expansion — Pierre Diffs provider", () => {
     testPage,
     apiClient,
     seedData,
+    backend,
   }) => {
-    await seedExpansionTask(testPage, apiClient, seedData);
+    await seedExpansionTask(testPage, apiClient, seedData, backend);
     await openChangesTab(testPage);
     await openExpansionFileDiff(testPage);
 
@@ -326,8 +335,9 @@ test.describe("Diff expansion — Pierre Diffs provider", () => {
     testPage,
     apiClient,
     seedData,
+    backend,
   }) => {
-    await seedExpansionTask(testPage, apiClient, seedData);
+    await seedExpansionTask(testPage, apiClient, seedData, backend);
     await openChangesTab(testPage);
     await openExpansionFileDiff(testPage);
 
@@ -382,8 +392,9 @@ test.describe("Diff expansion — Pierre Diffs provider", () => {
     testPage,
     apiClient,
     seedData,
+    backend,
   }) => {
-    await seedExpansionTask(testPage, apiClient, seedData);
+    await seedExpansionTask(testPage, apiClient, seedData, backend);
     await openChangesTab(testPage);
     await openExpansionFileDiff(testPage);
 

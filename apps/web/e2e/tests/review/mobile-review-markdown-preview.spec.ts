@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { test, expect } from "../../fixtures/test-base";
+import { test, expect, resetSeedRepositoryCheckout } from "../../fixtures/test-base";
 import { GitHelper, makeGitEnv } from "../../helpers/git-helper";
 import { SessionPage } from "../../pages/session-page";
 
@@ -16,7 +16,8 @@ test.describe("Review Markdown preview on mobile", () => {
     backend,
     prCapture,
   }) => {
-    const repoDir = path.join(backend.tmpDir, "repos", "e2e-repo");
+    resetSeedRepositoryCheckout(seedData, backend.tmpDir);
+    const repoDir = seedData.repositoryPath;
     fs.writeFileSync(
       path.join(repoDir, MARKDOWN_FILE),
       "# Mobile review preview\n\nRendered content.",

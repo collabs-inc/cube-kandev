@@ -16,10 +16,16 @@ test.describe("PR file row containment", () => {
     testPage,
     apiClient,
     seedData,
+    backend,
   }) => {
     test.setTimeout(120_000);
     await testPage.setViewportSize({ width: 1366, height: 900 });
-    const task = await seedLongPRFileTask(apiClient, seedData, "Desktop PR Row Containment");
+    const task = await seedLongPRFileTask(
+      apiClient,
+      seedData,
+      backend,
+      "Desktop PR Row Containment",
+    );
 
     await testPage.goto(`/t/${task.id}`);
     const session = new SessionPage(testPage);

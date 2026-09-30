@@ -59,6 +59,7 @@ test.describe("Workspace repository sets settings", () => {
       `[role="option"][data-value="${seedData.repositoryId}"]`,
     );
     await expect(repositoryOption).toBeVisible();
+    await repositoryOption.scrollIntoViewIfNeeded();
     await expect
       .poll(() =>
         repositoryOption.evaluate((element) => {

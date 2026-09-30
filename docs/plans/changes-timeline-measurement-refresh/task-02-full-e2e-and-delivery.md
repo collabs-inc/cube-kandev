@@ -207,3 +207,15 @@ its closing picker and scheduled focus restoration before another picker opens.
 All existing behavior assertions
 remain; no forced clicks, page reloads, extra retries, or local test replays
 were introduced. Fresh current-head CI must validate these scoped repairs.
+
+
+The next standard run on `48cca0ed` passed all required checks and the previously
+repaired scenarios on their first attempts. Its full E2E report again contained
+3,618 passes and 47 skips, with four different tests passing after retry.
+Failure snapshots showed inherited canvas files ahead of the diff-expansion,
+mobile PR-file, and mobile Markdown-review targets. Those seed helpers now
+restore the immutable checkout before creating their scenario. The repository
+set picker contained repositories created by earlier tests, so its seed option
+was clipped by the scrolling list; the test now scrolls that option into view
+before its existing edge hit-test. Geometry and user-behavior assertions remain
+unchanged. These scoped fixture repairs require fresh CI; no local replay ran.
