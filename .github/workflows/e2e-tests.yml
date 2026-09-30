@@ -35,6 +35,8 @@ jobs:
       COREPACK_ENABLE_AUTO_PIN: "0"
       NODE_OPTIONS: --dns-result-order=ipv4first
       PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
+      PLAYWRIGHT_BLOB_OUTPUT_DIR: e2e/blob-report
+      E2E_FAIL_ON_FLAKY: "1"
     steps:
       - name: Check out PR source
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
