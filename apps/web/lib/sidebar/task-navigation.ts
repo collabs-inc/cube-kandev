@@ -74,12 +74,9 @@ function isInsideViewport(row: HTMLElement, viewport: HTMLElement): boolean {
 function scrollRowIntoViewport(row: HTMLElement, viewport: HTMLElement): void {
   const rowRect = row.getBoundingClientRect();
   const viewportRect = viewport.getBoundingClientRect();
-  let topDelta = 0;
-  if (rowRect.top < viewportRect.top) {
-    topDelta = rowRect.top - viewportRect.top;
-  } else if (rowRect.bottom > viewportRect.bottom) {
-    topDelta = rowRect.bottom - viewportRect.bottom;
-  }
+  const rowCenter = rowRect.top + rowRect.height / 2;
+  const viewportCenter = viewportRect.top + viewport.clientTop + viewport.clientHeight / 2;
+  const topDelta = rowCenter - viewportCenter;
   let leftDelta = 0;
   if (rowRect.left < viewportRect.left) {
     leftDelta = rowRect.left - viewportRect.left;

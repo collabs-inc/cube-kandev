@@ -65,19 +65,18 @@ describe("revealSidebarTask", () => {
     const row = mountRow(viewport, TEST_TASK_ID, { x: 0, y: 120, width: 320, height: 24 });
 
     await expect(revealSidebarTask(TEST_TASK_ID, (callback) => callback())).resolves.toBe(true);
-    expect(viewport.scrollTop).toBe(44);
+    expect(viewport.scrollTop).toBe(82);
     expect(viewport.scrollLeft).toBe(0);
+    expect(row.scrollIntoView).not.toHaveBeenCalled();
     expect(row.classList.contains(TASK_ROW_REVEAL_CLASS)).toBe(true);
   });
 
-  it("scrolls a partly clipped row fully into view", async () => {
+  it("centers a partially visible row so its full target is revealed", async () => {
     const viewport = mountViewport();
-    viewport.scrollTop = 70;
-    const row = mountRow(viewport, TEST_TASK_ID, { x: 0, y: -24, width: 320, height: 64 });
+    const row = mountRow(viewport, TEST_TASK_ID, { x: 0, y: 80, width: 320, height: 52 });
 
     await expect(revealSidebarTask(TEST_TASK_ID, (callback) => callback())).resolves.toBe(true);
-
-    expect(viewport.scrollTop).toBe(46);
+    expect(viewport.scrollTop).toBe(56);
     expect(row.scrollIntoView).not.toHaveBeenCalled();
   });
 
@@ -88,6 +87,7 @@ describe("revealSidebarTask", () => {
 
     await expect(revealSidebarTask(TEST_TASK_ID, (callback) => callback())).resolves.toBe(true);
     expect(viewport.scrollTop).toBe(0);
+    expect(row.scrollIntoView).not.toHaveBeenCalled();
     expect(row.classList.contains(TASK_ROW_REVEAL_CLASS)).toBe(true);
   });
 
@@ -131,7 +131,7 @@ describe("revealSidebarTask edge cases", () => {
     callbacks.shift()!();
 
     await expect(navigation).resolves.toBe(true);
-    expect(viewport.scrollTop).toBe(44);
+    expect(viewport.scrollTop).toBe(82);
     expect(row.scrollIntoView).not.toHaveBeenCalled();
   });
 
@@ -146,14 +146,14 @@ describe("revealSidebarTask edge cases", () => {
 
     mountRow(viewport, "task-b", { x: 0, y: 120, width: 320, height: 24 });
     await expect(revealSidebarTask("task-b", (callback) => callback())).resolves.toBe(true);
-    expect(viewport.scrollTop).toBe(44);
+    expect(viewport.scrollTop).toBe(82);
 
     const firstRow = mountRow(viewport, "task-a", { x: 0, y: 120, width: 320, height: 24 });
     firstCallbacks.shift()!();
 
     await expect(firstNavigation).resolves.toBe(false);
     expect(firstRow.scrollIntoView).not.toHaveBeenCalled();
-    expect(viewport.scrollTop).toBe(44);
+    expect(viewport.scrollTop).toBe(82);
   });
 
   it("cancels a pending reveal before a newer route is ready", async () => {
@@ -201,7 +201,7 @@ describe("revealSidebarTask edge cases", () => {
 
     await expect(revealSidebarTask(TEST_TASK_ID, (callback) => callback())).resolves.toBe(true);
     expect(hiddenViewport.scrollTop).toBe(0);
-    expect(visibleViewport.scrollTop).toBe(44);
+    expect(visibleViewport.scrollTop).toBe(82);
     expect(hiddenRow.scrollIntoView).not.toHaveBeenCalled();
     expect(visibleRow.scrollIntoView).not.toHaveBeenCalled();
   });
