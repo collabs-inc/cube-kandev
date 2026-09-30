@@ -49,7 +49,7 @@ func benchmarkSidebarColdRead(b *testing.B, repo *Repository, workspaceID string
 	return result, err
 }
 
-func logSidebarPostgresJITCost(b *testing.B, repo *Repository, workspaceID string, query models.SidebarTaskViewQuery) {
+func logSidebarPostgresExecution(b *testing.B, repo *Repository, workspaceID string, query models.SidebarTaskViewQuery) {
 	b.Helper()
 	ctx, cancel := context.WithTimeout(b.Context(), 30*time.Second)
 	defer cancel()
@@ -62,12 +62,19 @@ func logSidebarPostgresJITCost(b *testing.B, repo *Repository, workspaceID strin
 	if err != nil {
 		b.Fatal(err)
 	}
-	if _, err := snapshot.tx.ExecContext(ctx, "SET LOCAL jit = on"); err != nil {
-		b.Fatal(err)
-	}
 	ctes, args := sidebarPageCTEs(repo.ro.DriverName(), query, models.SidebarTaskViewPreferences{})
 	statement := "EXPLAIN (ANALYZE, FORMAT JSON) " + baseSQL + ctes + sidebarPageSelectSQL(query.Group == sidebarGroupNone)
 	var raw []byte
+	if err := snapshot.tx.QueryRowContext(ctx, repo.ro.Rebind(statement), append(baseArgs, args...)...).Scan(&raw); err != nil {
+		b.Fatal(err)
+	}
+	b.Logf("postgres_execution_plan group=%s plan=%s", query.Group, raw)
+	if query.Group != sidebarGroupNone {
+		return
+	}
+	if _, err := snapshot.tx.ExecContext(ctx, "SET LOCAL jit = on"); err != nil {
+		b.Fatal(err)
+	}
 	if err := snapshot.tx.QueryRowContext(ctx, repo.ro.Rebind(statement), append(baseArgs, args...)...).Scan(&raw); err != nil {
 		b.Fatal(err)
 	}
