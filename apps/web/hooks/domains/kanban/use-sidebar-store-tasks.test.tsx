@@ -23,6 +23,15 @@ function task(id: string): AppState["kanban"]["tasks"][number] {
     workflowStepId: "step-1",
     title: id,
     position: 0,
+    parentTaskId: undefined,
+    metadata: {},
+    origin: "",
+    state: "TODO",
+    statusSummary: undefined,
+    createdAt: "2026-09-29T00:00:00Z",
+    updatedAt: "2026-09-29T00:00:00Z",
+    repositories: [],
+    primaryExecutorType: undefined,
   };
 }
 
@@ -33,12 +42,26 @@ beforeEach(() => {
     state.workspaces.activeId = "ws-1";
     state.workspaceContextRead.workspaceId = "ws-1";
     state.workspaceContextRead.generation = state.workspaceContextGeneration;
+    state.repositories.itemsByWorkspaceId["ws-1"] = [];
+    state.workflows.taskWorkflowCoverage = {
+      workspace_id: "ws-1",
+      workflow_ids: ["wf-1"],
+      complete: true,
+    };
     state.workflows.items = [{ id: "wf-1", workspaceId: "ws-1", name: "Workflow" }];
     state.kanbanMulti.snapshots["wf-1"] = {
       workflowId: "wf-1",
       workflowName: "Workflow",
       steps: [],
       tasks: [task("a"), task("b")],
+      taskCoverage: {
+        workspace_id: "ws-1",
+        workflow_id: "wf-1",
+        membership: "active",
+        complete: true,
+        total: 2,
+        ordering_profile: "sqlite_nocase_v1",
+      },
     };
   });
   vi.mocked(querySidebarTasks).mockResolvedValue({
@@ -127,8 +150,10 @@ describe("shared sidebar task state", () => {
   it("renders immediately, tracks live changes and never queries or accumulates page responses", () => {
     const hook = renderHook(() => useWorkspaceSidebarTasks("ws-1"));
     expect(hook.result.current.allTasks.map((row) => row.id)).toEqual(["a", "b"]);
-    expect(hook.result.current.pageEntries).toBeUndefined();
-    expect(hook.result.current.page.response).toBeNull();
+    expect(hook.result.current.pageEntries?.filter((entry) => entry.kind === "task")).toHaveLength(
+      2,
+    );
+    expect(hook.result.current.page.response?.total_visible_tasks).toBe(2);
     expect(hook.result.current.isLoading).toBe(false);
     act(() =>
       store.setState((state) => {
@@ -140,33 +165,20 @@ describe("shared sidebar task state", () => {
     expect(querySidebarTasks).not.toHaveBeenCalled();
   });
 
-  it("uses shared state at 100 tasks and returns to bounded paging at 101", async () => {
+  it("pages a complete resident set of 101 tasks without any network traversal", () => {
     store.setState((state) => {
-      state.kanbanMulti.snapshots["wf-1"].tasks = Array.from({ length: 100 }, (_, i) =>
-        task(String(i)),
+      state.kanbanMulti.snapshots["wf-1"].tasks = Array.from({ length: 101 }, (_, i) =>
+        task(String(i).padStart(3, "0")),
       );
     });
     const hook = renderHook(() => useWorkspaceSidebarTasks("ws-1"));
     expect(hook.result.current.allTasks).toHaveLength(100);
+    expect(hook.result.current.page.response?.has_next).toBe(true);
+    act(() => hook.result.current.page.goToPage(2));
+    expect(hook.result.current.allTasks.map((task) => task.id)).toEqual(["100"]);
+    expect(hook.result.current.page.isRefreshing).toBe(false);
     expect(querySidebarTasks).not.toHaveBeenCalled();
-    act(() =>
-      store.setState((state) => {
-        state.kanbanMulti.snapshots["wf-1"].tasks.push(task("101"));
-      }),
-    );
-    await waitFor(() => expect(querySidebarTasks).toHaveBeenCalledTimes(1));
-    expect(querySidebarTasks).toHaveBeenCalledWith(
-      "ws-1",
-      expect.objectContaining({ page_size: 100 }),
-      expect.anything(),
-    );
-    await waitFor(() => expect(hook.result.current.page.response?.query_key).toBe("large"));
-    act(() =>
-      store.setState((state) => {
-        state.kanbanMulti.snapshots["wf-1"].tasks.pop();
-      }),
-    );
+    act(() => hook.result.current.page.goToPage(1));
     expect(hook.result.current.allTasks).toHaveLength(100);
-    expect(hook.result.current.page.response).toBeNull();
   });
 });

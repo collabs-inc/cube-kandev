@@ -24,7 +24,7 @@ The [decision](../../../decisions/2026-09-29-shared-sidebar-task-state.md) revis
 
 All references use `AC-UI-SIDEBAR-ARCHIVED-FILTER-002`.
 
-## Current source evidence
+## Source evidence before implementation
 
 `useWorkspaceSidebarTasks` renders only `useSidebarTaskPage.response.entries`.
 `useAllWorkflowSnapshots` separately hydrates `kanbanMulti.snapshots`, whose task arrays feed homepage consumers.
@@ -80,6 +80,19 @@ A WebSocket disconnect, replay gap, unknown membership mutation, or missing requ
 A complete accepted snapshot can restore it after reconciliation with concurrent live changes.
 Known create/update/archive/delete/move events update records and affected complete membership atomically.
 A move out of the covered scope removes membership without pretending that unrelated scopes are complete.
+The additive `task_workflow_coverage` on existing workflow-list responses, and
+`taskWorkflowCoverage` in boot state, identifies all scopes containing eligible active
+tasks. It includes hidden/Office scopes and an empty identifier for unassigned tasks,
+regardless of which workflows the navigation list displays. Authoritatively empty
+scopes require no extra snapshot. Positive workflow filters can use their own complete
+snapshots. This is one lightweight server identity query, not another browser task fetch.
+
+Compatibility task arrays are derived atomically by `withTaskOverviewNormalization`:
+legacy write inputs are merged before publication, and all arrays expose exactly the
+canonical objects. They cannot publish an independently mutable task record. Page
+memberships retain IDs and group metadata. Wire patches preserve own-field availability;
+source eligibility additionally requires every field used by the requested evaluator.
+
 No extra polling or all-workflow snapshot fetch is mounted solely for the sidebar.
 Cold deep links can use the bounded server query immediately.
 

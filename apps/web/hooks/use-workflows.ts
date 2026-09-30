@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useAppStore, useAppStoreApi } from "@/components/state-provider";
 import { listWorkflows } from "@/lib/api";
-import type { WorkflowsState } from "@/lib/state/slices";
 import {
   classifyWorkspaceContextReadError,
   isCurrentWorkspaceContext,
@@ -16,8 +15,7 @@ import type { WorkspaceContextReadState } from "@/lib/state/slices/kanban/types"
 const WORKSPACE_CONTEXT_RETRY_DELAYS_MS = [2_000, 5_000] as const;
 const NOOP_REFRESH = () => {};
 
-type StoreWorkflow = WorkflowsState["items"][number];
-type SetWorkflows = (workflows: StoreWorkflow[]) => void;
+type SetWorkflows = AppState["setWorkflows"];
 
 function canRetryWorkspaceContext(
   readState: WorkspaceContextReadState | undefined,
@@ -117,7 +115,7 @@ function useWorkflowsFetchEffect(
           hidden: workflow.hidden,
           style: workflow.style,
         }));
-        setWorkflows(mapped);
+        setWorkflows(mapped, response.task_workflow_coverage);
         if (trackRecovery && typeof state.setWorkspaceContextRead === "function") {
           state.setWorkspaceContextRead(
             "workflows",

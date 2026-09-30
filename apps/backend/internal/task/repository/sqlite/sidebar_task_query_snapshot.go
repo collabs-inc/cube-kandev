@@ -97,10 +97,10 @@ func (s *sidebarQuerySnapshot) close() {
 func (s *sidebarQuerySnapshot) release(cleanupCtx context.Context) {
 	defer func() { _ = s.conn.Close() }()
 	err := s.tx.Rollback()
-	clean := !s.commitFailed && (err == nil || errors.Is(err, sql.ErrTxDone))
+	clean := !s.commitFailed && cleanupCtx.Err() == nil && (err == nil || errors.Is(err, sql.ErrTxDone))
 	if s.sqlite && clean {
 		_, err = s.conn.ExecContext(cleanupCtx, "DROP TABLE IF EXISTS "+sidebarScratchTable)
-		clean = err == nil
+		clean = err == nil && cleanupCtx.Err() == nil
 	}
 	if !clean {
 		// ErrConnDone means database/sql already discarded a cancelled transaction's connection.

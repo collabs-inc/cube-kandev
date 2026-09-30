@@ -1,7 +1,7 @@
 ---
 id: "03-shared-overviews"
 title: "Normalize shared task overviews and coverage"
-status: pending
+status: in_progress
 wave: 2
 depends_on: ["01-bound-preparation"]
 plan: "plan.md"
@@ -131,4 +131,4 @@ Do not invent a shared revision across different field owners.
 
 ## Results
 
-Pending.
+Implementation and regression cases are in progress. The user requires CI-only test execution; no local test or benchmark has been run. Full conformance and combined surface evidence remain required before completion.

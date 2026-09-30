@@ -1,7 +1,7 @@
 ---
 id: "04-reuse-and-progress"
 title: "Reuse complete views and preserve initial-load progress"
-status: pending
+status: in_progress
 wave: 3
 depends_on: ["03-shared-overviews"]
 plan: "plan.md"
@@ -157,4 +157,4 @@ In-progress response reconciliation cannot reconstruct unseen rows or exact fres
 
 ## Results
 
-Pending.
+Implementation and regression cases are in progress. The user requires CI-only test execution; no local test or benchmark has been run. Full conformance and combined surface evidence remain required before completion.
