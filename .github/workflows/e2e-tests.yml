@@ -60,6 +60,6 @@ jobs:
           name: pr-4088-isolated-${{ matrix.label }}
           path: |
             apps/web/e2e/test-results/
-            apps/web/blob-report/
+            apps/web/e2e/blob-report/
           if-no-files-found: ignore
           retention-days: 7
