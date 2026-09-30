@@ -2,7 +2,6 @@ package sqlite
 
 import (
 	"testing"
-	"time"
 
 	"github.com/kandev/kandev/internal/task/models"
 	"github.com/stretchr/testify/require"
@@ -17,12 +16,11 @@ func TestSidebarTaskWorkflowCoverage(t *testing.T) {
 			for _, id := range []string{"visible", "hidden", "excluded", "empty"} {
 				require.NoError(t, repo.CreateWorkflow(t.Context(), &models.Workflow{ID: id, WorkspaceID: "coverage", Name: id, Hidden: id == "hidden"}))
 			}
-			now := time.Now()
 			for _, task := range []*models.Task{
 				{ID: "visible", WorkflowID: "visible"},
 				{ID: "hidden", WorkflowID: "hidden"},
 				{ID: "unassigned"},
-				{ID: "archived", WorkflowID: "excluded", ArchivedAt: &now},
+				{ID: "archived", WorkflowID: "excluded"},
 				{ID: "ephemeral", WorkflowID: "excluded", IsEphemeral: true},
 				{ID: "automation", WorkflowID: "excluded", Origin: models.TaskOriginAutomationRun},
 				{ID: "config", WorkflowID: "excluded", Metadata: map[string]interface{}{"config_mode": true}},
@@ -30,6 +28,7 @@ func TestSidebarTaskWorkflowCoverage(t *testing.T) {
 				task.WorkspaceID, task.Title = "coverage", task.ID
 				require.NoError(t, repo.CreateTask(t.Context(), task))
 			}
+			require.NoError(t, repo.ArchiveTask(t.Context(), "archived"))
 			require.NoError(t, repo.CreateTask(t.Context(), &models.Task{ID: "other", WorkspaceID: "other", Title: "Other workspace"}))
 			ids, err := repo.SidebarTaskWorkflowIDs(t.Context(), "coverage")
 			require.NoError(t, err)
