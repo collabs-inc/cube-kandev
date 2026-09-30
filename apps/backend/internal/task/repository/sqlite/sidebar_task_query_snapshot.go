@@ -58,9 +58,16 @@ func (s *sidebarQuerySnapshot) prepare(
 		return "", nil, err
 	}
 	for _, column := range []string{"id", "parent_id"} {
-		if _, err := s.tx.ExecContext(ctx, "CREATE INDEX temp.kandev_sidebar_"+column+" ON kandev_sidebar_filtered ("+column+")"); err != nil {
+		unique := ""
+		if column == "id" {
+			unique = "UNIQUE "
+		}
+		if _, err := s.tx.ExecContext(ctx, "CREATE "+unique+"INDEX temp.kandev_sidebar_"+column+" ON kandev_sidebar_filtered ("+column+")"); err != nil {
 			return "", nil, fmt.Errorf("index sidebar candidates: %w", err)
 		}
+	}
+	if _, err := s.tx.ExecContext(ctx, "ANALYZE "+sidebarScratchTable); err != nil {
+		return "", nil, fmt.Errorf("analyze sidebar candidates: %w", err)
 	}
 	if err := s.checkpoint("indexed"); err != nil {
 		return "", nil, err

@@ -182,7 +182,15 @@ func TestSidebarQueryScratchKeepsReadSnapshotAndReadOnlyMain(t *testing.T) {
 
 func assertSidebarScratchAbsent(t *testing.T, repo *Repository) {
 	t.Helper()
+	conn, err := repo.ro.Connx(t.Context())
+	require.NoError(t, err)
+	defer func() { _ = conn.Close() }()
 	var count int
-	require.NoError(t, repo.ro.GetContext(t.Context(), &count, "SELECT COUNT(*) FROM sqlite_temp_master WHERE name IN ('kandev_sidebar_filtered', 'kandev_sidebar_preferences')"))
+	require.NoError(t, conn.GetContext(t.Context(), &count, "SELECT COUNT(*) FROM sqlite_temp_master WHERE name IN ('kandev_sidebar_filtered', 'kandev_sidebar_preferences')"))
 	require.Zero(t, count)
+	require.NoError(t, conn.GetContext(t.Context(), &count, "SELECT COUNT(*) FROM sqlite_temp_master WHERE name = 'sqlite_stat1'"))
+	if count > 0 {
+		require.NoError(t, conn.GetContext(t.Context(), &count, "SELECT COUNT(*) FROM temp.sqlite_stat1 WHERE tbl IN ('kandev_sidebar_filtered', 'kandev_sidebar_preferences')"))
+		require.Zero(t, count, "scratch statistics must not retain workspace data for the next borrower")
+	}
 }

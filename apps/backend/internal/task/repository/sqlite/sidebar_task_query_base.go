@@ -54,7 +54,7 @@ func sidebarBaseCTE(driver, groupExpr, groupLabelExpr, scopeSQL string, query mo
 		projectionMaterialization = "MATERIALIZED"
 		// Keep base-table identity statistics without repeating derived projections.
 		identityProjection = `, candidate AS NOT MATERIALIZED (
-			SELECT identity.id, candidate_projection.* FROM candidate_projection
+			SELECT identity.id, identity.parent_id, candidate_projection.* FROM candidate_projection
 			JOIN tasks identity ON identity.id = candidate_projection.projection_id
 		)`
 	}
@@ -89,6 +89,7 @@ func sidebarBaseCandidateFields(driver string, needs sidebarBaseNeeds) []string 
 	fields := []string{"t.id", "t.workspace_id", "t.workflow_id", "t.workflow_step_id", "t.title", "t.parent_id", "t.archived_at", "t.created_at", "t.updated_at"}
 	if dialect.IsPostgres(driver) {
 		fields[0] = "t.id AS projection_id"
+		fields = append(fields[:5], fields[6:]...)
 	}
 	fields = append(fields, sidebarStateFields(driver, needs)...)
 	fields = append(fields, sidebarActivityFields(driver, needs)...)
@@ -418,7 +419,7 @@ func sidebarClauseValues(clause models.SidebarTaskViewClause) ([]any, error) {
 
 func sidebarTotalGroupCountSQL(group string) string {
 	if group == sidebarGroupNone {
-		return `(SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END FROM filtered)`
+		return `CASE WHEN EXISTS (SELECT 1 FROM filtered) THEN 1 ELSE 0 END`
 	}
 	return `(SELECT COUNT(*) FROM ordered_groups)`
 }
@@ -428,7 +429,7 @@ func sidebarPageSelectSQL(groupNone bool) string {
 	groupCountJoin := `LEFT JOIN group_task_counts group_count ON group_count.group_key = tree.root_group_key
 		AND group_count.group_label = tree.root_group_label`
 	if groupNone {
-		groupCountExpr = `(SELECT COUNT(*) FROM visible)`
+		groupCountExpr = `page_summary.total_visible_tasks`
 		groupCountJoin = ""
 	}
 	return ` SELECT tree.id, tree.root_group_key, tree.root_group_label,
