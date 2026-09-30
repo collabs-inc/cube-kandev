@@ -183,3 +183,10 @@ single-shot auth setup. Both failing suites now use their own database paths,
 matching the existing auth test isolation pattern. Assertions and production
 auth behavior remain unchanged. Routing passed in the same CI run. The new
 auth fixture repairs require fresh current-head CI; no local replay was run.
+
+The lifecycle, organization-unit, and optional SSO suites also performed setup
+on the preserved baseline database. They now own separate database paths too;
+otherwise fixing the first failure would prevent Playwright's discarded-worker
+restart from masking the next setup collision. All auth setup owners follow
+the existing per-suite database pattern. The optional external Google OIDC
+capture retains its existing package-absent CI skip. No assertions were relaxed.
