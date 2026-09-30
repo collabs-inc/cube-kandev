@@ -190,3 +190,20 @@ otherwise fixing the first failure would prevent Playwright's discarded-worker
 restart from masking the next setup collision. All auth setup owners follow
 the existing per-suite database pattern. The optional external Google OIDC
 capture retains its existing package-absent CI skip. No assertions were relaxed.
+
+The final-head frontend CI run passed 2,450 test files and 21,002 tests with
+four skips. The isolated auth/routing run passed 31 auth tests (one existing
+optional package-absent skip) and nine routing tests with retries disabled.
+Standard E2E completed with 3,618 passes and 47 skips, but artifact auditing
+exposed six scenarios that passed after seven failed attempts. External PR
+detection inherited earlier LSP commits, and
+two review scenarios inherited canvas files, placing expected rows outside the
+mounted viewport. Those scenarios now reset the seed checkout before creating
+their tasks. Copy-icon geometry now samples the current SVG and its visibility
+in one browser operation, including an explicit copied-check-icon assertion.
+The managed deletion scenario waits for its closing overlay and body pointer
+lock to clear before reopening the task menu. Workflow selection now waits for
+its closing picker and scheduled focus restoration before another picker opens.
+All existing behavior assertions
+remain; no forced clicks, page reloads, extra retries, or local test replays
+were introduced. Fresh current-head CI must validate these scoped repairs.
