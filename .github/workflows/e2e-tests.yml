@@ -27,7 +27,7 @@ jobs:
       - name: Check out PR source
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
-          ref: 5e9ab21ec28731f4a6845c19f01b13ac23e24bd0
+          ref: 98cf3494251dc6ed4775c3545b89f33360abf2e8
           persist-credentials: false
       - name: Record tested revision
         run: |
