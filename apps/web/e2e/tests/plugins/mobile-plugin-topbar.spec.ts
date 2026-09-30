@@ -227,6 +227,17 @@ test.describe("Mobile plugin menu actions", () => {
     const actionBox = await requireBox(action, "session plugin action");
     expect(actionBox.height).toBeGreaterThanOrEqual(44);
     expect(actionBox.width).toBeGreaterThanOrEqual(44);
+    await action.scrollIntoViewIfNeeded();
+    await waitForFiniteAnimations(menu);
+    const actionReceivesCenterTap = await action.evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      const target = document.elementFromPoint(
+        rect.left + rect.width / 2,
+        rect.top + rect.height / 2,
+      );
+      return target === element || (target instanceof Node && element.contains(target));
+    });
+    expect(actionReceivesCenterTap).toBe(true);
     await action.tap();
     await expect(action).toHaveAttribute("data-activated", "true");
     await expect(menu).toBeVisible();

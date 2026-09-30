@@ -1,7 +1,6 @@
 import { test, expect } from "../../fixtures/test-base";
 import type { ApiClient } from "../../helpers/api-client";
 import type { SeedData } from "../../fixtures/test-base";
-import { KanbanPage } from "../../pages/kanban-page";
 import { SessionPage } from "../../pages/session-page";
 import type { Page } from "@playwright/test";
 import { waitForFiniteAnimations } from "../../helpers/animations";
@@ -48,21 +47,9 @@ async function createTaskAndWait(apiClient: ApiClient, seedData: SeedData, title
   return task;
 }
 
-async function openTask(page: Page, title: string): Promise<SessionPage> {
-  const kanban = new KanbanPage(page);
-  await kanban.goto();
+async function openTask(page: Page, taskId: string): Promise<SessionPage> {
+  await page.goto(`/t/${taskId}`);
   const session = new SessionPage(page);
-  const sidebarTask = session.sidebarTaskItem(title);
-  if (await sidebarTask.isVisible({ timeout: 15_000 }).catch(() => false)) {
-    // Sidebar task rows are live immediately after creation. The Kanban board
-    // can still be waiting for its filtered column to render the same task.
-    await sidebarTask.click();
-  } else {
-    const card = kanban.taskCardByTitle(title);
-    await expect(card).toBeVisible({ timeout: 15_000 });
-    await card.click();
-  }
-  await expect(page).toHaveURL(/\/t\//, { timeout: 15_000 });
   await session.waitForLoad();
   return session;
 }
@@ -285,7 +272,7 @@ test.describe("Terminals — dockview UI", () => {
   }) => {
     test.setTimeout(120_000);
     const task = await createTaskAndWait(apiClient, seedData, "Close + Reload UI");
-    const session = await openTask(testPage, "Close + Reload UI");
+    const session = await openTask(testPage, task.id);
     await session.clickTab("Terminal");
     await session.expectTerminalConnected();
 
@@ -373,8 +360,8 @@ test.describe("Terminals — dockview UI", () => {
     seedData,
   }) => {
     test.setTimeout(180_000);
-    await createTaskAndWait(apiClient, seedData, "Reload Badges UI");
-    const session = await openTask(testPage, "Reload Badges UI");
+    const task = await createTaskAndWait(apiClient, seedData, "Reload Badges UI");
+    const session = await openTask(testPage, task.id);
     await session.clickTab("Terminal");
     await session.expectTerminalConnected();
 
@@ -426,7 +413,7 @@ test.describe("Terminals — dockview UI", () => {
   }) => {
     test.setTimeout(120_000);
     const task = await createTaskAndWait(apiClient, seedData, "Row Destroy UI");
-    const session = await openTask(testPage, "Row Destroy UI");
+    const session = await openTask(testPage, task.id);
     await session.clickTab("Terminal");
     await session.expectTerminalConnected();
 
@@ -538,8 +525,8 @@ test.describe("Terminals — dockview UI", () => {
     seedData,
   }) => {
     test.setTimeout(120_000);
-    await createTaskAndWait(apiClient, seedData, "Focus Existing UI");
-    const session = await openTask(testPage, "Focus Existing UI");
+    const task = await createTaskAndWait(apiClient, seedData, "Focus Existing UI");
+    const session = await openTask(testPage, task.id);
     await session.clickTab("Terminal");
     await session.expectTerminalConnected();
 
@@ -599,8 +586,8 @@ test.describe("Terminals — dockview UI", () => {
   }) => {
     test.setTimeout(120_000);
     const destroyPause = await pauseNextTerminalDestroy(testPage);
-    await createTaskAndWait(apiClient, seedData, "Busy Close UI");
-    const session = await openTask(testPage, "Busy Close UI");
+    const task = await createTaskAndWait(apiClient, seedData, "Busy Close UI");
+    const session = await openTask(testPage, task.id);
     await session.clickTab("Terminal");
     await session.expectTerminalConnected();
 
@@ -687,8 +674,8 @@ test.describe("Terminals — dockview UI", () => {
     seedData,
   }) => {
     test.setTimeout(120_000);
-    await createTaskAndWait(apiClient, seedData, "Tab Terminate UI");
-    const session = await openTask(testPage, "Tab Terminate UI");
+    const task = await createTaskAndWait(apiClient, seedData, "Tab Terminate UI");
+    const session = await openTask(testPage, task.id);
     await session.clickTab("Terminal");
     await session.expectTerminalConnected();
 
@@ -733,8 +720,8 @@ test.describe("Terminals — dockview UI", () => {
     seedData,
   }) => {
     test.setTimeout(90_000);
-    await createTaskAndWait(apiClient, seedData, "Inline Rename UI");
-    const session = await openTask(testPage, "Inline Rename UI");
+    const task = await createTaskAndWait(apiClient, seedData, "Inline Rename UI");
+    const session = await openTask(testPage, task.id);
     await session.clickTab("Terminal");
     await session.expectTerminalConnected();
 

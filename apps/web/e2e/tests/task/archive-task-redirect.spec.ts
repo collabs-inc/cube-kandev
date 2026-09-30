@@ -28,7 +28,7 @@ test.describe("Archive task redirect", () => {
       },
     );
 
-    await apiClient.createTaskWithAgent(
+    const taskB = await apiClient.createTaskWithAgent(
       seedData.workspaceId,
       "Archive Task B",
       seedData.agentProfileId,
@@ -75,8 +75,8 @@ test.describe("Archive task redirect", () => {
       timeout: 15_000,
     });
 
-    // The URL should have changed to Task B's session (still a /t/ route, but different ID)
-    await expect(testPage).toHaveURL(/\/t\//, { timeout: 10_000 });
+    // Wait for the route to converge on B before issuing the second archive.
+    await expect.poll(() => new URL(testPage.url()).pathname).toBe(`/t/${taskB.id}`);
     expect(testPage.url()).not.toBe(urlBeforeArchive);
 
     // --- Archive the last remaining task (B) — should redirect home ---
