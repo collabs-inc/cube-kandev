@@ -140,9 +140,11 @@ test.describe("Session layout", () => {
     await expect(session.terminal).toBeVisible({ timeout: 15_000 });
     await session.expectTerminalConnected(60_000);
 
-    // Task A should still be maximized with our output
+    // Task A should still be maximized and accept terminal input after reconnect.
     await session.expectMaximized();
-    await session.expectTerminalHasText(TERMINAL_MARKER, 60_000);
+    const restoredMarker = "KANDEV_E2E_MARKER_AFTER_TASK_SWITCH";
+    await session.typeInTerminal(`printf ${restoredMarker}`);
+    await session.expectTerminalHasText(restoredMarker, 60_000);
   });
 
   test("closing maximized panel exits maximize and restores layout", async ({

@@ -37,6 +37,7 @@ async function setupTaskWithFilePanel(args: {
   // Local-executor specs can leave the worker-scoped seed clone on a task
   // branch. Make this fixture independent of file execution order.
   git.exec("git checkout main");
+  git.exec("git fetch origin main && git merge --ff-only origin/main");
   git.createFile(filename, "// leak fixture\n");
   git.stageAll();
   git.commit("seed leak fixture");

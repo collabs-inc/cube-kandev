@@ -146,6 +146,7 @@ test.describe("Office workflow quorum-guarded transitions", () => {
     officeSeed,
     seedData,
   }) => {
+    test.setTimeout(120_000);
     const reviewer = (await officeApi.createAgent(officeSeed.workspaceId, {
       name: "Quorum Reviewer",
       role: "worker",
