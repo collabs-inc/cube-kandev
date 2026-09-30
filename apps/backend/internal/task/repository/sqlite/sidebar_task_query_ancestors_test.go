@@ -59,6 +59,37 @@ func TestSidebarTreeActivityAndStateShareCompleteAncestors(t *testing.T) {
 	}
 }
 
+func TestSidebarTreeActivityKeepsNewerParentActivity(t *testing.T) {
+	for _, backend := range []string{"sqlite", "postgres"} {
+		t.Run(backend, func(t *testing.T) {
+			repo := newRepoForSidebarConformance(t, backend)
+			seedWorkspace(t, repo, "parent-activity")
+			base := time.Date(2026, 9, 30, 12, 0, 0, 0, time.UTC)
+			for _, row := range []struct {
+				id, parent string
+				activity   time.Duration
+			}{
+				{"root", "", 10 * time.Minute},
+				{"child", "root", time.Minute},
+				{"peer", "", 5 * time.Minute},
+			} {
+				require.NoError(t, repo.CreateTask(t.Context(), &models.Task{
+					ID: row.id, WorkspaceID: "parent-activity", Title: row.id, ParentID: row.parent,
+					State: "TODO", CreatedAt: base, UpdatedAt: base.Add(row.activity),
+				}))
+			}
+			for _, group := range []string{"none", "state"} {
+				query := sidebarTaskQuery(1)
+				query.Group = group
+				query.Sort = models.SidebarTaskViewSort{Key: "lastActivityAt", Direction: "desc"}
+				page, err := repo.QuerySidebarTaskPage(t.Context(), "parent-activity", query, models.SidebarTaskViewPreferences{})
+				require.NoError(t, err)
+				require.Equal(t, []string{"root", "child", "peer"}, sidebarTaskIDs(page.Tasks), group)
+			}
+		})
+	}
+}
+
 func TestSidebarUniformAndMixedTreeStates(t *testing.T) {
 	for _, backend := range []string{"sqlite", "postgres"} {
 		t.Run(backend, func(t *testing.T) {

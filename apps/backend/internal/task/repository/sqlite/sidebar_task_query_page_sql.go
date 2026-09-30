@@ -316,19 +316,26 @@ func sidebarAncestorCTE(driver string, query models.SidebarTaskViewQuery) string
 	}
 	activityValue, stateValue, bucketValue, primaryValue := sidebarSQLNull, sidebarSQLNull, sidebarSQLNull, sidebarSQLNull
 	if activity {
-		activityValue = "activity_at"
+		activityValue = "source.activity_at"
 	}
 	if state {
-		stateValue, bucketValue, primaryValue = sidebarStateKey, "state_bucket", "primary_session_state"
+		stateValue, bucketValue, primaryValue = "source.state", "source.state_bucket", "source.primary_session_state"
+	}
+	//nolint:dupword // A state projection includes the source itself before its ancestors.
+	anchorIdentity := `source.id, source.id, source.parent_id, '/' || source.id || '/'`
+	anchorSource := `filtered source`
+	if !state {
+		// Activity aggregation only needs proper descendants; each row keeps its own value.
+		anchorIdentity = `source.id, parent.id, parent.parent_id, '/' || source.id || '/' || parent.id || '/'`
+		anchorSource += ` JOIN filtered parent ON parent.id = source.parent_id AND parent.id <> source.id`
 	}
 	guard := `instr(walk.visited, '/' || parent.id || '/') = 0`
 	if dialect.IsPostgres(driver) {
 		guard = `POSITION('/' || parent.id || '/' IN walk.visited) = 0`
 	}
 	// Each source carries its projections through one shared ancestor traversal.
-	//nolint:dupword // SQL CTE keys follow the task identifier schema.
 	return `, ancestor_walk(source_key, ancestor_key, parent_key, visited, activity_at, state, state_bucket, primary_session_state) AS (
-		SELECT id, id, parent_id, '/' || id || '/', ` + activityValue + `, ` + stateValue + `, ` + bucketValue + `, ` + primaryValue + ` FROM filtered
+		SELECT ` + anchorIdentity + `, ` + activityValue + `, ` + stateValue + `, ` + bucketValue + `, ` + primaryValue + ` FROM ` + anchorSource + `
 		UNION ALL
 		SELECT walk.source_key, parent.id, parent.parent_id, walk.visited || parent.id || '/',
 			walk.activity_at, walk.state, walk.state_bucket, walk.primary_session_state
@@ -396,7 +403,7 @@ func sidebarActivityCTEs(query models.SidebarTaskViewQuery) (string, string) {
 	}
 	return `, tree_activity AS (
 		SELECT ancestor_key AS ancestor_id, MAX(activity_at) AS tree_activity_at
-		FROM ancestor_walk
+		FROM ancestor_walk WHERE source_key <> ancestor_key
 		GROUP BY ancestor_key
 	)`, ` LEFT JOIN tree_activity activity ON activity.ancestor_id = v.id`
 }
@@ -465,7 +472,7 @@ func sidebarSortExpression(driver, key, direction string, orderIDs []string) (st
 	case "updatedAt":
 		return "v.updated_at " + order, nil
 	case sidebarActivitySortField:
-		return "COALESCE(activity.tree_activity_at, v.activity_at) " + order, nil
+		return "CASE WHEN v.activity_at IS NULL OR activity.tree_activity_at > v.activity_at THEN activity.tree_activity_at ELSE v.activity_at END " + order, nil
 	case "createdAt":
 		return "v.created_at " + order, nil
 	case "title":
