@@ -618,3 +618,25 @@ Four targeted browser checks passed without retries, including a reproduction
 with a deleted dynamic profile referencing the shared fixture. The temporary
 reproduction was removed. No product behavior, protection policy, timeout, or
 assertion was weakened. External checks will rerun after publication.
+
+## Latest-main conflict resolution (2026-09-30)
+
+Merged authoritative main at `61d791ebd7425dd93f99e84e56a0a8803b886ae7`
+after the user reported new conflicts. The profile-navigation test conflicted
+because main selected the shared seeded Mock profile. Retained explicit Mock
+agent selection and this branch's test-owned profile with deterministic deletion,
+which avoids disabling a seed referenced by other scenarios. The automatically
+merged PR-detection test retains its isolated repository and offline origin;
+resetting the unrelated shared repository is unnecessary for that fixture.
+
+Both fixture corrections preserve main's cleanup intent and the existing
+assertions. The incoming changelist measurement, stall-notice recovery,
+dispatch cancellation, and walkthrough fixes remain intact.
+
+Verification on the combined tree passed 253 frontend tests across 21 files,
+web typecheck and lint, affected lifecycle/task-service/SQLite Go race tests,
+and documentation, specification, architecture, and harness validation. A fresh
+managed production build passed nine desktop browser scenarios without retries.
+Its unchanged artifacts passed four phone scenarios without retries, including
+changelist spacing, tree touch controls, status groups in both themes, and
+workflow hierarchy. Fresh exact-head CI will run after the merge is published.
