@@ -1,4 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+const mockReleasePortalScrollRestoration = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/layout/panel-portal-host", () => ({
+  releasePortalScrollRestoration: mockReleasePortalScrollRestoration,
+}));
+
 import {
   TASK_ROW_DOM_ATTR,
   TASK_ROW_REVEAL_CLASS,
@@ -36,8 +42,32 @@ function mountViewport(visible = true) {
 function mountRow(viewport: HTMLElement, taskId: string, rect: Rect) {
   const row = document.createElement("div");
   row.setAttribute(TASK_ROW_DOM_ATTR, taskId);
-  row.scrollIntoView = vi.fn();
-  setRect(row, rect);
+  row.setAttribute("aria-current", "true");
+  let currentRect = rect;
+  vi.spyOn(row, "getBoundingClientRect").mockImplementation(
+    () =>
+      ({
+        x: currentRect.x,
+        y: currentRect.y,
+        width: currentRect.width,
+        height: currentRect.height,
+        top: currentRect.y,
+        right: currentRect.x + currentRect.width,
+        bottom: currentRect.y + currentRect.height,
+        left: currentRect.x,
+        toJSON: () => ({}),
+      }) as DOMRect,
+  );
+  row.scrollIntoView = vi.fn(() => {
+    const viewportRect = viewport.getBoundingClientRect();
+    currentRect = {
+      ...currentRect,
+      y:
+        currentRect.y < viewportRect.top
+          ? viewportRect.top
+          : viewportRect.bottom - currentRect.height,
+    };
+  });
   viewport.appendChild(row);
   return row;
 }
@@ -51,6 +81,7 @@ function setReducedMotion(reducedMotion: boolean) {
 
 afterEach(() => {
   document.body.innerHTML = "";
+  mockReleasePortalScrollRestoration.mockReset();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
   vi.useRealTimers();
@@ -74,6 +105,7 @@ describe("revealSidebarTask", () => {
       block: "center",
       inline: "nearest",
     });
+    expect(mockReleasePortalScrollRestoration).toHaveBeenCalledWith(viewport);
     expect(row.classList.contains(TASK_ROW_REVEAL_CLASS)).toBe(true);
   });
 
@@ -140,9 +172,31 @@ describe("revealSidebarTask edge cases", () => {
     expect(callbacks).toHaveLength(1);
     const row = mountRow(viewport, "late", { x: 0, y: 120, width: 320, height: 24 });
     callbacks.shift()!();
+    while (callbacks.length > 0) callbacks.shift()!();
 
     await expect(navigation).resolves.toBe(true);
     expect(row.scrollIntoView).toHaveBeenCalledTimes(1);
+  });
+
+  it("waits for the row to stay inside the viewport before resolving", async () => {
+    const viewport = mountViewport();
+    const row = mountRow(viewport, "settled", { x: 0, y: 120, width: 320, height: 24 });
+    const callbacks: Array<() => void> = [];
+    const navigation = revealSidebarTask("settled", (callback) => callbacks.push(callback));
+
+    callbacks.shift()!();
+    expect(row.scrollIntoView).toHaveBeenCalledTimes(1);
+    expect(row.classList.contains(TASK_ROW_REVEAL_CLASS)).toBe(false);
+    expect(callbacks).toHaveLength(1);
+
+    for (let frame = 0; frame < 2; frame++) {
+      callbacks.shift()!();
+      expect(row.classList.contains(TASK_ROW_REVEAL_CLASS)).toBe(false);
+    }
+    callbacks.shift()!();
+
+    await expect(navigation).resolves.toBe(true);
+    expect(row.classList.contains(TASK_ROW_REVEAL_CLASS)).toBe(true);
   });
 
   it("does not scroll a superseded task when its row renders late", async () => {

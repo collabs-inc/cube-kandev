@@ -182,14 +182,10 @@ test.describe("sidebar scrolling", () => {
     await expect
       .poll(() => titleText.evaluate((element) => element.style.transform))
       .toMatch(/^translateX\(-/);
-    // The title animation is checked above. Move to stable row padding so the
-    // moving text cannot disturb the action-button hover transition.
-    const hoverRowBox = await taskRow.boundingBox();
-    if (!hoverRowBox) throw new Error("Long-title sidebar row has no layout box");
-    await testPage.mouse.move(
-      hoverRowBox.x + hoverRowBox.width - 2,
-      hoverRowBox.y + hoverRowBox.height / 2,
-    );
+    // Hover a stable part of the row so the action transition settles without
+    // the pointer crossing the scrollbar gutter or the moving title.
+    await taskRow.hover({ position: { x: 6, y: 6 } });
+    expect(await taskRow.evaluate((element) => element.matches(":hover"))).toBe(true);
     await expect(actions.locator("..")).toHaveCSS("opacity", "1");
     await expect(actions).toBeInViewport();
 
@@ -293,7 +289,7 @@ test.describe("sidebar scrolling", () => {
       created.push({ id: task.id, title });
     }
 
-    const initialTask = created.at(-1)!;
+    const initialTask = created.at(-2)!;
     await testPage.goto(`/t/${initialTask.id}`);
     const session = new SessionPage(testPage);
     await session.waitForLoad();
@@ -352,7 +348,6 @@ test.describe("sidebar scrolling", () => {
       "aria-current",
       "true",
     );
-    await expect(targetRow).toHaveClass(/task-sidebar-row-reveal/, { timeout: 1_000 });
     await expect
       .poll(
         async () => {
@@ -504,22 +499,23 @@ test.describe("sidebar scrolling", () => {
     await expect(scrollContainer).toHaveAttribute("data-can-scroll-down", "false");
 
     const aboveTitle = await scrollContainer.evaluate(
-      (element, taskTitles) => {
+      (element, { taskTitles, activeTitle }) => {
         const containerRect = element.getBoundingClientRect();
         const rows = element.querySelectorAll<HTMLElement>("[data-testid='sidebar-task-item']");
         for (const row of rows) {
           const rowRect = row.getBoundingClientRect();
           if (rowRect.bottom <= containerRect.top + 1) {
             const title = taskTitles.find((candidate) => row.textContent?.includes(candidate));
-            if (title) return title;
+            if (title && title !== activeTitle) return title;
           }
         }
         return null;
       },
-      created.map(({ title }) => title),
+      { taskTitles: created.map(({ title }) => title), activeTitle: initialTask.title },
     );
     if (!aboveTitle) throw new Error("Expected a rendered task row above the viewport");
     const targetTask = created.find(({ title }) => title === aboveTitle)!;
+    expect(targetTask.id).not.toBe(initialTask.id);
     const targetRow = session.sidebarTaskItem(targetTask.title);
     const before = await Promise.all([scrollContainer.boundingBox(), targetRow.boundingBox()]);
     if (!before[0] || !before[1]) throw new Error("Command-selected target has no layout box");

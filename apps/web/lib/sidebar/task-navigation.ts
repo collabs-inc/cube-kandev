@@ -1,8 +1,11 @@
+import { releasePortalScrollRestoration } from "@/lib/layout/panel-portal-host";
+
 export const TASK_ROW_DOM_ATTR = "data-task-row-id";
 export const TASK_SIDEBAR_SCROLL_SELECTOR = '[data-testid="task-sidebar-scroll"]';
 export const TASK_ROW_REVEAL_CLASS = "task-sidebar-row-reveal";
 
 const MAX_TASK_NAVIGATION_ATTEMPTS = 60;
+const STABLE_VISIBLE_FRAME_COUNT = 3;
 const TASK_ROW_REVEAL_DURATION_MS = 1400;
 let latestNavigationRequestId = 0;
 let latestCueId = 0;
@@ -71,6 +74,19 @@ function isInsideViewport(row: HTMLElement, viewport: HTMLElement): boolean {
   );
 }
 
+function positionRowInsideViewport(row: HTMLElement, viewport: HTMLElement): void {
+  const rowRect = row.getBoundingClientRect();
+  const viewportRect = viewport.getBoundingClientRect();
+  if (rowRect.top < viewportRect.top) viewport.scrollTop += rowRect.top - viewportRect.top;
+  else if (rowRect.bottom > viewportRect.bottom) {
+    viewport.scrollTop += rowRect.bottom - viewportRect.bottom;
+  }
+  if (rowRect.left < viewportRect.left) viewport.scrollLeft += rowRect.left - viewportRect.left;
+  else if (rowRect.right > viewportRect.right) {
+    viewport.scrollLeft += rowRect.right - viewportRect.right;
+  }
+}
+
 function defaultRequestFrame(callback: () => void): void {
   if (typeof requestAnimationFrame === "function") {
     requestAnimationFrame(callback);
@@ -108,6 +124,61 @@ function cueTaskRow(row: HTMLElement): void {
   activeTaskRowCue = { cueId, row, timeoutId };
 }
 
+type TaskRowVisibilityState = {
+  portalScrollRestoreReleased: boolean;
+  scrollRequested: boolean;
+  framesSinceScroll: number;
+  visibleFrames: number;
+  previousGeometry: [number, number, number, number, number] | null;
+};
+
+function updateTaskRowVisibility(
+  match: { row: HTMLElement; viewport: HTMLElement },
+  state: TaskRowVisibilityState,
+): boolean {
+  if (!state.portalScrollRestoreReleased) {
+    releasePortalScrollRestoration(match.viewport);
+    state.portalScrollRestoreReleased = true;
+  }
+  if (!isInsideViewport(match.row, match.viewport)) {
+    state.visibleFrames = 0;
+    state.previousGeometry = null;
+    if (!state.scrollRequested) {
+      match.row.scrollIntoView({
+        behavior: prefersReducedMotion() ? "auto" : "smooth",
+        block: "nearest",
+        inline: "nearest",
+      });
+      state.scrollRequested = true;
+      state.framesSinceScroll = 0;
+    } else if (++state.framesSinceScroll >= 4) {
+      positionRowInsideViewport(match.row, match.viewport);
+      state.framesSinceScroll = 0;
+    }
+    return false;
+  }
+
+  const rowRect = match.row.getBoundingClientRect();
+  const viewportRect = match.viewport.getBoundingClientRect();
+  const geometry: [number, number, number, number, number] = [
+    rowRect.top,
+    rowRect.bottom,
+    viewportRect.top,
+    viewportRect.bottom,
+    match.viewport.scrollTop,
+  ];
+  const geometryStable = state.previousGeometry?.every(
+    (value, index) => Math.abs(value - geometry[index]) <= 0.5,
+  );
+  state.visibleFrames = geometryStable ? state.visibleFrames + 1 : 1;
+  state.previousGeometry = geometry;
+  if (state.visibleFrames < STABLE_VISIBLE_FRAME_COUNT) return false;
+
+  releasePortalScrollRestoration(match.viewport);
+  cueTaskRow(match.row);
+  return true;
+}
+
 /**
  * Reveals a rendered task row in the visible desktop sidebar.
  *
@@ -124,6 +195,13 @@ export function revealSidebarTask(
   const requestId = ++latestNavigationRequestId;
   return new Promise((resolve) => {
     let attempts = 0;
+    const visibilityState: TaskRowVisibilityState = {
+      portalScrollRestoreReleased: false,
+      scrollRequested: false,
+      framesSinceScroll: 0,
+      visibleFrames: 0,
+      previousGeometry: null,
+    };
     const tick = () => {
       if (requestId !== latestNavigationRequestId) {
         resolve(false);
@@ -132,20 +210,13 @@ export function revealSidebarTask(
 
       const match = findVisibleTaskRow(taskId);
       if (match) {
-        if (requestId !== latestNavigationRequestId) {
-          resolve(false);
+        if (updateTaskRowVisibility(match, visibilityState)) {
+          resolve(true);
           return;
         }
-        if (!isInsideViewport(match.row, match.viewport)) {
-          match.row.scrollIntoView({
-            behavior: prefersReducedMotion() ? "auto" : "smooth",
-            block: "center",
-            inline: "nearest",
-          });
-        }
-        cueTaskRow(match.row);
-        resolve(true);
-        return;
+      } else {
+        visibilityState.visibleFrames = 0;
+        visibilityState.previousGeometry = null;
       }
 
       attempts += 1;
@@ -155,6 +226,6 @@ export function revealSidebarTask(
       }
       requestFrame(tick);
     };
-    tick();
+    requestFrame(tick);
   });
 }
