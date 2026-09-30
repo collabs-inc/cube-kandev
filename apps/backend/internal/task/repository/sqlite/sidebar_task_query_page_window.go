@@ -1,6 +1,10 @@
 package sqlite
 
-import "github.com/kandev/kandev/internal/task/models"
+import (
+	"strconv"
+
+	"github.com/kandev/kandev/internal/task/models"
+)
 
 func sidebarRootWindowCTEs(query models.SidebarTaskViewQuery, treeRootSQL string, page *sidebarPageBuildContext) string {
 	visible := ""
@@ -82,7 +86,7 @@ func sidebarSelectedTreeCTEs(query models.SidebarTaskViewQuery, page sidebarPage
 	), page_window AS MATERIALIZED (
 		SELECT tree.* FROM tree` + visible + `
 		ORDER BY group_order ASC, order_path ASC
-		LIMIT (SELECT page_size FROM page_options)
+		LIMIT ` + strconv.Itoa(query.PageSize) + `
 		OFFSET (SELECT (page - 1) * page_size FROM page_options)
 			- COALESCE((SELECT MIN(end_offset - visible_count) FROM selected_roots), 0)
 	)`

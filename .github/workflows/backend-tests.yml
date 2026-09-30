@@ -728,7 +728,7 @@ jobs:
         run: |
           set -euo pipefail
           go test -tags sqlite_fts5 -p 1 ./internal/task/repository/sqlite \
-            -run '^Test(QuerySidebarTaskPage|SidebarTaskViewConformance|SidebarLocalViewSQLiteConformance|SidebarTreeActivity|SidebarUniformAndMixedTreeStates|SidebarRepositoryProjection|SidebarPostgresJITSetting)' \
+            -run '^Test(QuerySidebarTaskPage|SidebarQueryScratch|SidebarTaskViewConformance|SidebarLocalViewSQLiteConformance|SidebarTreeActivity|SidebarUniformAndMixedTreeStates|SidebarRepositoryProjection|SidebarPostgresJITSetting)' \
             -bench '^BenchmarkSidebarTaskPage100K$' \
             -benchtime=1x -timeout 15m -count=1 -v 2>&1 | tee sidebar-benchmark.log
       - name: Upload sidebar resource evidence
