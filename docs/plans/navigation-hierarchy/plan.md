@@ -583,3 +583,23 @@ Integrated main at `ccaa7c0a8d80ef4f2f089b1f416bd1230417da0a` before publication
 The seven locale conflicts were independent additions: retained the upstream
 query/filter validation copy and this change's active-filter label in every
 locale, with duplicate-key and localization validation.
+
+
+## Third CI remediation (2026-09-30)
+
+The second published remediation completed CI with 58 passed checks and three
+failed checks: browser shard 6 and its two dependent E2E gates. Its PostgreSQL 16
+timeout passed on the single failed-job retry. All other backend, frontend,
+browser, and container jobs passed; no unresolved review threads remained.
+
+The nesting scenario reproduced a hover against the rounded row corner, where
+the context-menu wrapper receives the pointer. It now hovers the task title
+before opening actions, preserving the real nest and un-nest assertions. The
+external PR scenario reproduced a leaked-history failure after adding twelve
+commits to the shared worker repository. It now owns an isolated repository and
+offline origin using existing fixture helpers. Both scenarios and the polluted
+repository reproduction passed without Playwright retries (three checks). The
+temporary reproduction file was removed. No product behavior or timeout changed.
+
+Main advanced without file conflicts; validation of the final combined result
+and exact-head external CI will follow publication of this test-only fixup.
