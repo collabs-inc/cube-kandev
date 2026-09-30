@@ -294,6 +294,40 @@ and retries disabled. CI/review results for the pushed remediation commit and
 fresh screenshots remain externally pending until verified on GitHub. No merge
 is part of this remediation request.
 
+### Second CI pass and advancing base
+
+The next CI pass exposed three stale browser assumptions: Office creation matched
+the hidden desktop primary action, promoted phone canvases required expanding
+their tool group, and a checkout without tags generated empty development release
+notes. Office coverage now scopes creation to the page's main region; canvas
+coverage expands and verifies the disclosure before using its child destination.
+The E2E-only build selects a fixed non-development version and the latest
+changelog entry, making release-note availability independent of runner tags.
+Production version resolution is unchanged.
+
+The advancing main branch's fixture and task-interaction fixes were integrated.
+Its stable task-row geometry wait and this PR's bounded content/viewport observer
+are both retained; phone recovery keeps the upstream session-scoped failure and
+teardown handling. The two overlaps were resolved with those invariants preserved.
+The earlier module-proxy download failure cleared after one targeted backend
+rerun, including the backend aggregate.
+
+On the reconciled tree, 81 focused units across 10 files and type checking passed.
+Four phone browser cases passed: promoted canvas navigation, Office creation,
+session recovery, and stream-overload isolation. Release-note data generation
+reports the latest changelog fallback for the fixed E2E version. The desktop
+release-note, delayed-reveal, and ended-session terminal cases are validated
+before the second remediation push. The prior 506-test audit and screenshots
+remain historical evidence until the new commit's checks and captures complete.
+
+The combined reveal wait now invalidates an unfinished scroll when its content
+or viewport dimensions change before the row first enters view. A regression
+fails without that reset; the fixed navigation suite passes 20 cases. Desktop
+browser checks pass for readable release notes, the ended-session terminal, and
+the delayed settings-blocked reveal after a fresh production E2E build. The
+earlier clipping failure is preserved as regression evidence. Changed-file
+ESLint and staged/unstaged diff checks pass, with no unresolved merge entries.
+
 ## Requested refinement (2026-09-28)
 
 After reviewing the seeded preview, the user explicitly requested a larger New
