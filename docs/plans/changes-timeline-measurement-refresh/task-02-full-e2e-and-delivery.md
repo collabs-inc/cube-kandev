@@ -164,3 +164,12 @@ Desktop and phone captures were inspected and compressed, with manifests
 preserved across managed-runner cleanup. The PR publication, current-head CI,
 review dispositions, and authorized merge are tracked in the live task/PR;
 those external delivery gates remain pending at this handoff snapshot.
+
+PR #4088 review identified two assertion gaps: the controlled-observer test
+could accept unchanged geometry before its refresh callback, and the browser
+helper ignored nonconsecutive visible row indices. The test now waits for a
+new measurement call after each trigger; the helper requires consecutive
+visible indices and checks every visible adjacency. Offscreen retained focus
+rows remain excluded by the existing viewport intersection filter. A comment
+also states why estimated offsets are rebuilt before restoring mounted sizes.
+These scoped review fixes are awaiting CI validation; no local tests were run.

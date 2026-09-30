@@ -55,14 +55,13 @@ export async function visibleTimelineGeometry(page: Page) {
       })
       .filter((row) => row.bottom > top && row.top < bottom)
       .sort((left, right) => left.index - right.index);
-    const gaps = rows
-      .slice(1)
-      .flatMap((row, index) =>
-        row.index === rows[index].index + 1 ? [row.top - rows[index].bottom] : [],
-      );
+    const gaps = rows.slice(1).map((row, index) => row.top - rows[index].bottom);
     return {
       count: rows.length,
       maxGap: Math.max(0, ...gaps.map(Math.abs)),
+      indicesContiguous: rows.every(
+        (row, index) => index === 0 || row.index === rows[index - 1].index + 1,
+      ),
       anchor: rows[0] ? { key: rows[0].key, offset: rows[0].top - top } : null,
     };
   });
@@ -71,9 +70,15 @@ export async function visibleTimelineGeometry(page: Page) {
 export async function expectContiguousTimeline(page: Page): Promise<void> {
   await expectBoundedTimeline(page);
   await expect
-    .poll(async () => (await visibleTimelineGeometry(page)).maxGap)
-    .toBeLessThanOrEqual(1);
-  expect((await visibleTimelineGeometry(page)).count).toBeGreaterThan(3);
+    .poll(async () => {
+      const geometry = await visibleTimelineGeometry(page);
+      return {
+        enoughRows: geometry.count > 3,
+        indicesContiguous: geometry.indicesContiguous,
+        touching: geometry.maxGap <= 1,
+      };
+    })
+    .toEqual({ enoughRows: true, indicesContiguous: true, touching: true });
 }
 
 export async function refreshSpacingAndExpectAnchor(page: Page): Promise<void> {

@@ -386,6 +386,7 @@ it.each(["font", "locale", "width", "pointer"] as const)(
     const positions = () => wrappers.map((wrapper) => wrapper.style.transform);
     const expected = [0, 24, 76, 100, 136].map((top) => `translateY(${top}px)`);
     await waitFor(() => expect(positions()).toEqual(expected));
+    virtualizerTestHooks.measure.mockClear();
     const previousLanguage = document.documentElement.lang;
     try {
       act(() => {
@@ -401,7 +402,10 @@ it.each(["font", "locale", "width", "pointer"] as const)(
           pointerMode.dispatchEvent(new Event("change"));
         }
       });
-      await waitFor(() => expect(positions()).toEqual(expected));
+      await waitFor(() => {
+        expect(virtualizerTestHooks.measure).toHaveBeenCalled();
+        expect(positions()).toEqual(expected);
+      });
     } finally {
       document.documentElement.lang = previousLanguage;
     }

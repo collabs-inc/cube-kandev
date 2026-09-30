@@ -33,6 +33,7 @@ export function refreshChangesTimelineMeasurements(
 
   // Unchanged mounted rows will not receive another observer entry after cache invalidation.
   virtualizer.measure();
+  // Rebuild estimated offsets synchronously before restoring the mounted row sizes.
   virtualizer.getVirtualItems();
   for (const { element, index, key, size } of measurements) {
     if (
