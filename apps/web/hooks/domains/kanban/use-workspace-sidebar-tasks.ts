@@ -30,7 +30,7 @@ export type WorkspaceSidebarTasksResult = AggregatedSidebarTasks & {
   workspaceContextError: WorkspaceContextReadError | null;
   workspaceContextPending: boolean;
   workspaceContextAccessDenied: boolean;
-  retryWorkspaceContext: () => void;
+  retryWorkspaceContext: (() => void) | undefined;
 };
 
 const NOOP_REFRESH = () => {};
@@ -153,6 +153,7 @@ function getWorkspaceContextStatus(
     error: errors.find((error) => error === "access_denied") ?? errors[0] ?? null,
     accessDenied: errors.includes("access_denied"),
     pending: matches && workspaceContextIsPending(workspaceContextRead),
+    canRetry: !matches || workspaceContextRead.snapshotError !== "access_denied",
   };
 }
 
@@ -335,6 +336,6 @@ export function useWorkspaceSidebarTasks(workspaceId: string | null): WorkspaceS
     workspaceContextError: workspaceContextStatus.error,
     workspaceContextPending: workspaceContextStatus.pending,
     workspaceContextAccessDenied: workspaceContextStatus.accessDenied,
-    retryWorkspaceContext,
+    retryWorkspaceContext: workspaceContextStatus.canRetry ? retryWorkspaceContext : undefined,
   };
 }

@@ -227,11 +227,13 @@ describe("useSidebarTaskPage request lifecycle", () => {
     expect(requests[1]?.signal?.aborted).toBe(false);
 
     await act(async () => requests[1]?.deferred.resolve(response(2, true, false)));
-    expect(requests).toHaveLength(3);
-    expect(requests[2]?.query.page).toBe(2);
+    expect(requests).toHaveLength(2);
     expect(result.current.response?.page).toBe(2);
     expect(result.current.response?.provisional).toBe(true);
     expect(afterNavigation).toHaveBeenCalledTimes(1);
+    await act(async () => vi.advanceTimersByTimeAsync(250));
+    expect(requests).toHaveLength(3);
+    expect(requests[2]?.query.page).toBe(2);
     await act(async () => requests[2]?.deferred.resolve(response(2, true, false)));
     expect(result.current.requestedPage).toBeNull();
     expect(result.current.response?.page).toBe(2);
@@ -241,6 +243,38 @@ describe("useSidebarTaskPage request lifecycle", () => {
 });
 
 describe("useSidebarTaskPage refresh invalidation", () => {
+  it("shares one trailing refresh with updates arriving just after a slow first response", async () => {
+    const requests: Array<ReturnType<typeof deferred<SidebarTaskPageResponse>>> = [];
+    vi.mocked(querySidebarTasks).mockImplementation(() => {
+      const request = deferred<SidebarTaskPageResponse>();
+      requests.push(request);
+      return request.promise;
+    });
+    const { result, rerender } = renderHook(() => useSidebarTaskPage("ws-1"));
+    await waitFor(() => expect(requests).toHaveLength(1));
+    vi.useFakeTimers();
+    act(() => {
+      mocks.state.sidebarArchivedTasks.revisionByWorkspaceId["ws-1"] = 1;
+      rerender();
+    });
+    await act(async () => vi.advanceTimersByTimeAsync(250));
+    await act(async () => requests[0]?.resolve(response(1, false, true)));
+    expect(result.current.response?.provisional).toBe(true);
+    expect(requests).toHaveLength(1);
+    await act(async () => vi.advanceTimersByTimeAsync(100));
+    act(() => {
+      mocks.state.sidebarArchivedTasks.revisionByWorkspaceId["ws-1"] = 2;
+      rerender();
+    });
+    await act(async () => vi.advanceTimersByTimeAsync(150));
+    expect(requests).toHaveLength(2);
+    await act(async () => requests[1]?.resolve(response(1, false, true)));
+    await act(async () => vi.advanceTimersByTimeAsync(1000));
+    expect(requests).toHaveLength(2);
+    expect(result.current.requestedPage).toBeNull();
+    expect(result.current.response?.provisional).toBe(false);
+  });
+
   it("coalesces task invalidations and refreshes once after the trailing window", async () => {
     vi.mocked(querySidebarTasks).mockResolvedValue(response(1, false, true));
     const { rerender } = renderHook(() => useSidebarTaskPage("ws-1"));

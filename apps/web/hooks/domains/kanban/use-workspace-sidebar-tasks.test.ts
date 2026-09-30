@@ -84,25 +84,25 @@ function setPageTasks(tasks: Task[]) {
   };
 }
 
-describe("useWorkspaceSidebarTasks", () => {
-  beforeEach(() => {
-    mocks.state.taskOverview.byId = {};
-    mocks.state.taskRemoval = { pendingTokenByTaskId: {}, operationsByToken: {} };
-    mocks.state.kanbanMulti = { snapshots: {} };
-    mocks.state.sidebarStatusSummaryByWorkspaceId = {};
-    mocks.state.workflows = { items: [{ id: "wf-1", workspaceId: "ws-1", name: "Workflow" }] };
-    mocks.state.kanban = {
-      workflowId: null,
-      steps: [{ id: "step-1", title: "Start", color: "blue", position: 0 }],
-    };
-    mocks.state.workspaceContextGeneration = 0;
-    mocks.state.workspaceContextRead = undefined;
-    mocks.page.response = null;
-    mocks.page.isLoading = false;
-    mocks.page.error = null;
-    vi.clearAllMocks();
-  });
+beforeEach(() => {
+  mocks.state.taskOverview.byId = {};
+  mocks.state.taskRemoval = { pendingTokenByTaskId: {}, operationsByToken: {} };
+  mocks.state.kanbanMulti = { snapshots: {} };
+  mocks.state.sidebarStatusSummaryByWorkspaceId = {};
+  mocks.state.workflows = { items: [{ id: "wf-1", workspaceId: "ws-1", name: "Workflow" }] };
+  mocks.state.kanban = {
+    workflowId: null,
+    steps: [{ id: "step-1", title: "Start", color: "blue", position: 0 }],
+  };
+  mocks.state.workspaceContextGeneration = 0;
+  mocks.state.workspaceContextRead = undefined;
+  mocks.page.response = null;
+  mocks.page.isLoading = false;
+  mocks.page.error = null;
+  vi.clearAllMocks();
+});
 
+describe("useWorkspaceSidebarTasks", () => {
   it("uses only the bounded page and does not leak workspace snapshot tasks", () => {
     setPageTasks([task("page-a"), task("page-b")]);
     mocks.state.kanbanMulti.snapshots = {
@@ -202,4 +202,29 @@ it("hides a known archive immediately while the server replacement remains pendi
   };
   rerender();
   expect(result.current.allTasks.map((item) => item.id)).toEqual(["retained"]);
+});
+
+it("allows workspace-list recovery without retrying a denied task page", () => {
+  mocks.state.workspaceContextRead = {
+    workspaceId: "ws-1",
+    generation: 0,
+    errors: { workflows: "access_denied" },
+    pending: {},
+    snapshotError: null,
+  };
+  const hook = renderHook(() => useWorkspaceSidebarTasks("ws-1"));
+  expect(hook.result.current.workspaceContextAccessDenied).toBe(true);
+  expect(hook.result.current.retryWorkspaceContext).toBe(
+    mocks.state.requestWorkspaceContextRefresh,
+  );
+  mocks.state.workspaceContextRead = {
+    workspaceId: "ws-1",
+    generation: 0,
+    errors: {},
+    pending: {},
+    snapshotError: "access_denied",
+  };
+  hook.rerender();
+  expect(hook.result.current.workspaceContextAccessDenied).toBe(true);
+  expect(hook.result.current.retryWorkspaceContext).toBeUndefined();
 });

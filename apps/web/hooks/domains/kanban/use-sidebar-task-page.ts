@@ -245,10 +245,10 @@ function useSidebarRevisionRefresh(
   workspaceId: string | null,
   queryRevision: number,
   refresh: () => void,
+  refreshTimerRef: { current: ReturnType<typeof setTimeout> | null },
 ) {
   const seenQueryRevisionRef = useRef<{ workspaceId: string; revision: number } | null>(null);
   const refreshBurstStartedRef = useRef<number | null>(null);
-  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!workspaceId) {
@@ -282,13 +282,13 @@ function useSidebarRevisionRefresh(
       if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
       refreshTimerRef.current = null;
     };
-  }, [queryRevision, refresh, workspaceId]);
+  }, [queryRevision, refresh, workspaceId, refreshTimerRef]);
 
   useEffect(
     () => () => {
       if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
     },
-    [],
+    [refreshTimerRef],
   );
   return refreshTimerRef;
 }
@@ -328,10 +328,11 @@ function useSidebarLiveRefresh(
     response: SidebarTaskPageResponse | null;
     pending: number | null;
     queued: { current: boolean };
+    timer: { current: ReturnType<typeof setTimeout> | null };
   },
   refresh: () => void,
 ) {
-  const timer = useSidebarRevisionRefresh(workspaceId, revision, refresh);
+  const timer = useSidebarRevisionRefresh(workspaceId, revision, refresh, page.timer);
   const { queued } = page;
   const isRefreshScheduled = useCallback(
     () => queued.current || timer.current !== null,
@@ -357,6 +358,7 @@ type SidebarPageAutoLoadOptions = {
   autoLoadKeyRef: { current: string };
   autoLoadScopeRef: { current: string };
   queuedRefreshRef: { current: boolean };
+  refreshTimerRef: { current: ReturnType<typeof setTimeout> | null };
 };
 
 function useSidebarPageAutoLoad({
@@ -371,6 +373,7 @@ function useSidebarPageAutoLoad({
   autoLoadKeyRef,
   autoLoadScopeRef,
   queuedRefreshRef,
+  refreshTimerRef,
 }: SidebarPageAutoLoadOptions): void {
   useEffect(
     () => () => {
@@ -416,9 +419,15 @@ function useSidebarPageAutoLoad({
 
   useEffect(() => {
     if (loader.pendingPage !== null || !queuedRefreshRef.current) return;
-    queuedRefreshRef.current = false;
-    setRefreshRevision((revision) => revision + 1);
-  }, [loader.pendingPage, queuedRefreshRef, setRefreshRevision]);
+    const timer = setTimeout(() => {
+      if (!queuedRefreshRef.current) return;
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+      refreshTimerRef.current = null;
+      queuedRefreshRef.current = false;
+      setRefreshRevision((revision) => revision + 1);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [loader.pendingPage, queuedRefreshRef, refreshTimerRef, setRefreshRevision]);
 }
 
 function useSidebarPageNavigation({
@@ -467,6 +476,24 @@ function useSidebarPageNavigation({
   );
 }
 
+function useSidebarPageRefresh(
+  hasInFlight: () => boolean,
+  queued: { current: boolean },
+  timer: { current: ReturnType<typeof setTimeout> | null },
+  setRefreshRevision: Dispatch<SetStateAction<number>>,
+) {
+  return useCallback(() => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+    if (hasInFlight()) {
+      queued.current = true;
+      return;
+    }
+    queued.current = false;
+    setRefreshRevision((revision) => revision + 1);
+  }, [hasInFlight, queued, timer, setRefreshRevision]);
+}
+
 /** Covered views page locally; incomplete views retain one bounded server page. */
 export function useSidebarTaskPage(
   workspaceId: string | null,
@@ -482,7 +509,8 @@ export function useSidebarTaskPage(
   const viewKeyRef = useRef("");
   const autoLoadKeyRef = useRef("");
   const autoLoadScopeRef = useRef("");
-  const queuedRefreshRef = useRef(false);
+  const queued = useRef(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   viewKeyRef.current = viewKey;
   const queryWorkspaceId = enabled && !accessDenied ? workspaceId : null;
@@ -524,23 +552,22 @@ export function useSidebarTaskPage(
     loader,
     autoLoadKeyRef,
     autoLoadScopeRef,
-    queuedRefreshRef,
+    queuedRefreshRef: queued,
+    refreshTimerRef: timer,
   });
 
-  const refresh = useCallback(() => {
-    if (loader.hasInFlight()) {
-      queuedRefreshRef.current = true;
-      return;
-    }
-    queuedRefreshRef.current = false;
-    setRefreshRevision((revision) => revision + 1);
-  }, [loader.hasInFlight]);
+  const refresh = useSidebarPageRefresh(loader.hasInFlight, queued, timer, setRefreshRevision);
 
   useForegroundRefresh(refresh, Boolean(queryWorkspaceId), queryWorkspaceId);
   useSidebarLiveRefresh(
     queryWorkspaceId,
     revision,
-    { response: currentResponse, pending: pendingPage, queued: queuedRefreshRef },
+    {
+      response: currentResponse,
+      pending: pendingPage,
+      queued: queued,
+      timer,
+    },
     refresh,
   );
 

@@ -107,6 +107,7 @@ export async function exerciseSharedPaging(
   await page.goto("/");
   await waitForCoverage(page, seed.workspaceId);
   expect(requests).toBe(0);
+  await page.getByRole("textbox", { name: "Search tasks...", exact: true }).fill(anchor.title);
   await page.getByTestId(`task-card-${anchor.id}`).click();
   const { session, rows } = await surface(page, mobile);
   const controls = rows.getByTestId("sidebar-page-controls");
