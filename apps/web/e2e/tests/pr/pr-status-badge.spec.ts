@@ -907,7 +907,7 @@ test.describe("PR status badge", () => {
     expect(actionsBox).not.toBeNull();
     expect(Math.abs(actionsBox!.width - statusBox!.width)).toBeLessThanOrEqual(1);
     expect(
-      Math.abs(statusBox!.x + statusBox!.width - (rowBox!.x + rowBox!.width - 12)),
+      Math.abs(statusBox!.x + statusBox!.width - (rowBox!.x + rowBox!.width - 8)),
     ).toBeLessThanOrEqual(1);
     const icon = taskRow.getByTestId(`pr-task-icon-${task.id}`);
     await expect(icon).toHaveAttribute("data-pr-ready-to-merge", "true");

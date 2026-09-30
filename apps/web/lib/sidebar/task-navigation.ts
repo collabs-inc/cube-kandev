@@ -11,6 +11,7 @@ type ActiveTaskRowCue = {
   cueId: number;
   row: HTMLElement;
   timeoutId: number;
+  resizeObserver?: ResizeObserver;
 };
 
 let activeTaskRowCue: ActiveTaskRowCue | null = null;
@@ -21,6 +22,7 @@ export function cancelSidebarTaskReveal(): void {
   if (!activeTaskRowCue) return;
 
   window.clearTimeout(activeTaskRowCue.timeoutId);
+  activeTaskRowCue.resizeObserver?.disconnect();
   activeTaskRowCue.row.classList.remove(TASK_ROW_REVEAL_CLASS);
   activeTaskRowCue = null;
 }
@@ -87,10 +89,47 @@ function prefersReducedMotion(): boolean {
   );
 }
 
+function scrollTaskRow(row: HTMLElement): void {
+  row.scrollIntoView({
+    behavior: prefersReducedMotion() ? "auto" : "smooth",
+    block: "center",
+    inline: "nearest",
+  });
+}
+
+function observeCueViewport(row: HTMLElement, viewport: HTMLElement, cueId: number) {
+  if (typeof ResizeObserver === "undefined") return undefined;
+  let previous = viewport.getBoundingClientRect();
+  let previousContentHeight = viewport.scrollHeight;
+  const observer = new ResizeObserver(() => {
+    if (
+      activeTaskRowCue?.cueId !== cueId ||
+      !row.isConnected ||
+      row.getAttribute("aria-current") === "false"
+    )
+      return;
+    const current = viewport.getBoundingClientRect();
+    const contentHeight = viewport.scrollHeight;
+    if (
+      current.width === previous.width &&
+      current.height === previous.height &&
+      contentHeight === previousContentHeight
+    )
+      return;
+    previous = current;
+    previousContentHeight = contentHeight;
+    if (!isInsideViewport(row, viewport)) scrollTaskRow(row);
+  });
+  observer.observe(viewport);
+  if (viewport.firstElementChild) observer.observe(viewport.firstElementChild);
+  return observer;
+}
+
 /** Restarts the short-lived cue on the latest command-selected row. */
-function cueTaskRow(row: HTMLElement): void {
+function cueTaskRow(row: HTMLElement, viewport: HTMLElement): void {
   if (activeTaskRowCue) {
     window.clearTimeout(activeTaskRowCue.timeoutId);
+    activeTaskRowCue.resizeObserver?.disconnect();
     activeTaskRowCue.row.classList.remove(TASK_ROW_REVEAL_CLASS);
   }
 
@@ -102,10 +141,16 @@ function cueTaskRow(row: HTMLElement): void {
 
   const timeoutId = window.setTimeout(() => {
     if (activeTaskRowCue?.cueId !== cueId) return;
+    activeTaskRowCue.resizeObserver?.disconnect();
     row.classList.remove(TASK_ROW_REVEAL_CLASS);
     activeTaskRowCue = null;
   }, TASK_ROW_REVEAL_DURATION_MS);
-  activeTaskRowCue = { cueId, row, timeoutId };
+  activeTaskRowCue = {
+    cueId,
+    row,
+    timeoutId,
+    resizeObserver: observeCueViewport(row, viewport, cueId),
+  };
 }
 
 /**
@@ -137,13 +182,9 @@ export function revealSidebarTask(
           return;
         }
         if (!isInsideViewport(match.row, match.viewport)) {
-          match.row.scrollIntoView({
-            behavior: prefersReducedMotion() ? "auto" : "smooth",
-            block: "nearest",
-            inline: "nearest",
-          });
+          scrollTaskRow(match.row);
         }
-        cueTaskRow(match.row);
+        cueTaskRow(match.row, match.viewport);
         resolve(true);
         return;
       }

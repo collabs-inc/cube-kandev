@@ -238,6 +238,62 @@ verification audit. Changes remain uncommitted for review.
   available development port exposure. Report a reachability blocker rather
   than presenting an unreachable URL as a working comparison.
 
+## PR review and CI remediation (2026-09-30)
+
+This entry supersedes the implementation checkpoint's uncommitted status.
+PR #4063 incorporates the current main branch without conflicts. Remediation
+preserves the accepted plain rows, neutral primary action, quiet utilities,
+compact grouping, and saved-layout behavior.
+
+All three inline review findings are addressed: exceptional task states retain
+their canonical group icons, and desktop section/phone Canvases disclosures
+identify their controlled content. The aggregate review's filter cues now expose
+accessible image names, phone-order documentation and coverage annotations match
+the implementation, and What's New remains available after reading or disabling
+notifications. Reopening it displays the latest notes.
+
+The command-selected row now stays visible when hydration grows the list content
+during its selection cue. A short-lived resize observer covers both content and
+viewport changes and disconnects on cancellation, replacement, or expiry. Browser
+measurements proved content growth, rather than a changing viewport height, caused
+the clipping. Regression coverage also verifies cancellation cannot recenter an
+obsolete selection.
+
+CI test remediation updates assumptions changed by this UI: plugin actions follow
+both built-in utilities; plain-row padding is eight pixels; localized phone/touch
+time and action slots remain separate; and phone task creation uses the primary
+action. Session recovery measures controls while the injected failure remains
+active. The agentctl launch-deadline test uses Go's virtual clock and an injected
+transport to prove timeout, transfer cancellation, and fresh retry without a real
+40ms filesystem scheduling race. Backend runtime behavior is unchanged.
+
+Local validation passed on the reconciled tree:
+
+- 506 focused frontend unit tests across 44 files, including sidebar disclosure,
+  state, filter, footer, release-notes, navigation cancellation, and phone cases.
+- 20 desktop browser tests across navigation, task hierarchy, scroll preservation,
+  workspace plugins, PR trailing actions, and localized time slots.
+- 11 phone browser tests across navigation, hierarchy/subtasks, disclosure,
+  hidden-action fallback, GitHub/empty task views, session recovery, and Office
+  manager reassignment.
+- `KANDEV_E2E_CONTAINERS=1 pnpm --dir apps/web e2e:run --host --no-build --project
+  containers tests/docker/repository-secrets.spec.ts`: one passed after building
+  the required Linux mock helper. The previous blank-terminal CI failure did not
+  reproduce on the reconciled tree. The pause/resume cleanup case also passed.
+- `go test -race ./internal/agent/runtime/lifecycle -run 'TestAgentctlResolver'
+  -count=1`: passed. The deadline regression also passed 20 repeated race runs.
+- `GOMAXPROCS=2 GOGC=50 golangci-lint run ./... --new-from-rev=origin/main
+  --timeout=5m`: zero issues against the verified base.
+- `pnpm --dir apps/web run typecheck`, `pnpm --dir apps/web run i18n:check`,
+  changed-file ESLint, production E2E build, harness validation, documentation
+  catalog/spec lint, and both staged/unstaged diff checks passed.
+
+Commands use the pinned toolchain through `mise exec --`; Go commands run from
+`apps/backend`. Focused browser runs use the managed host runner with one worker
+and retries disabled. CI/review results for the pushed remediation commit and
+fresh screenshots remain externally pending until verified on GitHub. No merge
+is part of this remediation request.
+
 ## Requested refinement (2026-09-28)
 
 After reviewing the seeded preview, the user explicitly requested a larger New

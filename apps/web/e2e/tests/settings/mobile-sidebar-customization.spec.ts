@@ -221,7 +221,7 @@ test.describe("Sidebar customization on phone", () => {
   });
 });
 
-// @covers AC-UI-NAV-HIERARCHY-003.3
+// @covers AC-UI-NAV-HIERARCHY-003.2 AC-UI-NAV-HIERARCHY-003.4
 test("hiding the primary action preserves task creation without rewriting the layout", async ({
   testPage,
   apiClient,
@@ -255,6 +255,10 @@ test("default phone canvases expand as a tool group", async ({ testPage, apiClie
     const menu = testPage.getByTestId("app-nav-sheet");
     const toggle = menu.getByRole("button", { name: "Canvases", exact: true });
     const setup = menu.getByTestId("mobile-workspace-canvases-settings");
+    await expect(toggle).toHaveAttribute("aria-controls", /.+/);
+    const controlsId = (await toggle.getAttribute("aria-controls"))!;
+    const content = setup.locator("xpath=..");
+    await expect(content).toHaveAttribute("id", controlsId);
     await expect(toggle).toHaveAttribute("aria-expanded", "false");
     await expect(setup).toBeHidden();
     await toggle.tap();

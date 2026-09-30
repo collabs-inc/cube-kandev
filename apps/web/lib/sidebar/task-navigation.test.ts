@@ -50,6 +50,7 @@ function setReducedMotion(reducedMotion: boolean) {
 }
 
 afterEach(() => {
+  cancelSidebarTaskReveal();
   document.body.innerHTML = "";
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
@@ -63,6 +64,41 @@ describe("taskRowSelector", () => {
 });
 
 describe("revealSidebarTask", () => {
+  it.each(["viewport", "content"])(
+    "keeps the selected row visible when navigation changes the %s height",
+    async (changed) => {
+      let resized!: ResizeObserverCallback;
+      const disconnect = vi.fn();
+      vi.stubGlobal(
+        "ResizeObserver",
+        class {
+          constructor(callback: ResizeObserverCallback) {
+            resized = callback;
+          }
+          observe = vi.fn();
+          disconnect = disconnect;
+        },
+      );
+      const viewport = mountViewport();
+      const row = mountRow(viewport, TEST_TASK_ID, { x: 0, y: 70, width: 320, height: 24 });
+      await revealSidebarTask(TEST_TASK_ID, (callback) => callback());
+      expect(row.scrollIntoView).not.toHaveBeenCalled();
+
+      if (changed === "viewport") {
+        setRect(viewport, { x: 0, y: 0, width: 320, height: 60 });
+      } else {
+        Object.defineProperty(viewport, "scrollHeight", { value: 200 });
+        setRect(row, { x: 0, y: 140, width: 320, height: 24 });
+      }
+      resized([], {} as ResizeObserver);
+      expect(row.scrollIntoView).toHaveBeenCalledOnce();
+      cancelSidebarTaskReveal();
+      expect(disconnect).toHaveBeenCalledOnce();
+      resized([], {} as ResizeObserver);
+      expect(row.scrollIntoView).toHaveBeenCalledOnce();
+    },
+  );
+
   it("smoothly scrolls and cues an off-screen rendered row", async () => {
     setReducedMotion(false);
     const viewport = mountViewport();
@@ -71,13 +107,25 @@ describe("revealSidebarTask", () => {
     await expect(revealSidebarTask(TEST_TASK_ID, (callback) => callback())).resolves.toBe(true);
     expect(row.scrollIntoView).toHaveBeenCalledWith({
       behavior: "smooth",
-      block: "nearest",
+      block: "center",
       inline: "nearest",
     });
     expect(row.classList.contains(TASK_ROW_REVEAL_CLASS)).toBe(true);
   });
 
-  it("uses immediate nearest scrolling and a non-animated cue for reduced motion", async () => {
+  it("centers a partially visible row so its full target is revealed", async () => {
+    const viewport = mountViewport();
+    const row = mountRow(viewport, TEST_TASK_ID, { x: 0, y: -40, width: 320, height: 52 });
+
+    await expect(revealSidebarTask(TEST_TASK_ID, (callback) => callback())).resolves.toBe(true);
+    expect(row.scrollIntoView).toHaveBeenCalledWith({
+      behavior: "smooth",
+      block: "center",
+      inline: "nearest",
+    });
+  });
+
+  it("uses immediate centered scrolling and a non-animated cue for reduced motion", async () => {
     setReducedMotion(true);
     const viewport = mountViewport();
     const row = mountRow(viewport, TEST_TASK_ID, { x: 0, y: -24, width: 320, height: 24 });
@@ -85,7 +133,7 @@ describe("revealSidebarTask", () => {
     await expect(revealSidebarTask(TEST_TASK_ID, (callback) => callback())).resolves.toBe(true);
     expect(row.scrollIntoView).toHaveBeenCalledWith({
       behavior: "auto",
-      block: "nearest",
+      block: "center",
       inline: "nearest",
     });
     expect(row.classList.contains(TASK_ROW_REVEAL_CLASS)).toBe(true);

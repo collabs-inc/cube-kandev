@@ -248,7 +248,7 @@ function SidebarFooterMenu({
             <IconStethoscope className="size-4" aria-hidden="true" />
             {t("sidebar:improveKandev")}
           </DropdownMenuItem>
-          {releaseNotes.showTopbarButton && (
+          {releaseNotes.hasNotes && (
             <DropdownMenuItem
               onClick={releaseNotes.openDialog}
               className="cursor-pointer [@media(pointer:coarse)]:min-h-11"

@@ -191,3 +191,15 @@ Actual final captures include dark/light desktop and phone, Portuguese desktop,
 and keyboard focus. Live tasks and preferences were preserved. Evidence lives in
 `/tmp/kandev-navigation-compare-z54_iuek/quiet-final` and `quiet-check.json`.
 The seeded preview remains running at its existing URL.
+
+
+## PR review remediation (2026-09-30)
+
+Section disclosures reference their controlled content in ordinary and growing
+sections. The utilities menu uses release-note availability rather than unseen
+notification eligibility; reopening read notes shows the current release instead
+of an empty dialog. Preferences still control the trigger indicator. Added
+failing regressions before implementation, then verified section/footer
+components and the release-note lifecycle. Browser coverage verifies actual
+menu clickability and readable notes at the 768px desktop boundary. Final
+validation and CI evidence are recorded in the plan and linked PR.

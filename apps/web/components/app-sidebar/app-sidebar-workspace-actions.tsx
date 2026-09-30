@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { IconChevronRight, IconLayoutGrid, IconListDetails } from "@tabler/icons-react";
 import Link from "@/components/routing/app-link";
@@ -75,6 +75,7 @@ export function MobileWorkspaceActionsSection({
 }) {
   const { t } = useTranslation();
   const [canvasesExpanded, setCanvasesExpanded] = useState(false);
+  const canvasesContentId = useId();
   const activeWorkspaceId = useAppStore((state) => state.workspaces?.activeId ?? null);
   const canvasesEnabled = useFeature("canvases");
   const hasSavedSidebarLayout = useHasSavedSidebarLayout();
@@ -101,11 +102,12 @@ export function MobileWorkspaceActionsSection({
       {showCanvases && (
         <div className="flex flex-col gap-1" data-testid="mobile-workspace-canvases">
           <WorkspaceCanvasHeading
+            controlsId={canvasesContentId}
             collapsible={collapseCanvases}
             expanded={canvasesExpanded}
             onToggle={() => setCanvasesExpanded(!canvasesExpanded)}
           />
-          <div hidden={collapseCanvases && !canvasesExpanded}>
+          <div id={canvasesContentId} hidden={collapseCanvases && !canvasesExpanded}>
             {activeCanvases.length > 0 ? (
               activeCanvases.map((canvas) => (
                 <Link
@@ -143,10 +145,12 @@ export function MobileWorkspaceActionsSection({
 }
 
 function WorkspaceCanvasHeading({
+  controlsId,
   collapsible,
   expanded,
   onToggle,
 }: {
+  controlsId: string;
   collapsible: boolean;
   expanded: boolean;
   onToggle: () => void;
@@ -168,6 +172,7 @@ function WorkspaceCanvasHeading({
     <button
       type="button"
       aria-expanded={expanded}
+      aria-controls={controlsId}
       onClick={onToggle}
       className="flex min-h-11 w-full cursor-pointer items-center gap-2 text-left text-sm font-medium"
     >

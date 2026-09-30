@@ -379,6 +379,9 @@ export type AgentProfilePayload = {
   allow_indexing: boolean;
   cli_passthrough?: boolean;
   cursor_mcp_auth_enabled?: boolean;
+  cursor_plugins_mcp_enabled?: boolean;
+  mcp_selection_mode?: "inherit" | "selected";
+  mcp_selected_servers?: string[];
   plan: string;
   created_at?: string;
   updated_at?: string;
@@ -451,6 +454,7 @@ export type BackendMessageMap = SessionBackendMessageMap &
   OfficeBackendMessageMap &
   import("@/lib/types/http").WalkthroughBackendMessageMap &
   import("@/lib/types/review").ReviewBackendMessageMap & {
+    "prompts.changed": BackendMessage<"prompts.changed", Record<string, never>>;
     "kanban.update": BackendMessage<"kanban.update", KanbanUpdatePayload>;
     "task.reordered": BackendMessage<"task.reordered", TaskReorderedPayload>;
     "task.created": BackendMessage<"task.created", TaskEventPayload>;

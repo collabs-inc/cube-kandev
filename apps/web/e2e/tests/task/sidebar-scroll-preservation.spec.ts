@@ -97,9 +97,12 @@ test.describe("sidebar scrolling", () => {
       const rowRect = row.getBoundingClientRect();
       return {
         rowRightGap: containerRect.right - rowRect.right,
+        rowMargin: Number.parseFloat(getComputedStyle(row).marginRight),
       };
     });
-    expect(overlayGeometry.rowRightGap).toBeLessThanOrEqual(1);
+    expect(Math.abs(overlayGeometry.rowRightGap - overlayGeometry.rowMargin)).toBeLessThanOrEqual(
+      1,
+    );
 
     await expect(scrollContainer).toHaveAttribute("data-can-scroll-down", "true");
     const overlayScrollbar = session.sidebar.locator(OVERLAY_SCROLLBAR_SELECTOR);
@@ -182,6 +185,11 @@ test.describe("sidebar scrolling", () => {
     await expect
       .poll(() => titleText.evaluate((element) => element.style.transform))
       .toMatch(/^translateX\(-/);
+    const rowBoxBeforeHover = await taskRow.boundingBox();
+    if (!rowBoxBeforeHover) throw new Error("Long-title sidebar row has no layout box");
+    await taskRow.hover({
+      position: { x: rowBoxBeforeHover.width - 2, y: rowBoxBeforeHover.height / 2 },
+    });
     await expect(actions.locator("..")).toHaveCSS("opacity", "1");
     await expect(actions).toBeInViewport();
 
@@ -195,7 +203,7 @@ test.describe("sidebar scrolling", () => {
       throw new Error("Long-title sidebar row has no layout box");
     }
     expect(rowBox.x + rowBox.width).toBeLessThanOrEqual(containerBox.x + containerBox.width + 1);
-    expect(rowBox.x + rowBox.width - (actionBox.x + actionBox.width)).toBeGreaterThanOrEqual(11);
+    expect(rowBox.x + rowBox.width - (actionBox.x + actionBox.width)).toBeGreaterThanOrEqual(8);
     expect(actionBox.x - (titleBox.x + titleBox.width)).toBeGreaterThanOrEqual(7);
   });
 
@@ -450,15 +458,19 @@ test.describe("sidebar scrolling", () => {
               scrollContainer.boundingBox(),
               targetRow.boundingBox(),
             ]);
-            if (!containerBox || !rowBox) return false;
-            return (
-              rowBox.y >= containerBox.y - 1 &&
-              rowBox.y + rowBox.height <= containerBox.y + containerBox.height + 1
-            );
+            return {
+              inside:
+                !!containerBox &&
+                !!rowBox &&
+                rowBox.y >= containerBox.y - 1 &&
+                rowBox.y + rowBox.height <= containerBox.y + containerBox.height + 1,
+              container: containerBox,
+              row: rowBox,
+            };
           },
           { timeout: 10_000 },
         )
-        .toBe(true);
+        .toMatchObject({ inside: true });
     } finally {
       await apiClient.rawRequest("PATCH", "/api/v1/user/settings", {
         changes_panel_layout: initialLayout,
@@ -537,6 +549,7 @@ test.describe("sidebar scrolling", () => {
       "aria-current",
       "true",
     );
+    await expect(targetRow).toHaveClass(/task-sidebar-row-reveal/, { timeout: 1_000 });
     await expect
       .poll(
         async () => {

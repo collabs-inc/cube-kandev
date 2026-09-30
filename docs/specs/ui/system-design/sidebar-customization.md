@@ -233,11 +233,14 @@ A phone group uses a full-width disclosure row, followed by a compact icon strip
 expansion reveals labelled shortcuts beneath it. The extra line preserves 44px
 hit targets and name space. More contains overflow, without horizontal page scroll.
 
-The saved-layout renderer places visible Home and quick actions before the
-existing `afterPrimary` task/local-navigation outlet. Remaining visible nodes
-follow that outlet in saved relative order. This is an effective phone projection;
-neither layout revisions nor desktop ordering change. Wider sheet consumers retain
-their existing ordering. Required inbox destinations remain reachable. Regular phone workspaces use the Tasks heading plus for built-in task creation; Office and explicit custom New Task shortcuts keep their existing launch controls.
+The saved-layout renderer places visible New Task, Home, and quick actions first,
+then visible tools in saved relative order, before the existing `afterPrimary`
+task/local-navigation outlet. This is an effective phone projection; neither
+layout revisions nor desktop ordering change. Wider sheet consumers retain their
+existing ordering. Required inbox destinations remain reachable. Regular phone
+workspaces show the Tasks heading plus only when the primary New Task action is
+hidden. Office and explicit custom New Task shortcuts keep their existing launch
+controls.
 
 Built-in resource sections do not use the custom group's icon-strip presentation.
 Reuse `MobileAutomationsSection` and `MobileIntegrationsSection` for their labelled

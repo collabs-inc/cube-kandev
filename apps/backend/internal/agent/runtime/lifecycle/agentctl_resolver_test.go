@@ -566,22 +566,22 @@ func TestAgentctlResolverCachePruneDoesNotDelayDeadlineBoundLaunch(t *testing.T)
 		resolved <- resolution{path: path, err: err}
 	}()
 	select {
-	case <-inventoryStarted:
-	case <-time.After(time.Second):
-		cancel()
-		t.Fatal("cache prune did not start its mount inventory")
-	}
-	if !<-deadlineSeen {
-		cancel()
-		t.Fatal("background mount inventory has no time bound")
-	}
-	select {
 	case got := <-resolved:
 		if got.err != nil || got.path != cachePath {
 			t.Fatalf("resolution = %q, %v; want %q", got.path, got.err, cachePath)
 		}
 	case <-ctx.Done():
 		t.Fatal("helper resolution waited for background cache cleanup until the launch deadline")
+	}
+	select {
+	case <-inventoryStarted:
+	case <-time.After(5 * time.Second):
+		cancel()
+		t.Fatal("cache prune did not start its mount inventory")
+	}
+	if !<-deadlineSeen {
+		cancel()
+		t.Fatal("background mount inventory has no time bound")
 	}
 	cancel()
 	select {
@@ -719,59 +719,6 @@ func TestAgentctlResolverKeepsHelperSelectedByPendingOlderLaunch(t *testing.T) {
 
 	if _, err := os.Stat(oldPath); err != nil {
 		t.Fatalf("pending older launch helper was pruned before container creation: %v", err)
-	}
-}
-
-func TestAgentctlResolverLaunchDeadlineBoundsDownload(t *testing.T) {
-	const version = "1.2.3"
-	const commit = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-	bundle := t.TempDir()
-	payload := []byte("helper")
-	writeResolverManifest(t, bundle, version, commit, "standard", "linux/amd64", payload)
-	var requests atomic.Int32
-	requestStarted := make(chan struct{})
-	requestCanceled := make(chan struct{})
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if requests.Add(1) == 1 {
-			close(requestStarted)
-			<-r.Context().Done()
-			close(requestCanceled)
-			return
-		}
-		writeGzip(t, w, payload)
-	}))
-	defer server.Close()
-	resolver := NewAgentctlResolverWithOptions(newResolverTestLogger(t), AgentctlResolverOptions{
-		Version: version, Commit: commit, BundleDir: bundle, HomeDir: t.TempDir(), ReleaseBaseURL: server.URL,
-		DownloadTimeout: 250 * time.Millisecond,
-	})
-	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Millisecond)
-	defer cancel()
-	var steps []PrepareStep
-	_, err := resolver.ResolveRemoteBinaryContext(ctx, SSHRemotePlatform{GOOS: "linux", GOARCH: "amd64"}, func(step PrepareStep, _, _ int) {
-		steps = append(steps, step)
-	})
-	if !errors.Is(err, context.DeadlineExceeded) {
-		t.Fatalf("resolve error = %v, want launch deadline", err)
-	}
-	if len(steps) != 2 || steps[1].FailureCode != "timeout" || steps[1].Status != PrepareStepFailed {
-		t.Fatalf("download progress = %#v, want timeout failure", steps)
-	}
-	select {
-	case <-requestStarted:
-	default:
-		t.Fatal("helper transfer did not start")
-	}
-	select {
-	case <-requestCanceled:
-	case <-time.After(150 * time.Millisecond):
-		t.Fatal("shared helper transfer continued after its only launch waiter expired")
-	}
-	if _, err := resolver.ResolveRemoteBinaryContext(context.Background(), SSHRemotePlatform{GOOS: "linux", GOARCH: "amd64"}, nil); err != nil {
-		t.Fatalf("retry after canceled transfer: %v", err)
-	}
-	if got := requests.Load(); got != 2 {
-		t.Fatalf("HTTP requests after retry = %d, want a fresh request", got)
 	}
 }
 

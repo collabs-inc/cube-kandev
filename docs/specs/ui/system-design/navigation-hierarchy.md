@@ -185,6 +185,11 @@ overlap the row's primary tap target or trailing values. State presentation must
 not collapse review/completion, clarification, failures, or background work into
 the four illustrative screenshot groups.
 
+Command selection retains its brief row cue and keeps that row inside the list
+while the viewport or hydrated group content changes height. Observe those
+changes only for the cue's lifetime; cancel, replacement, and expiry disconnect
+the observer, and a different selected row is never recentered by the old cue.
+
 ## Phone composition
 
 Nearest shipped exemplars: `AppNavSurface` for the inset `Drawer`, fixed header,

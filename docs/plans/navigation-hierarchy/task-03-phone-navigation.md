@@ -169,3 +169,15 @@ Validation passed:
 - Error recovery, Portuguese labels, dark/light controls, and the narrow mouse/tablet touch boundary checks.
 
 Targeted checks use the managed production-build runner with one worker. Final browser build includes the full phone-range task-action and group-header fixes.
+
+
+## PR review and CI remediation (2026-09-30)
+
+Phone Canvases disclosure uses a unique controlled-content ID. Browser coverage
+verifies that relationship and collapsed/expanded visibility. The hidden-primary
+action test references the creation-fallback and saved-layout criteria. Existing
+GitHub task-view coverage opens the visible primary New Task action; localized
+trailing-slot tests use the shared 768px phone boundary. The recovery test
+measures retry/details controls before releasing the injected history failure,
+preserving a deterministic opportunity to interact. Final browser validation
+and CI evidence are recorded in the plan and linked PR.

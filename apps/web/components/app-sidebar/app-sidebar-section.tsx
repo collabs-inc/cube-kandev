@@ -35,6 +35,7 @@ type AppSidebarSectionProps = {
 };
 
 type SectionHeaderProps = {
+  id: string;
   label: string;
   expanded: boolean;
   headerAction?: React.ReactNode;
@@ -45,6 +46,7 @@ type SectionHeaderProps = {
 };
 
 function SectionHeader({
+  id,
   label,
   expanded,
   headerAction,
@@ -63,6 +65,7 @@ function SectionHeader({
         onClick={onToggle}
         className="flex min-h-7 [@media(pointer:coarse)]:min-h-11 min-w-0 flex-1 items-center gap-1.5 text-left cursor-pointer text-foreground/70 hover:text-foreground transition-colors"
         aria-expanded={expanded}
+        aria-controls={`sidebar-section-${id}`}
       >
         <span className="text-[11px] font-semibold uppercase tracking-wider truncate">{label}</span>
         {!expanded && collapsedSummary != null && (
@@ -100,7 +103,7 @@ function NavigationSectionHeader({
   collapsedSummary,
   icon: Icon,
   id,
-}: SectionHeaderProps & { icon: DestinationIcon; id: string }) {
+}: SectionHeaderProps & { icon: DestinationIcon }) {
   return (
     <div className="flex min-w-0 items-center gap-1">
       <button
@@ -212,6 +215,7 @@ export function AppSidebarSection({
         {collapsed ? railButton : header}
         {expanded && (
           <div
+            id={`sidebar-section-${id}`}
             className={cn(
               "flex flex-col gap-0.5",
               collapsed ? "hidden" : "flex-1 min-h-0 sidebar-fade-in",

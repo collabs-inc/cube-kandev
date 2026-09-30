@@ -40,7 +40,6 @@ test.describe("mobile session entry recovery", () => {
     const historyNotice = chat.getByTestId("session-history-unavailable");
     await expect(historyNotice).toBeVisible({ timeout: 45_000 });
     expect(proxy.rejectedResponseCount("message.list")).toBeGreaterThan(0);
-    proxy.releaseRejectedResponses("message.list");
 
     const retry = historyNotice.getByTestId("session-history-retry");
     const retryBox = await retry.boundingBox();
@@ -50,6 +49,7 @@ test.describe("mobile session entry recovery", () => {
     expect(detailsBox?.height).toBeGreaterThanOrEqual(44);
     await assertNoDocumentHorizontalOverflow(testPage, "mobile session history recovery");
 
+    proxy.releaseRejectedResponses("message.list");
     await retry.click();
     await expect(historyNotice).toHaveCount(0);
     await expect(chat).toContainText("simple mock response", { timeout: 30_000 });

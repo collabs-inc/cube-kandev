@@ -146,3 +146,21 @@ selection retain tonal fills; keyboard focus and multiselection retain their
 rings. Metadata, grouping, nesting, row actions, and phone targets are preserved.
 Active-row browser assertions now require a borderless highlighted row. The
 latest validation and comparison refresh are recorded in the plan.
+
+
+## PR review and CI remediation (2026-09-30)
+
+Blocked, failed, and cancelled group headings use the established state-aware
+icons instead of the task-row backlog fallback. Applied-filter and unsaved-draft
+markers expose labelled image roles. Regressions cover their distinct semantics.
+CI geometry assertions retain the accepted plain-row 8px inset and padding while
+continuing to reject a reserved scrollbar gutter, clipped hover actions, and
+trailing values outside the row.
+
+A command-selected task could move below the list as hydrated group content grew
+after its initial scroll. The brief selection cue now observes the viewport and
+its content and recenters only the still-selected row when needed. Cancellation,
+replacement, and expiry disconnect the observer. Unit regressions cover
+viewport/content growth and cancellation; the delayed navigation-blocker browser
+test exercises the complete route/list path. Final validation and CI evidence
+are recorded in the plan and linked PR.

@@ -90,6 +90,8 @@ const STATS_DESTINATION: FooterDestination = {
 
 let insightDestinations: FooterDestination[] = [STATS_DESTINATION];
 let releaseNotesAvailable = false;
+let releaseNotesUnseen = true;
+let releaseNotificationsEnabled = true;
 
 vi.mock("@/hooks/use-app-destinations", () => ({
   useStaticDestinations: () => insightDestinations,
@@ -99,12 +101,12 @@ vi.mock("@/hooks/use-release-notes", () => ({
   useReleaseNotes: () => ({
     unseenEntries: [],
     latestVersion: "0.0.0",
-    hasUnseen: releaseNotesAvailable,
+    hasUnseen: releaseNotesAvailable && releaseNotesUnseen,
     dialogOpen: false,
     openDialog: mocks.openReleaseNotes,
     closeDialog: vi.fn(),
     hasNotes: releaseNotesAvailable,
-    showTopbarButton: releaseNotesAvailable,
+    showTopbarButton: releaseNotesAvailable && releaseNotesUnseen && releaseNotificationsEnabled,
   }),
 }));
 
@@ -183,6 +185,8 @@ function renderFooter(collapsed = false, layoutManaged = false) {
 function resetFooterState() {
   blockNavigation = false;
   releaseNotesAvailable = false;
+  releaseNotesUnseen = true;
+  releaseNotificationsEnabled = true;
   mocks.openReleaseNotes.mockClear();
   mocks.setImproveDialogOpen.mockClear();
   pathname = DEFAULT_PATHNAME;
@@ -460,6 +464,18 @@ describe("AppSidebarFooter utilities menu", () => {
     renderFooter();
     expect(screen.queryByTestId("sidebar-release-notes-button")).toBeNull();
   });
+
+  it.each(["seen", "notifications disabled"])(
+    "keeps available release notes reachable when %s",
+    (state) => {
+      releaseNotesAvailable = true;
+      releaseNotesUnseen = state !== "seen";
+      releaseNotificationsEnabled = state !== "notifications disabled";
+      renderFooter();
+      fireEvent.click(within(overflowMenuContent()).getByTestId("sidebar-release-notes-button"));
+      expect(mocks.openReleaseNotes).toHaveBeenCalledOnce();
+    },
+  );
 
   it.each([false, true])(
     "keeps every plugin reachable in registration order, collapsed=%s",

@@ -54,6 +54,7 @@ export function TaskPickerSurface({
   open,
   onOpenChange,
   onCloseAutoFocus,
+  restoreFocusOnClose = true,
   children,
 }: {
   presentation?: "sheet" | "drawer";
@@ -61,14 +62,23 @@ export function TaskPickerSurface({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCloseAutoFocus?: (event: Event) => void;
+  restoreFocusOnClose?: boolean;
 } & { children: ReactNode }) {
+  const handleCloseAutoFocus = (event: Event) => {
+    if (!restoreFocusOnClose) {
+      event.preventDefault();
+      return;
+    }
+    onCloseAutoFocus?.(event);
+  };
+
   if (presentation === "drawer")
     return (
       <TaskSwitcherDrawer
         key={workspaceId}
         open={open}
         onOpenChange={onOpenChange}
-        onCloseAutoFocus={onCloseAutoFocus}
+        onCloseAutoFocus={handleCloseAutoFocus}
       >
         {children}
       </TaskSwitcherDrawer>
@@ -76,7 +86,7 @@ export function TaskPickerSurface({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
-        onCloseAutoFocus={onCloseAutoFocus}
+        onCloseAutoFocus={handleCloseAutoFocus}
         showCloseButton={false}
         side="left"
         className="w-[85vw] max-w-sm p-0 flex flex-col"

@@ -30,6 +30,7 @@ test("primary action, disclosure, destination and footer have distinct behavior"
   const terminalBox = (await terminal.boundingBox())!;
   const createBox = (await create.boundingBox())!;
   const utilities = sidebar.getByRole("group", { name: "Utilities", exact: true });
+  await expect(utilities).toHaveCSS("transform", "none");
   const utilitiesBox = (await utilities.boundingBox())!;
   expect(utilitiesBox.x).toBe(createBox.x);
   expect(utilitiesBox.width).toBe(createBox.width);
@@ -102,6 +103,39 @@ test("an unconfigured workspace retains integration setup", async ({
   await expect(testPage).toHaveURL(
     new RegExp(`/settings/workspaces/${seedData.workspaceId}/integrations`),
   );
+});
+
+// @covers AC-UI-NAV-HIERARCHY-001.5
+test("release notes stay reachable and readable after being seen with notifications disabled", async ({
+  testPage,
+  apiClient,
+}) => {
+  await apiClient.saveUserSettings({
+    show_release_notification: false,
+    release_notes_last_seen_version: "999.0.0",
+  });
+  await testPage.setViewportSize({ width: 768, height: 900 });
+  await testPage.goto("/tasks");
+  const more = testPage.getByTestId("sidebar-footer-more-button");
+  for (let attempt = 0; attempt < 2; attempt++) {
+    await more.click();
+    const notes = testPage.getByTestId("sidebar-release-notes-button");
+    await expect(notes).toBeVisible();
+    expect(
+      await notes.evaluate((element) => {
+        const bounds = element.getBoundingClientRect();
+        return element.contains(
+          document.elementFromPoint(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2),
+        );
+      }),
+    ).toBe(true);
+    await notes.click();
+    const dialog = testPage.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await expect(dialog.locator(".markdown-body").first()).toContainText(/\S.{20}/);
+    await testPage.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+  }
 });
 
 test("tablet coarse-pointer navigation has touch targets", async ({

@@ -8,6 +8,14 @@ import {
   NOT_STARTED_STATE_GROUP_KEY,
 } from "@/lib/sidebar/effective-task-tree-state";
 import { TaskStateIcon } from "./task-state-icon";
+import { getTaskStateIcon } from "@/lib/ui/state-icons";
+
+function GroupStateIcon({ state }: { state?: TaskState }) {
+  if (state === "BLOCKED" || state === "FAILED" || state === "CANCELLED") {
+    return getTaskStateIcon(state, "h-3.5 w-3.5");
+  }
+  return <TaskStateIcon state={state} isOnLastWorkflowStep={state === "COMPLETED"} />;
+}
 
 export function TaskSwitcherSkeleton() {
   return (
@@ -63,9 +71,8 @@ export function GroupHeader({
       />
       {grouping === "state" && Object.hasOwn(STATE_GROUP_ORDER, groupKey) && (
         <span data-testid="sidebar-group-state" aria-hidden="true" className="flex shrink-0">
-          <TaskStateIcon
+          <GroupStateIcon
             state={groupKey === NOT_STARTED_STATE_GROUP_KEY ? undefined : (groupKey as TaskState)}
-            isOnLastWorkflowStep={groupKey === "COMPLETED"}
           />
         </span>
       )}

@@ -452,6 +452,7 @@ export const SessionTaskSwitcherSheet = memo(function SessionTaskSwitcherSheet({
       open={open}
       onOpenChange={handleOpenChange}
       onCloseAutoFocus={onCloseAutoFocus}
+      restoreFocusOnClose={!dialogOpen}
     >
       {surfaceContent}
     </TaskPickerSurface>

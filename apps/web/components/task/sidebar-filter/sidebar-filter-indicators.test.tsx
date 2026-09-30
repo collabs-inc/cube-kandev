@@ -36,8 +36,8 @@ describe("Sidebar filter indicators", () => {
   it("marks a saved filtered view without claiming unsaved changes", () => {
     state.sidebarViews.views = [{ ...DEFAULT_VIEW, filters: [filter] }];
     render(<SidebarFilterIndicators />);
-    expect(screen.getByLabelText(ACTIVE_LABEL)).toBeTruthy();
-    expect(screen.queryByLabelText(DRAFT_LABEL)).toBeNull();
+    expect(screen.getByRole("img", { name: ACTIVE_LABEL })).toBeTruthy();
+    expect(screen.queryByRole("img", { name: DRAFT_LABEL })).toBeNull();
   });
 
   it("distinguishes a sorting draft from active filters", () => {
@@ -47,22 +47,22 @@ describe("Sidebar filter indicators", () => {
       sort: { key: "title", direction: "asc" },
     };
     render(<SidebarFilterIndicators />);
-    expect(screen.queryByLabelText(ACTIVE_LABEL)).toBeNull();
-    expect(screen.getByLabelText(DRAFT_LABEL)).toBeTruthy();
+    expect(screen.queryByRole("img", { name: ACTIVE_LABEL })).toBeNull();
+    expect(screen.getByRole("img", { name: DRAFT_LABEL })).toBeTruthy();
   });
 
   it("uses draft filters immediately, including removing the saved filter", () => {
     state.sidebarViews.views = [{ ...DEFAULT_VIEW, filters: [filter] }];
     state.sidebarViews.draft = { ...DEFAULT_VIEW, baseViewId: DEFAULT_VIEW.id };
     render(<SidebarFilterIndicators />);
-    expect(screen.queryByLabelText(ACTIVE_LABEL)).toBeNull();
-    expect(screen.getByLabelText(DRAFT_LABEL)).toBeTruthy();
+    expect(screen.queryByRole("img", { name: ACTIVE_LABEL })).toBeNull();
+    expect(screen.getByRole("img", { name: DRAFT_LABEL })).toBeTruthy();
   });
 
   it("ignores a draft belonging to another view", () => {
     state.sidebarViews.draft = { ...DEFAULT_VIEW, baseViewId: "other", filters: [filter] };
     render(<SidebarFilterIndicators />);
-    expect(screen.queryByLabelText(ACTIVE_LABEL)).toBeNull();
-    expect(screen.queryByLabelText(DRAFT_LABEL)).toBeNull();
+    expect(screen.queryByRole("img", { name: ACTIVE_LABEL })).toBeNull();
+    expect(screen.queryByRole("img", { name: DRAFT_LABEL })).toBeNull();
   });
 });

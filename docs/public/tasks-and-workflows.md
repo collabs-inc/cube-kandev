@@ -168,7 +168,7 @@ Use **New Task** in the sidebar. In an open task, the **Task** split button also
 />
 
 1. **Set a title.** If the title field appears, enter up to 60 characters. With **Agent-generated task titles** enabled, Kandev uses the prompt's first six words as a provisional title. See [advanced task creation](#let-the-agent-name-new-tasks).
-2. **Choose a workspace and workflow.** Kandev can infer them from the current view. A regular task must belong to a workflow. Use the arrow between the workflow and step names to see where each start action places the task.
+2. **Choose a workspace and workflow.** Kandev can infer them from the current view. A regular task must belong to a workflow. Use the arrow between the workflow and step names to see where each start action places the task. Open the workflow selector to compare the ordered steps in each available workflow. If a preview fails, select **Retry** on that row. Your workflow selection and task draft stay unchanged.
 3. **Choose a source:**
 
    | Source     | Use it for                                        | Notes                                                                                                                                                                                                                                        |
@@ -639,11 +639,16 @@ Choose **Last activity** when you want to review tasks by the least recent user 
 
 Each sidebar view shows up to 100 task rows at a time. Views with more than 100 matching rows show **Previous** and **Next** controls. Filters, grouping, and collapsed groups are applied before paging, so headings do not use task slots. Paging keeps the open task and conversation in place. This applies to active and archived tasks in built-in, saved, and draft views.
 
-Returning to a recently opened sidebar view can show its first page immediately
-while **Updating tasks** refreshes it. These pages are kept only in the current
-browser session, for up to five minutes. Task changes, workspace changes, and
-signing out invalidate the relevant pages. Switching views still leaves your
-open conversation in place, including in the phone **Tasks** drawer.
+Views already covered by the current homepage data appear immediately, without
+another sidebar request. Larger covered views also page through the data already
+loaded. Archived views and incomplete data use bounded server pages.
+
+Returning to a recently opened server-backed view can show its first page while
+it refreshes in the background. Refreshing keeps the list in place; no updating
+banner shifts the rows. These pages are kept only in the current browser session,
+for up to five minutes. Task changes, workspace changes, and signing out invalidate
+the relevant pages. Switching views leaves your open conversation in place,
+including in the phone **Tasks** drawer.
 
 If loading fails, the sidebar shows one message. **Retry** reloads a recoverable
 failure; rows already shown remain visible during a failed refresh. If a filter
