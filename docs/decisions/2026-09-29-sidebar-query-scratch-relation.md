@@ -15,7 +15,7 @@ The Go heap profile did not include these native allocations.
 
 Use a connection-local temporary relation between candidate filtering and recursive page evaluation on SQLite.
 Keep all stages on one pinned reader connection and in one consistent read transaction.
-The main database remains read-only. Only the SQLite temporary schema receives writes.
+The main database remains read-only. Only the SQLite temporary schema receives writes. Nonempty pin/manual-order lists share this lifetime in an indexed preference relation, populated with one JSON parameter; this prevents maximum legal saved preferences from expanding the page statement beyond SQLite parameter and preparation budgets.
 Destroy the relation before returning the connection; discard connections whose cleanup cannot be established.
 Keep PostgreSQL on its existing query path.
 

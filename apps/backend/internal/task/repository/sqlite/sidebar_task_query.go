@@ -82,6 +82,9 @@ func (r *Repository) QuerySidebarTaskPage(
 	if err != nil {
 		return nil, err
 	}
+	if err := snapshot.preparePreferences(ctx, prefs); err != nil {
+		return nil, err
+	}
 	return r.readSidebarTaskPage(ctx, snapshot, workspaceID, query, prefs, baseSQL, baseArgs)
 }
 

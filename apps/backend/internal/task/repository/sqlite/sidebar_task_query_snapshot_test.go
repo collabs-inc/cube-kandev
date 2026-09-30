@@ -30,7 +30,7 @@ func newSidebarReaderPool(t testing.TB) *Repository {
 }
 
 func TestSidebarQueryScratchLifecycle(t *testing.T) {
-	for _, stage := range []string{"created", "indexed", "page", "empty_count", "headers", "hydrated", "commit", "success"} {
+	for _, stage := range []string{"created", "indexed", "preferences", "page", "empty_count", "headers", "hydrated", "commit", "success"} {
 		t.Run(stage, func(t *testing.T) {
 			repo := newSidebarReaderPool(t)
 			repo.ro.SetMaxOpenConns(1)
@@ -47,7 +47,7 @@ func TestSidebarQueryScratchLifecycle(t *testing.T) {
 			}
 			query := sidebarTaskQuery(1)
 			query.CollapsedGroupKeys = []string{"nonmatching-group"}
-			_, err := repo.QuerySidebarTaskPage(t.Context(), "scratch", query, models.SidebarTaskViewPreferences{})
+			_, err := repo.QuerySidebarTaskPage(t.Context(), "scratch", query, models.SidebarTaskViewPreferences{PinnedTaskIDs: []string{"kept"}})
 			if stage == "success" {
 				require.NoError(t, err)
 			} else {
@@ -55,14 +55,14 @@ func TestSidebarQueryScratchLifecycle(t *testing.T) {
 			}
 			assertSidebarScratchAbsent(t, repo)
 			repo.sidebarQueryStage = nil
-			_, err = repo.QuerySidebarTaskPage(t.Context(), "scratch", query, models.SidebarTaskViewPreferences{})
+			_, err = repo.QuerySidebarTaskPage(t.Context(), "scratch", query, models.SidebarTaskViewPreferences{PinnedTaskIDs: []string{"kept"}})
 			require.NoError(t, err, "next borrower must start with a clean temporary schema")
 		})
 	}
 }
 
 func TestSidebarQueryScratchCancellation(t *testing.T) {
-	for _, stage := range []string{"before_start", "created", "indexed", "page", "headers", "hydrated"} {
+	for _, stage := range []string{"before_start", "created", "indexed", "preferences", "page", "headers", "hydrated"} {
 		t.Run(stage, func(t *testing.T) {
 			repo := newSidebarReaderPool(t)
 			repo.ro.SetMaxOpenConns(1)
@@ -79,7 +79,7 @@ func TestSidebarQueryScratchCancellation(t *testing.T) {
 				}
 				return nil
 			}
-			_, err := repo.QuerySidebarTaskPage(ctx, "cancelled", sidebarTaskQuery(1), models.SidebarTaskViewPreferences{})
+			_, err := repo.QuerySidebarTaskPage(ctx, "cancelled", sidebarTaskQuery(1), models.SidebarTaskViewPreferences{PinnedTaskIDs: []string{"kept"}})
 			require.ErrorIs(t, err, context.Canceled)
 			assertSidebarScratchAbsent(t, repo)
 		})
@@ -124,7 +124,7 @@ func TestSidebarQueryScratchDiscardsUncertainConnections(t *testing.T) {
 				return nil
 			}))
 			var count int
-			require.NoError(t, conn.QueryRowxContext(t.Context(), "SELECT COUNT(*) FROM sqlite_temp_master WHERE name = 'kandev_sidebar_filtered'").Scan(&count))
+			require.NoError(t, conn.QueryRowxContext(t.Context(), "SELECT COUNT(*) FROM sqlite_temp_master WHERE name IN ('kandev_sidebar_filtered', 'kandev_sidebar_preferences')").Scan(&count))
 			require.Zero(t, count)
 		})
 	}
@@ -183,6 +183,6 @@ func TestSidebarQueryScratchKeepsReadSnapshotAndReadOnlyMain(t *testing.T) {
 func assertSidebarScratchAbsent(t *testing.T, repo *Repository) {
 	t.Helper()
 	var count int
-	require.NoError(t, repo.ro.GetContext(t.Context(), &count, "SELECT COUNT(*) FROM sqlite_temp_master WHERE name = 'kandev_sidebar_filtered'"))
+	require.NoError(t, repo.ro.GetContext(t.Context(), &count, "SELECT COUNT(*) FROM sqlite_temp_master WHERE name IN ('kandev_sidebar_filtered', 'kandev_sidebar_preferences')"))
 	require.Zero(t, count)
 }

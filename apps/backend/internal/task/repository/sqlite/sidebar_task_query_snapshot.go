@@ -67,7 +67,7 @@ func (s *sidebarQuerySnapshot) prepare(
 
 func (s *sidebarQuerySnapshot) commit(ctx context.Context) error {
 	if s.sqlite {
-		if _, err := s.tx.ExecContext(ctx, "DROP TABLE "+sidebarScratchTable); err != nil {
+		if _, err := s.tx.ExecContext(ctx, "DROP TABLE "+sidebarScratchTable+"; DROP TABLE IF EXISTS "+sidebarPreferenceTable); err != nil {
 			return fmt.Errorf("release sidebar candidates: %w", err)
 		}
 	}
@@ -99,7 +99,7 @@ func (s *sidebarQuerySnapshot) release(cleanupCtx context.Context) {
 	err := s.tx.Rollback()
 	clean := !s.commitFailed && cleanupCtx.Err() == nil && (err == nil || errors.Is(err, sql.ErrTxDone))
 	if s.sqlite && clean {
-		_, err = s.conn.ExecContext(cleanupCtx, "DROP TABLE IF EXISTS "+sidebarScratchTable)
+		_, err = s.conn.ExecContext(cleanupCtx, "DROP TABLE IF EXISTS "+sidebarScratchTable+"; DROP TABLE IF EXISTS "+sidebarPreferenceTable)
 		clean = err == nil && cleanupCtx.Err() == nil
 	}
 	if !clean {

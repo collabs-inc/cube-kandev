@@ -1,7 +1,7 @@
 ---
 id: "02-resource-and-surface-evidence"
 title: "Prove pooled resource bounds and surface compatibility"
-status: pending
+status: in_progress
 wave: 4
 depends_on: ["04-reuse-and-progress"]
 plan: "plan.md"
@@ -158,4 +158,6 @@ Browser tests prove view compatibility, not the cause or absence of a renderer m
 
 ## Results
 
-Pending.
+The CI-only resource job now runs fresh subprocesses for every sort/group/direction case, 100 reads per case at concurrency four, plus an alternating-workspace run. It also covers maximum legal filters, collapse lists, and pin/manual-order preferences. Populated benchmarks cover first, middle, and final pages for Last activity with None, State, and Repository grouping on SQLite and PostgreSQL. Native peak, retained allocation, RSS, elapsed time, cold execution, and Go allocation evidence remain pending CI.
+
+Desktop and phone regression cases now cover State-grouped repeated child activity, complete-store local pagination without sidebar requests, bounded archive ownership, and safe first-response progress during three live invalidations. They execute through the existing E2E CI projects; no local tests or seeded instance were run. Final discovered/passed counts and measurements must be recorded before completion.

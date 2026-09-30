@@ -1,3 +1,4 @@
+import { parseStrictRfc3339Timestamp } from "@/lib/utils/strict-timestamp";
 import { pickFreshestStatusSummary } from "@/lib/task-status-summary";
 import type { TaskOverview, TaskOverviewPatch, TaskOverviewState } from "./task-overview-types";
 
@@ -6,11 +7,9 @@ export function mergeTaskOverview(
   patch: TaskOverviewPatch,
 ): TaskOverview {
   if (current === patch) return current;
-  const stale = Boolean(
-    current?.updatedAt &&
-    patch.updatedAt &&
-    Date.parse(patch.updatedAt) < Date.parse(current.updatedAt),
-  );
+  const before = parseStrictRfc3339Timestamp(current?.updatedAt?.replace(" ", "T"));
+  const incoming = parseStrictRfc3339Timestamp(patch.updatedAt?.replace(" ", "T"));
+  const stale = before !== null && incoming !== null && incoming < before;
   const next = { ...current, ...(stale ? {} : patch) } as TaskOverview;
   next.statusSummary = pickFreshestStatusSummary(patch.statusSummary, current?.statusSummary);
   if (!current) return next;

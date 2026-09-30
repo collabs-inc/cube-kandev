@@ -270,46 +270,62 @@ func BenchmarkSidebarTaskPage100K(b *testing.B) {
 	for _, backend := range []string{"sqlite", "postgres"} {
 		b.Run(backend, func(b *testing.B) {
 			repo := newRepoForSidebarBenchmark(b, backend)
-			ctx := context.Background()
 			workspaceID := "ws-sidebar-benchmark-100k"
 			seedWorkspace(b, repo, workspaceID)
 			insertSidebarBenchmarkTasks(b, repo, workspaceID, 100000)
-
-			pageNames := []struct {
-				name string
-				page int
-			}{{name: "first", page: 1}, {name: "middle", page: 500}, {name: "final", page: 1000}}
-			planQuery := sidebarTaskQuery(pageNames[0].page)
-			logSidebarTaskPageQueryPlan(b, repo, workspaceID, planQuery)
-			for _, page := range pageNames {
-				b.Run(page.name, func(b *testing.B) {
-					query := sidebarTaskQuery(page.page)
-					b.ReportAllocs()
-					warmup, err := repo.QuerySidebarTaskPage(ctx, workspaceID, query, models.SidebarTaskViewPreferences{})
-					if err != nil {
-						b.Fatal(err)
+			for _, group := range []string{"none", "state", "repository"} {
+				b.Run(group, func(b *testing.B) {
+					for _, page := range []struct {
+						name   string
+						number int
+					}{{"first", 1}, {"middle", 500}, {"final", 1000}} {
+						b.Run(page.name, func(b *testing.B) {
+							query := sidebarTaskQuery(page.number)
+							query.Sort = models.SidebarTaskViewSort{Key: "lastActivityAt", Direction: "desc"}
+							query.Group = group
+							benchmarkSidebarPage(b, repo, workspaceID, query)
+						})
 					}
-					if _, err := marshalSidebarBenchmarkResponse(warmup); err != nil {
-						b.Fatal(err)
-					}
-					b.ResetTimer()
-					var responseBytes int
-					for range b.N {
-						result, err := repo.QuerySidebarTaskPage(ctx, workspaceID, query, models.SidebarTaskViewPreferences{})
-						if err != nil {
-							b.Fatal(err)
-						}
-						payload, err := marshalSidebarBenchmarkResponse(result)
-						if err != nil {
-							b.Fatal(err)
-						}
-						responseBytes = len(payload)
-					}
-					b.ReportMetric(float64(responseBytes), "response-B")
 				})
 			}
 		})
 	}
+}
+
+func benchmarkSidebarPage(b *testing.B, repo *Repository, workspaceID string, query models.SidebarTaskViewQuery) {
+	b.Helper()
+	baselineNative, baselineRSS := sidebarBenchmarkMemory(b, true)
+	started := time.Now()
+	warmup, err := repo.QuerySidebarTaskPage(b.Context(), workspaceID, query, models.SidebarTaskViewPreferences{})
+	if err != nil {
+		b.Fatal(err)
+	}
+	cold := time.Since(started)
+	if len(warmup.Tasks) != 100 || warmup.TotalVisibleTasks != 100000 || warmup.Page != query.Page {
+		b.Fatalf("unexpected benchmark page bounds: tasks=%d total=%d page=%d", len(warmup.Tasks), warmup.TotalVisibleTasks, warmup.Page)
+	}
+	b.Logf("cold_execution=%s dialect=%s group=%s page=%d", cold, repo.ro.DriverName(), query.Group, query.Page)
+	b.ReportAllocs()
+	b.ResetTimer()
+	var responseBytes int
+	for range b.N {
+		result, err := repo.QuerySidebarTaskPage(b.Context(), workspaceID, query, models.SidebarTaskViewPreferences{})
+		if err != nil {
+			b.Fatal(err)
+		}
+		payload, err := marshalSidebarBenchmarkResponse(result)
+		if err != nil {
+			b.Fatal(err)
+		}
+		responseBytes = len(payload)
+	}
+	b.StopTimer()
+	peak, rss := sidebarBenchmarkMemory(b, false)
+	b.ReportMetric(float64(responseBytes), "response-B")
+	b.ReportMetric(float64(cold.Nanoseconds()), "cold-ns")
+	b.ReportMetric(float64(peak-baselineNative), "native-peak-B")
+	b.ReportMetric(float64(rss-baselineRSS), "rss-delta-B")
+	logSidebarTaskPageQueryPlan(b, repo, workspaceID, query)
 }
 
 type sidebarBenchmarkEntry struct {
@@ -416,16 +432,15 @@ func insertSidebarBenchmarkTasks(b *testing.B, repo *Repository, workspaceID str
 func logSidebarTaskPageQueryPlan(b *testing.B, repo *Repository, workspaceID string, query models.SidebarTaskViewQuery) {
 	b.Helper()
 	driver := repo.ro.DriverName()
-	baseSQL := sidebarBaseCTE(driver, "'__all__'", "'__all__'", query)
-	filterSQL, filterArgs, err := sidebarFilterSQL(driver, query.Filters)
+	snapshot, err := beginSidebarQuerySnapshot(b.Context(), repo.ro)
 	if err != nil {
 		b.Fatal(err)
 	}
-	baseSQL += ", filtered AS MATERIALIZED (SELECT * FROM candidate WHERE " + filterSQL + ")"
-	baseArgs := append([]any{workspaceID}, filterArgs...)
-	visibleSQL, visibleArgs := sidebarVisibleCTE(query)
-	baseSQL += visibleSQL
-	baseArgs = append(baseArgs, visibleArgs...)
+	defer snapshot.close()
+	baseSQL, baseArgs, err := snapshot.prepare(b.Context(), driver, workspaceID, query)
+	if err != nil {
+		b.Fatal(err)
+	}
 	pageCTEs, cteArgs := sidebarPageCTEs(driver, query, models.SidebarTaskViewPreferences{})
 	args := append(append([]any(nil), baseArgs...), cteArgs...)
 	explain := "EXPLAIN "
@@ -433,7 +448,7 @@ func logSidebarTaskPageQueryPlan(b *testing.B, repo *Repository, workspaceID str
 		explain = "EXPLAIN QUERY PLAN "
 	}
 	pageSQL := sidebarPageSelectSQL(query.Group == "none")
-	rows, err := repo.db.QueryContext(context.Background(), repo.db.Rebind(explain+baseSQL+pageCTEs+pageSQL), args...)
+	rows, err := snapshot.tx.QueryContext(b.Context(), repo.ro.Rebind(explain+baseSQL+pageCTEs+pageSQL), args...)
 	if err != nil {
 		b.Fatalf("explain sidebar benchmark page query: %v", err)
 	}

@@ -19,6 +19,7 @@ import (
 )
 
 const sidebarMemoryChild = "KANDEV_SIDEBAR_MEMORY_CHILD"
+const sidebarMemoryCase = "KANDEV_SIDEBAR_MEMORY_CASE"
 const sidebarMiB = int64(1024 * 1024)
 
 func TestSidebarQueryPreparationMemory(t *testing.T) {
@@ -49,17 +50,50 @@ func TestSidebarQueryPreparationMemory(t *testing.T) {
 
 func TestSidebarQueryPoolMemoryPlateau(t *testing.T) {
 	if os.Getenv(sidebarMemoryChild) == "" {
-		runSidebarMemoryChild(t, "TestSidebarQueryPoolMemoryPlateau", 101)
+		if os.Getenv("KANDEV_SIDEBAR_MEMORY_MATRIX") == "1" {
+			for index, query := range sidebarMemoryQueries() {
+				name := fmt.Sprintf("%s/%s/%s", query.Sort.Key, query.Group, query.Sort.Direction)
+				t.Run(name, func(t *testing.T) {
+					t.Setenv(sidebarMemoryCase, strconv.Itoa(index))
+					runSidebarMemoryChild(t, "TestSidebarQueryPoolMemoryPlateau", 101)
+				})
+			}
+		}
+		t.Run("alternating", func(t *testing.T) {
+			t.Setenv(sidebarMemoryCase, "")
+			runSidebarMemoryChild(t, "TestSidebarQueryPoolMemoryPlateau", 101)
+		})
 		return
 	}
 	repo, _ := sidebarMemoryFixture(t)
 	queries := sidebarMemoryQueries()
+	if selected := os.Getenv(sidebarMemoryCase); selected != "" {
+		index, err := strconv.Atoi(selected)
+		if err != nil {
+			t.Fatal(err)
+		}
+		queries = queries[index : index+1]
+	}
 	// Warm every shape before retained-allocation measurements, on the production pool.
 	for _, query := range queries {
 		if _, err := repo.QuerySidebarTaskPage(t.Context(), "memory-a", query, models.SidebarTaskViewPreferences{}); err != nil {
 			t.Fatal(err)
 		}
 	}
+	// Warm all readers concurrently before measuring retained pool allocation.
+	var warm sync.WaitGroup
+	for range 4 {
+		warm.Go(func() {
+			if _, err := repo.QuerySidebarTaskPage(t.Context(), "memory-a", queries[0], models.SidebarTaskViewPreferences{}); err != nil {
+				t.Error(err)
+			}
+		})
+	}
+	warm.Wait()
+	if t.Failed() {
+		return
+	}
+	started := time.Now()
 	baseline, baselineRSS := sqlitememory.Used(), sidebarProcessRSS(t)
 	sqlitememory.Peak(true)
 	for start := 0; start < 100; start += 4 {
@@ -68,7 +102,7 @@ func TestSidebarQueryPoolMemoryPlateau(t *testing.T) {
 		for index := start; index < start+4; index++ {
 			wg.Go(func() {
 				workspaceID := "memory-a"
-				if index%2 == 1 {
+				if len(queries) > 1 && index%2 == 1 {
 					workspaceID = "memory-b"
 				}
 				query := queries[index%len(queries)]
@@ -95,7 +129,7 @@ func TestSidebarQueryPoolMemoryPlateau(t *testing.T) {
 			}
 		}
 		peak, retained, rss := sqlitememory.Peak(false)-baseline, sqlitememory.Used()-baseline, sidebarProcessRSS(t)-baselineRSS
-		t.Logf("reads=%d concurrency=4 native_peak_delta_bytes=%d retained_delta_bytes=%d rss_delta_bytes=%d", start+4, peak, retained, rss)
+		t.Logf("case=%s reads=%d concurrency=4 native_peak_delta_bytes=%d retained_delta_bytes=%d rss_delta_bytes=%d elapsed=%s", os.Getenv(sidebarMemoryCase), start+4, peak, retained, rss, time.Since(started))
 		if peak > 256*sidebarMiB || retained > 8*sidebarMiB || rss > 512*sidebarMiB {
 			t.Fatalf("pooled memory budget exceeded: native_peak=%d retained=%d rss=%d bytes", peak, retained, rss)
 		}
@@ -163,7 +197,7 @@ func sidebarMemoryQueries() []models.SidebarTaskViewQuery {
 	return queries
 }
 
-func sidebarProcessRSS(t *testing.T) int64 {
+func sidebarProcessRSS(t testing.TB) int64 {
 	t.Helper()
 	data, err := os.ReadFile("/proc/self/statm")
 	if err != nil {

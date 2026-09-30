@@ -23,7 +23,8 @@ export function localSidebarQueues(tasks: LocalSidebarTask[]) {
     queue.sort(
       ({ overview: a }, { overview: b }) =>
         a.position - b.position ||
-        (priority[a.priority ?? "none"] ?? 4) - (priority[b.priority ?? "none"] ?? 4) ||
+        (priority[(a.priority ?? "none").toLowerCase()] ?? 4) -
+          (priority[(b.priority ?? "none").toLowerCase()] ?? 4) ||
         sqliteBinary(a.queuedAt ?? a.createdAt ?? "", b.queuedAt ?? b.createdAt ?? "") ||
         sqliteBinary(a.createdAt ?? "", b.createdAt ?? "") ||
         sqliteBinary(a.id, b.id),

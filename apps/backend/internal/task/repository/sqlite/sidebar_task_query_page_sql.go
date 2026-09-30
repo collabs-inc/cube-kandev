@@ -246,8 +246,8 @@ func sidebarPageBuildContextFor(driver string, query models.SidebarTaskViewQuery
 
 	sortExpr, sortArgs := sidebarSortExpression(driver, query.Sort.Key, query.Sort.Direction, prefs.OrderedTaskIDs)
 	groupOrder := sidebarGroupOrderExpression(query.Group)
-	pinExpr, pinArgs := sidebarIDOrder(prefs.PinnedTaskIDs)
-	subtaskExpr, subtaskArgs := sidebarSubtaskOrder(prefs.SubtaskOrderByParentID)
+	pinExpr, pinArgs := sidebarIDOrder(driver, prefs.PinnedTaskIDs)
+	subtaskExpr, subtaskArgs := sidebarSubtaskOrder(driver, prefs.SubtaskOrderByParentID)
 	cycleProbeGuard := `instr(cycle_probe.visited, '/' || parent.id || '/') = 0`
 	activityCycleGuard := `instr(activity_walk.visited, '/' || parent.id || '/') = 0`
 	stateCycleGuard := `instr(state_walk.visited, '/' || parent.id || '/') = 0`
@@ -388,8 +388,16 @@ func sidebarGroupOrderExpression(group string) string {
 	}
 }
 
-func sidebarSubtaskOrder(orders map[string][]string) (string, []any) {
+func sidebarSubtaskOrder(driver string, orders map[string][]string) (string, []any) {
 	if len(orders) == 0 {
+		return sidebarSQLNull, nil
+	}
+	if !dialect.IsPostgres(driver) {
+		for _, ids := range orders {
+			if len(ids) > 0 {
+				return sidebarPreferenceOrder("child", "v.parent_id"), nil
+			}
+		}
 		return sidebarSQLNull, nil
 	}
 	parents := make([]string, 0, len(orders))
@@ -435,6 +443,9 @@ func sidebarSortExpression(driver, key, direction string, orderIDs []string) (st
 		if len(orderIDs) == 0 {
 			return "v.created_at DESC", nil
 		}
+		if !dialect.IsPostgres(driver) {
+			return sqliteSidebarIDOrder("ordered", len(orderIDs)) + " ASC, v.created_at DESC", nil
+		}
 		cases := make([]string, 0, len(orderIDs))
 		args := make([]any, 0, len(orderIDs)*2)
 		for index, id := range orderIDs {
@@ -447,9 +458,12 @@ func sidebarSortExpression(driver, key, direction string, orderIDs []string) (st
 	}
 }
 
-func sidebarIDOrder(ids []string) (string, []any) {
+func sidebarIDOrder(driver string, ids []string) (string, []any) {
 	if len(ids) == 0 {
 		return "CASE WHEN 1=1 THEN 0 ELSE 0 END", nil
+	}
+	if !dialect.IsPostgres(driver) {
+		return sqliteSidebarIDOrder("pinned", len(ids)), nil
 	}
 	cases := make([]string, 0, len(ids))
 	args := make([]any, 0, len(ids)*2)

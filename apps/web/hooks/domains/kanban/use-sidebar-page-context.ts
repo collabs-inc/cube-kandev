@@ -69,6 +69,12 @@ export function useSidebarPageContext(workspaceId: string | null) {
   const revision = useAppStore(
     (state) => state.sidebarArchivedTasks?.revisionByWorkspaceId?.[workspaceId ?? ""] ?? 0,
   );
+  const accessDenied = useAppStore(
+    (state) =>
+      state.workspaceContextRead?.snapshotError === "access_denied" ||
+      Object.values(state.workspaceContextRead?.errors ?? {}).includes("access_denied") ||
+      Boolean(state.auth && state.auth.mode !== "disabled" && !state.auth.authenticated),
+  );
   const prefs = useSidebarTaskPrefs();
   const locale = normalizeLocale(i18n.resolvedLanguage ?? i18n.language);
   const queryView = useMemo(
@@ -82,5 +88,5 @@ export function useSidebarPageContext(workspaceId: string | null) {
     queryView,
     prefs,
   );
-  return { view, workspaceGeneration, revision, queryView, viewKey, prefs };
+  return { view, workspaceGeneration, revision, queryView, viewKey, prefs, accessDenied };
 }

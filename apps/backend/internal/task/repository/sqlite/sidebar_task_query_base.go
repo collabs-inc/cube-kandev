@@ -192,7 +192,7 @@ func sidebarWatchField(driver, metadataKey, alias string) string {
 func sidebarActivitySortKey(driver, value string) string {
 	if dialect.IsPostgres(driver) {
 		validRFC3339 := `^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])([T]([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]([.][0-9]{1,9}){0,1}(Z|([+-]([01][0-9]|2[0-3]):[0-5][0-9]))| ([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]([.][0-9]{1,9}){0,1}(Z|([+-]([01][0-9]|2[0-3])(:[0-5][0-9]){0,1})))$`
-		utcSecond := `TO_CHAR(DATE_TRUNC('second', CAST((` + value + `) AS TIMESTAMPTZ)) AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS')`
+		utcSecond := `TO_CHAR(CAST(REGEXP_REPLACE((` + value + `), '[.][0-9]+', '') AS TIMESTAMPTZ) AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS')`
 		fraction := `RPAD(COALESCE(SUBSTRING((` + value + `) FROM '[.]([0-9]{1,9})'), ''), 9, '0')`
 		year := `CAST(SUBSTRING((` + value + `), 1, 4) AS INTEGER)`
 		month := `CAST(SUBSTRING((` + value + `), 6, 2) AS INTEGER)`
@@ -213,7 +213,9 @@ func sidebarActivitySortKey(driver, value string) string {
 	normalizedFraction := `SUBSTR((` + fraction + `) || '000000000', 1, 9)`
 	zoneStart := `CASE WHEN INSTR((` + value + `), '.') > 0 THEN INSTR((` + value + `), '.') + LENGTH(` + fraction + `) + 1 ELSE 20 END`
 	zone := `SUBSTR((` + value + `), ` + zoneStart + `)`
-	utcSecond := `STRFTIME('%Y-%m-%dT%H:%M:%S', (` + value + `))`
+	// Normalize the whole second separately so SQLite's millisecond rounding cannot carry a nanosecond fraction.
+	normalizedZone := `CASE WHEN LENGTH(` + zone + `) = 3 THEN ` + zone + ` || ':00' ELSE ` + zone + ` END`
+	utcSecond := `STRFTIME('%Y-%m-%dT%H:%M:%S', SUBSTR((` + value + `), 1, 19) || (` + normalizedZone + `))`
 	validCalendarDate := `DATE(SUBSTR((` + value + `), 1, 10), '+0 days') = SUBSTR((` + value + `), 1, 10)`
 	validClock := `SUBSTR((` + value + `), 1, 4) GLOB '[0-9][0-9][0-9][0-9]'
 		AND SUBSTR((` + value + `), 6, 2) BETWEEN '01' AND '12'

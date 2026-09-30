@@ -3,6 +3,7 @@ import { createAppStore } from "../store";
 import { toKanbanTask } from "@/lib/kanban/map-task";
 import { coveredTaskOverviews } from "./task-overview-coverage";
 import { DEFAULT_VIEW } from "./ui/sidebar-view-builtins";
+import type { FilterClause } from "./ui/sidebar-view-types";
 import type { TaskCoverage } from "@/lib/types/http";
 import { defaultKanbanState } from "./kanban/kanban-slice";
 
@@ -13,6 +14,8 @@ function fixture(total = 1) {
     workflow_id: "workflow",
     workflow_step_id: "step",
     title: "Task",
+    created_at: "2026-09-29T00:00:00Z",
+    updated_at: "2026-09-29T00:00:00Z",
   });
   const store = createAppStore({
     workspaces: { activeId: "workspace", items: [] },
@@ -105,12 +108,13 @@ describe("authoritative overview coverage", () => {
   });
   it("keeps archives on the server path for every boolean filter spelling", () => {
     const state = fixture().getState();
-    for (const filter of [
+    const filters: Array<Pick<FilterClause, "op" | "value">> = [
       { op: "is", value: true },
       { op: "is_not", value: false },
       { op: "in", value: ["true", "false"] },
       { op: "not_in", value: ["false"] },
-    ] as const) {
+    ];
+    for (const filter of filters) {
       expect(
         coveredTaskOverviews(state, "workspace", {
           ...DEFAULT_VIEW,
@@ -119,7 +123,7 @@ describe("authoritative overview coverage", () => {
               id: "archive",
               dimension: "archived",
               op: filter.op,
-              value: Array.isArray(filter.value) ? [...filter.value] : filter.value,
+              value: filter.value,
             },
           ],
         }),

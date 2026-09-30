@@ -92,7 +92,7 @@ Tasks [View v] [Filters]         +--------------------------+
 Parent task                     | Tasks [View v] [Filters]  |
   Child task                    | Parent task              |
 Other task                      |   Child task             |
-Updating tasks... (if stale)     | Other task               |
+                                | Other task               |
 [Previous] 1/2 [Next]            | [Previous] 1/2 [Next]     |
                                 +--------------------------+
 ```

@@ -1,3 +1,7 @@
+import { matchesSidebarClause } from "@/lib/sidebar/sidebar-local-filter";
+import { sidebarCandidate } from "@/lib/sidebar/sidebar-local-projection";
+import type { SidebarTaskQuery } from "@/lib/types/http";
+import type { TaskOverview } from "@/lib/state/slices/task-overview-types";
 import { useMemo, useRef } from "react";
 import { useAppStore } from "@/components/state-provider";
 import { useSidebarTaskPage } from "@/hooks/domains/kanban/use-sidebar-task-page";
@@ -156,11 +160,12 @@ function projectSidebarTasks(
   entries: NonNullable<ReturnType<typeof useSidebarTaskPage>["response"]>["entries"],
   byId: AppState["taskOverview"]["byId"],
   summaries: Record<string, TaskStatusSummary>,
+  filters: SidebarTaskQuery["filters"],
 ) {
   return entries.flatMap((entry): SidebarTask[] => {
     if (entry.kind !== "task") return [];
     const task = byId[entry.task_id ?? ""] ?? (entry.task ? toKanbanTask(entry.task) : undefined);
-    if (!task) return [];
+    if (!task || !eligibleArchiveMembership(task, filters)) return [];
     return [
       {
         ...task,
@@ -169,6 +174,14 @@ function projectSidebarTasks(
       },
     ];
   });
+}
+
+function eligibleArchiveMembership(task: TaskOverview, filters: SidebarTaskQuery["filters"]) {
+  if (!sidebarCandidate(task)) return false;
+  const clauses = filters.filter((clause) => clause.dimension === "archived");
+  return clauses.length
+    ? clauses.every((clause) => matchesSidebarClause(String(task.isArchived === true), clause))
+    : !task.isArchived;
 }
 
 function useWorkspaceWorkflowMetadata(workspaceId: string | null) {
@@ -253,8 +266,8 @@ export function useWorkspaceSidebarTasks(workspaceId: string | null): WorkspaceS
     }),
   );
   const nextPageTasks = useMemo(
-    () => projectSidebarTasks(pageEntries, byId, statusSummaryByTaskId),
-    [pageEntries, statusSummaryByTaskId, byId],
+    () => projectSidebarTasks(pageEntries, byId, statusSummaryByTaskId, page.view.filters),
+    [pageEntries, statusSummaryByTaskId, byId, page.view.filters],
   );
   const previousTasksRef = useRef<SidebarTask[]>([]);
   const allTasks = useMemo(() => {

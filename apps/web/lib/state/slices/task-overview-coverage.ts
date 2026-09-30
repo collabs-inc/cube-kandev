@@ -100,7 +100,9 @@ function coveredTask(
     task.workflowId === workflowId &&
     (!task.workspaceId || task.workspaceId === workspaceId) &&
     !task.isArchived &&
-    fields.every((field) => Object.hasOwn(task, field))
+    fields.every((field) => Object.hasOwn(task, field)) &&
+    typeof task.createdAt === "string" &&
+    typeof task.updatedAt === "string"
   );
 }
 

@@ -107,8 +107,21 @@ function collectBoardOwners(
     )
       delete overview.owners[owner];
   }
+  pruneBoardOwners(next, overview);
   const activeId = next.tasks.activeTaskId;
   overview.owners.detail = activeId && overview.byId[activeId] ? [activeId] : [];
+}
+
+function pruneBoardOwners(next: AppState, overview: TaskOverviewState) {
+  for (const [owner, workflowId] of [
+    ["board", next.kanban.workflowId],
+    ...Object.keys(next.kanbanMulti.snapshots).map((id) => [`workflow:${id}`, id]),
+  ] as Array<[string, string | null]>) {
+    overview.owners[owner] = (overview.owners[owner] ?? []).filter((id) => {
+      const task = overview.byId[id];
+      return task && !task.isArchived && (!workflowId || task.workflowId === workflowId);
+    });
+  }
 }
 
 function releaseUnownedRecords(overview: TaskOverviewState) {
@@ -118,10 +131,20 @@ function releaseUnownedRecords(overview: TaskOverviewState) {
   }
 }
 
-function canonicalTasks(tasks: TaskOverview[], overview: TaskOverviewState): TaskOverview[] {
+function canonicalTasks(
+  tasks: TaskOverview[],
+  overview: TaskOverviewState,
+  activeWorkflow?: string | null,
+): TaskOverview[] {
   let changed = false;
   const result = tasks.flatMap((task) => {
-    const canonical = overview.byId[task.id];
+    const record = overview.byId[task.id];
+    const canonical =
+      record &&
+      (activeWorkflow === undefined ||
+        (!record.isArchived && (!activeWorkflow || record.workflowId === activeWorkflow)))
+        ? record
+        : undefined;
     if (canonical !== task) changed = true;
     return canonical ? [canonical] : [];
   });
@@ -133,7 +156,7 @@ function projectSnapshot<T extends KanbanState | WorkflowSnapshotData>(
   overview: TaskOverviewState,
   previous?: T,
 ): T {
-  const tasks = canonicalTasks(snapshot.tasks, overview);
+  const tasks = canonicalTasks(snapshot.tasks, overview, snapshot.workflowId);
   const taskIds = tasks.map((task) => task.id);
   const sameIds =
     snapshot.taskIds?.length === taskIds.length &&

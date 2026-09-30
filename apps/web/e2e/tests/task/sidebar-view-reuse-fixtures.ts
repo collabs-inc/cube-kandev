@@ -60,6 +60,7 @@ async function seedViews(api: ApiClient, seed: SeedData, directories: string[]) 
   });
   await api.updateTaskState(current.id, "COMPLETED");
   await api.archiveTask(current.id);
+  await Promise.all([...taskIds, other.id].map((id) => api.archiveTask(id)));
   const views = [
     {
       id: "reuse-a",
@@ -73,6 +74,7 @@ async function seedViews(api: ApiClient, seed: SeedData, directories: string[]) 
     },
   ].map((view) => ({
     ...view,
+    filters: [...view.filters, { id: "archive", dimension: "archived", op: "is", value: true }],
     sort: { key: "updatedAt", direction: "desc" },
     group: "none",
     collapsed_groups: [],
@@ -184,7 +186,7 @@ async function verifySidebarViewReuse(
   }
 
   const invalidated = waitForHttp(page, "POST", /\/sidebar\/query$/);
-  await api.archiveTask(taskIds[0]);
+  await api.unarchiveTask(taskIds[0]);
   await invalidated;
   await expect(surface.locator(`[data-task-row-id="${taskIds[0]}"]`)).toHaveCount(0);
   await filters.selectViewByName("Other");

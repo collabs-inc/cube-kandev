@@ -191,12 +191,12 @@ Do not borrow the writer connection or weaken its read-only main-database contra
 2. Execute `CREATE TEMP TABLE kandev_sidebar_filtered AS` followed by candidate and filter evaluation.
    Populate only the columns already selected by `sidebarBaseCandidateFields`, plus group keys and labels.
    Evaluate the existing activity expression here without changing its precision or fallback rules.
-3. Add temporary indexes on task ID and parent ID for the recursive joins.
+3. Add temporary indexes on task ID and parent ID for the recursive joins. Stage nonempty pin/manual-order preferences in `temp.kandev_sidebar_preferences`, keyed by kind, parent ID, and task ID; parameterize the input as JSON and retain the first position for duplicate IDs. Indexed lookups keep statement size independent of saved-list length.
 4. Build the downstream query from a narrow `filtered` CTE over `temp.kandev_sidebar_filtered`.
    Apply collapse, cycle handling, tree aggregation, ranking, counts, and page selection as before.
 5. Use the same relation for empty-page counts and collapsed-group headers.
    Hydrate only the selected task IDs, within the same transaction.
-6. Drop the scratch table before a successful commit, then return the connection.
+6. Drop both owned scratch tables before a successful commit, then return the connection.
 
 Split `sidebarTaskBaseSQL` into candidate/filter construction and visibility construction.
 Keep stage arguments separate: workspace and filter arguments populate the relation.

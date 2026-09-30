@@ -19,7 +19,10 @@ export function applyTaskOverviewEvent(state: AppState, payload: TaskEventPayloa
       Object.assign(patch, { [key]: task[key] });
     }
   }
-  return { ...state, taskOverview: recordTaskOverviewChange(state.taskOverview, id, patch) };
+  return {
+    ...invalidateUnknownWorkflow(state, payload),
+    taskOverview: recordTaskOverviewChange(state.taskOverview, id, patch),
+  };
 }
 
 export function applyTaskOverviewPatch(
@@ -31,4 +34,30 @@ export function applyTaskOverviewPatch(
   if (!state.taskOverview) return state;
   if (workspaceId && workspaceId !== state.workspaces.activeId) return state;
   return { ...state, taskOverview: recordTaskOverviewChange(state.taskOverview, id, patch) };
+}
+
+function invalidateUnknownWorkflow(state: AppState, payload: TaskEventPayload): AppState {
+  const coverage = state.workflows.taskWorkflowCoverage;
+  if (
+    !coverage?.complete ||
+    !Object.hasOwn(payload, "workflow_id") ||
+    coverage.workflow_ids.includes(payload.workflow_id ?? "")
+  )
+    return state;
+  const workflowId = payload.workflow_id ?? "";
+  const snapshot = state.kanbanMulti.snapshots[workflowId];
+  const covered =
+    snapshot?.taskCoverage?.complete &&
+    snapshot.taskCoverage.workspace_id === coverage.workspace_id;
+  return {
+    ...state,
+    workflows: {
+      ...state.workflows,
+      taskWorkflowCoverage: {
+        ...coverage,
+        complete: Boolean(covered),
+        workflow_ids: covered ? [...coverage.workflow_ids, workflowId] : coverage.workflow_ids,
+      },
+    },
+  };
 }
