@@ -156,7 +156,7 @@ func sidebarTaskBaseSQL(driver, workspaceID string, query models.SidebarTaskView
 	if err != nil {
 		return "", nil, err
 	}
-	visibleSQL, visibleArgs := sidebarVisibleCTE(query)
+	visibleSQL, visibleArgs := sidebarVisibleCTE(driver, query)
 	return baseSQL + visibleSQL, append(baseArgs, visibleArgs...), nil
 }
 
@@ -231,8 +231,9 @@ func querySidebarGroupHeaders(
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)
-	args := append(append([]any(nil), cteArgs...), stringSliceToAny(keys)...)
-	query := queryCTEs + sidebarGroupHeaderSelectSQL(keys)
+	keysSQL, keysArgs := sidebarStringListSQL(repo.ro.DriverName(), keys)
+	args := append(append([]any(nil), cteArgs...), keysArgs...)
+	query := queryCTEs + sidebarGroupHeaderSelectSQL(keysSQL)
 	rows, err := tx.QueryContext(ctx, repo.ro.Rebind(query), args...)
 	if err != nil {
 		return nil, fmt.Errorf("query sidebar task groups: %w", err)

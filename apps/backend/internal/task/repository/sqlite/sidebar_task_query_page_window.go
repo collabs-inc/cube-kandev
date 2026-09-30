@@ -21,17 +21,16 @@ func sidebarRootMembershipCTEs() string {
 	)`
 }
 
-func sidebarRootWindowCTEs(query models.SidebarTaskViewQuery, treeRootSQL string, page *sidebarPageBuildContext) string {
+func sidebarRootWindowCTEs(driver string, query models.SidebarTaskViewQuery, treeRootSQL string, page *sidebarPageBuildContext) string {
 	visible := ""
 	if len(query.CollapsedTaskIDs) > 0 {
 		visible = ` WHERE id NOT IN (SELECT id FROM hidden_tasks)`
 	}
 	groups := ""
 	if len(query.CollapsedGroupKeys) > 0 {
-		groups = ` AND root.root_group_key NOT IN (` + placeholders(len(query.CollapsedGroupKeys)) + `)`
-		for _, key := range query.CollapsedGroupKeys {
-			page.args = append(page.args, key)
-		}
+		groupsSQL, groupsArgs := sidebarStringListSQL(driver, query.CollapsedGroupKeys)
+		groups = ` AND root.root_group_key NOT IN (` + groupsSQL + `)`
+		page.args = append(page.args, groupsArgs...)
 	}
 	// Counts use the complete forest; only intersecting trees need child ordering.
 	return `, root_visible_counts AS (

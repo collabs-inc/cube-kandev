@@ -268,16 +268,13 @@ func sidebarGroupExpressions(group string) (string, string) {
 	}
 }
 
-func sidebarVisibleCTE(query models.SidebarTaskViewQuery) (string, []any) {
+func sidebarVisibleCTE(driver string, query models.SidebarTaskViewQuery) (string, []any) {
 	var ctes []string
 	var args []any
 	if len(query.CollapsedTaskIDs) > 0 {
-		roots := make([]string, len(query.CollapsedTaskIDs))
-		for i, id := range query.CollapsedTaskIDs {
-			roots[i] = "(?)"
-			args = append(args, id)
-		}
-		ctes = append(ctes, "collapsed_requested(id) AS (VALUES "+strings.Join(roots, ", ")+")")
+		requestedSQL, requestedArgs := sidebarStringListSQL(driver, query.CollapsedTaskIDs)
+		args = append(args, requestedArgs...)
+		ctes = append(ctes, "collapsed_requested(id) AS ("+requestedSQL+")")
 		ctes = append(ctes, `collapsed_roots(id) AS (
 			SELECT filtered.id FROM filtered JOIN collapsed_requested requested ON requested.id = filtered.id
 		)`)
@@ -452,12 +449,12 @@ func sidebarPageSelectSQL(groupNone bool) string {
 	ORDER BY tree.group_order ASC, tree.order_path ASC`
 }
 
-func sidebarGroupHeaderSelectSQL(groupKeys []string) string {
+func sidebarGroupHeaderSelectSQL(groupKeysSQL string) string {
 	return ` SELECT groups.group_key, groups.group_label, COALESCE(counts.task_count, 0)
 	FROM ordered_groups groups
 	LEFT JOIN group_task_counts counts ON counts.group_key = groups.group_key
 		AND counts.group_label = groups.group_label
-	WHERE groups.group_key IN (` + placeholders(len(groupKeys)) + `)
+	WHERE groups.group_key IN (` + groupKeysSQL + `)
 	ORDER BY groups.group_order ASC`
 }
 

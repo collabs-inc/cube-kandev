@@ -13,7 +13,7 @@ func sidebarPageCTEs(driver string, query models.SidebarTaskViewQuery, prefs mod
 	page := sidebarPageBuildContextFor(driver, query, prefs)
 	groupCTEs, treeRootSQL := sidebarPageGroupExpressions(query, page)
 	ctes := sidebarPageTreeCTEs(page) + groupCTEs
-	ctes += sidebarRootWindowCTEs(query, treeRootSQL, &page)
+	ctes += sidebarRootWindowCTEs(driver, query, treeRootSQL, &page)
 	page.args = append(page.args, query.PageSize, query.Page)
 	ctes += sidebarSelectedTreeCTEs(query, page)
 	page.args = append(page.args, page.childArgs...)

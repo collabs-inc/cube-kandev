@@ -72,7 +72,7 @@ func (s *sidebarQuerySnapshot) prepare(
 	if err := s.checkpoint("indexed"); err != nil {
 		return "", nil, err
 	}
-	visibleSQL, visibleArgs := sidebarVisibleCTE(query)
+	visibleSQL, visibleArgs := sidebarVisibleCTE(driverName, query)
 	return "WITH RECURSIVE filtered AS NOT MATERIALIZED (SELECT * FROM " + sidebarScratchTable + ")" + visibleSQL, visibleArgs, nil
 }
 

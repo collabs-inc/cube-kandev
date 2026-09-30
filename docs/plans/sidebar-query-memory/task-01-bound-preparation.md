@@ -137,5 +137,13 @@ reads, stage failures, cancellation, cleanup expiry, snapshot consistency, and w
 isolation. Tests are authored for CI and have not run locally, per the user.
 Scratch preparation now adds a unique ID index and analyzes only the temporary
 candidate relation. Cleanup regressions check that its statistics retain no rows
-for the next borrower. The main reader remains read-only. Current CI results and
-the remaining maximum-input/benchmark matrix are pending.
+for the next borrower. The main reader remains read-only.
+
+CI on the earlier delivery head exposed a 75,247,976-byte native peak for the
+maximum collapsed-input case in the PostgreSQL job, backend shard 1, and isolated
+memory job. The existing maximum-input regression supplies the failing evidence.
+Collapse IDs, collapsed group exclusions, and collapsed header requests now bind
+JSON string arrays through SQLite/PostgreSQL set expansion instead of expanding
+thousands of SQL parameters. Cross-engine coverage preserves duplicate/missing
+membership, quoted IDs, counts, headers, and page clamping. CI verification of
+this correction and the remaining maximum-input/benchmark matrix is pending.
