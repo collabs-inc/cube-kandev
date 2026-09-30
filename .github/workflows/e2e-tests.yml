@@ -10,13 +10,25 @@ permissions:
 
 jobs:
   isolated-projects:
-    name: Isolated E2E (${{ matrix.project }})
+    name: Isolated E2E (${{ matrix.label }})
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     strategy:
       fail-fast: false
       matrix:
-        project: [auth, routing]
+        include:
+          - label: auth
+            project: auth
+            specs: ""
+          - label: routing
+            project: routing
+            specs: ""
+          - label: desktop-remediation
+            project: chromium
+            specs: e2e/tests/automations-pr-merged-trigger.spec.ts e2e/tests/panel-toolbars.spec.ts e2e/tests/plugins/managed-task-commands.spec.ts e2e/tests/pr/pr-detection.spec.ts e2e/tests/review/review-file-comments.spec.ts e2e/tests/review/review-fix-comments-popover.spec.ts
+          - label: phone-remediation
+            project: mobile-chrome
+            specs: e2e/tests/mobile-panel-toolbars.spec.ts e2e/tests/review/mobile-review-file-comments.spec.ts e2e/tests/review/mobile-review-fix-comments-popover.spec.ts
     container: ghcr.io/kdlbs/kandev-ci:build-latest
     env:
       COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
@@ -27,7 +39,7 @@ jobs:
       - name: Check out PR source
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
-          ref: 98cf3494251dc6ed4775c3545b89f33360abf2e8
+          ref: 48cca0ed561b2654e7851d50fcab8082ab199360
           persist-credentials: false
       - name: Record tested revision
         run: |
@@ -38,12 +50,16 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Build and test isolated project
         working-directory: apps/web
-        run: pnpm e2e:run --host --project "${{ matrix.project }}" -- --retries=0
+        env:
+          REMEDIATION_SPECS: ${{ matrix.specs }}
+        run: pnpm e2e:run --host --project "${{ matrix.project }}" -- --retries=0 --reporter=list,blob $REMEDIATION_SPECS
       - name: Preserve test artifacts
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: pr-4088-isolated-${{ matrix.project }}
-          path: apps/web/e2e/test-results/
+          name: pr-4088-isolated-${{ matrix.label }}
+          path: |
+            apps/web/e2e/test-results/
+            apps/web/blob-report/
           if-no-files-found: ignore
           retention-days: 7
