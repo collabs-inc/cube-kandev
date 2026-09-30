@@ -1,4 +1,5 @@
 import { test } from "../../fixtures/test-base";
+import { exerciseSharedContextRecovery } from "./sidebar-shared-context-fixtures";
 import {
   exerciseSharedPaging,
   exerciseSharedFirstResponse,
@@ -19,4 +20,13 @@ test("phone accepts safe first rows during three live invalidations", async ({
 }) => {
   test.setTimeout(120_000);
   await exerciseSharedFirstResponse(testPage, apiClient, seedData, true);
+});
+
+test("phone rejects old workspace pages and recovers shared coverage after reconnect", async ({
+  testPage,
+  apiClient,
+  seedData,
+}) => {
+  test.setTimeout(120_000);
+  await exerciseSharedContextRecovery(testPage, apiClient, seedData, true);
 });

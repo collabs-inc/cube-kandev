@@ -79,6 +79,7 @@ function useWorkflowsFetchEffect(
   trackRecovery: boolean,
   retryVersion: number,
 ) {
+  const connectionStatus = useAppStore((state) => state.connection.status);
   useEffect(() => {
     if (!enabled || !workspaceId) return;
     let cancelled = false;
@@ -188,6 +189,7 @@ function useWorkflowsFetchEffect(
     store,
     trackRecovery,
     workspaceId,
+    connectionStatus,
   ]);
 }
 

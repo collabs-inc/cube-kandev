@@ -1,9 +1,12 @@
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Task, SidebarTaskPageResponse } from "@/lib/types/http";
+import type { TaskOverview } from "@/lib/state/slices/task-overview-types";
+import { toKanbanTask } from "@/lib/kanban/map-task";
 
 const mocks = vi.hoisted(() => ({
   state: {
+    taskOverview: { byId: {} as Record<string, TaskOverview> },
     taskRemoval: {
       pendingTokenByTaskId: {} as Record<string, string>,
       operationsByToken: {} as Record<string, unknown>,
@@ -38,7 +41,7 @@ vi.mock("@/hooks/domains/kanban/use-sidebar-store-tasks", () => ({
 vi.mock("@/hooks/domains/kanban/use-sidebar-task-page", () => ({
   useSidebarTaskPage: () => ({
     ...mocks.page,
-    view: { id: "view-1", group: "none" },
+    view: { id: "view-1", group: "none", filters: [] },
   }),
 }));
 
@@ -62,6 +65,9 @@ function task(id: string, overrides: Partial<Task> = {}): Task {
 }
 
 function setPageTasks(tasks: Task[]) {
+  mocks.state.taskOverview.byId = Object.fromEntries(
+    tasks.map((item) => [item.id, toKanbanTask(item)]),
+  );
   mocks.page.response = {
     query_key: "query-1",
     page: 1,
@@ -73,13 +79,14 @@ function setPageTasks(tasks: Task[]) {
     has_next: false,
     entries: [
       { kind: "group", group_key: "__all__", group_label: "__all__" },
-      ...tasks.map((item) => ({ kind: "task" as const, task_id: item.id, task: item })),
+      ...tasks.map((item) => ({ kind: "task" as const, task_id: item.id })),
     ],
   };
 }
 
 describe("useWorkspaceSidebarTasks", () => {
   beforeEach(() => {
+    mocks.state.taskOverview.byId = {};
     mocks.state.taskRemoval = { pendingTokenByTaskId: {}, operationsByToken: {} };
     mocks.state.kanbanMulti = { snapshots: {} };
     mocks.state.sidebarStatusSummaryByWorkspaceId = {};
@@ -153,6 +160,7 @@ describe("useWorkspaceSidebarTasks", () => {
 
   it("uses queue position computed across tasks outside the current view page", () => {
     const queuedTask = task("queued-filtered", { queued_for_step_id: "step-1" });
+    mocks.state.taskOverview.byId[queuedTask.id] = toKanbanTask(queuedTask);
     mocks.page.response = {
       query_key: "query-wip",
       page: 1,
@@ -167,7 +175,6 @@ describe("useWorkspaceSidebarTasks", () => {
         {
           kind: "task",
           task_id: queuedTask.id,
-          task: queuedTask,
           workflow_step_name: "Start",
           wip_queue_position: 3,
           wip_queue_total: 3,
@@ -183,4 +190,16 @@ describe("useWorkspaceSidebarTasks", () => {
       destinationTitle: "Start",
     });
   });
+});
+
+it("hides a known archive immediately while the server replacement remains pending", () => {
+  setPageTasks([task("changed"), task("retained")]);
+  const { result, rerender } = renderHook(() => useWorkspaceSidebarTasks("ws-1"));
+  expect(result.current.allTasks.map((item) => item.id)).toEqual(["changed", "retained"]);
+  mocks.state.taskOverview.byId = {
+    ...mocks.state.taskOverview.byId,
+    changed: { ...mocks.state.taskOverview.byId.changed, isArchived: true },
+  };
+  rerender();
+  expect(result.current.allTasks.map((item) => item.id)).toEqual(["retained"]);
 });

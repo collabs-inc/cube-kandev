@@ -157,4 +157,10 @@ In-progress response reconciliation cannot reconstruct unseen rows or exact fres
 
 ## Results
 
-Implementation and regression cases are in progress. The user requires CI-only test execution; no local test or benchmark has been run. Full conformance and combined surface evidence remain required before completion.
+Complete eligible active scopes now render and paginate from canonical Zustand records. This includes resident collections above 100 tasks. The covered path has no sidebar request, loading state, or updating announcement. Uncovered archive/incomplete/PostgreSQL scopes keep bounded server paging and share accepted canonical records.
+
+The local evaluator and actual SQLite queries consume `repository/testdata/sidebar-local-conformance.json`: all 72 sort/group/direction pairs plus filter operators/dimensions, Unicode and ASCII ordering, nanosecond activity, stable ties, tree promotion/cycles/collapse, continuations, repository combinations, and WIP ordering. Existing local boundary/deep-tree tests cover 0/100/101 tasks and a 2,000-node chain.
+
+The page controller accepts safe first responses despite soft invalidations, merges live journal changes, excludes known deletions/ineligible archives, and schedules one trailing refresh. Provisional responses cannot enter reusable cache. Workspace/account/access/view/page/reconnect/overflow guards remain hard barriers. Existing translated server-refresh announcements remain limited to server-backed views and do not move the list.
+
+Desktop, phone, and app-navigation lists use the same controller. CI regression cases cover zero-request complete views, local pagination, bounded cold archive ownership, first-response progress after three live invalidations, repeated workspace changes, and reconnect recovery. No tests ran locally. Exact CI conformance and surface results remain pending.

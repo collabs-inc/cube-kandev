@@ -15,6 +15,7 @@ export type TaskOverviewState = {
   reads: Record<string, TaskOverviewRead>;
   scope: string;
   generation: number;
+  connectionGap: boolean;
 };
 
 export type TaskOverviewActions = {
@@ -28,5 +29,5 @@ export type TaskOverviewActions = {
 export type TaskOverviewSlice = TaskOverviewActions & { taskOverview: TaskOverviewState };
 
 export function emptyTaskOverviewState(scope = "", generation = 0): TaskOverviewState {
-  return { byId: {}, owners: {}, reads: {}, scope, generation };
+  return { byId: {}, owners: {}, reads: {}, scope, generation, connectionGap: false };
 }

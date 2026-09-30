@@ -41,7 +41,7 @@ async function saveViews(api: ApiClient, seed: SeedData, archived: boolean) {
     },
   });
 }
-async function anchorTask(api: ApiClient, seed: SeedData) {
+export async function anchorTask(api: ApiClient, seed: SeedData) {
   const task = await api.createTask(seed.workspaceId, "Conversation anchor", {
     workflow_id: seed.workflowId,
     workflow_step_id: seed.startStepId,
@@ -57,7 +57,7 @@ async function anchorTask(api: ApiClient, seed: SeedData) {
   });
   return task;
 }
-async function surface(page: Page, mobile: boolean) {
+export async function surface(page: Page, mobile: boolean) {
   const session = new SessionPage(page);
   await session.waitForLoad();
   if (mobile) await page.getByTestId("mobile-task-picker-trigger").tap();
@@ -69,7 +69,7 @@ async function selectView(page: Page, rows: Locator, mobile: boolean, name: stri
   if (mobile) await rows.getByRole("button", { name, exact: true }).tap();
   else await new SidebarFilterPopoverPage(page).selectViewByName(name);
 }
-async function waitForCoverage(page: Page, workspaceId: string) {
+export async function waitForCoverage(page: Page, workspaceId: string) {
   await expect
     .poll(() =>
       page.evaluate((workspaceId) => {

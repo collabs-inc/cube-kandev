@@ -143,3 +143,21 @@ describe("authoritative overview coverage", () => {
     expect(store.getState().taskOverview.byId).toEqual({});
   });
 });
+
+it("requires a fresh scope inventory and snapshot after a reconnect gap", () => {
+  const store = fixture();
+  const before = store.getState();
+  store.getState().setConnectionStatus("connected");
+  store.getState().setConnectionStatus("reconnecting");
+  expect(store.getState().workflows.taskWorkflowCoverage?.complete).toBe(false);
+  const read = store.getState().beginTaskOverviewRead();
+  store.getState().setWorkflows(before.workflows.items, before.workflows.taskWorkflowCoverage);
+  store.getState().setWorkflowSnapshot("workflow", before.kanbanMulti.snapshots.workflow);
+  expect(coveredTaskOverviews(store.getState(), "workspace", DEFAULT_VIEW)).toBeNull();
+  store.getState().setConnectionStatus("connected");
+  expect(store.getState().taskOverview.reads[read]).toBeUndefined();
+  store.getState().setWorkflowSnapshot("workflow", before.kanbanMulti.snapshots.workflow);
+  expect(coveredTaskOverviews(store.getState(), "workspace", DEFAULT_VIEW)).toBeNull();
+  store.getState().setWorkflows(before.workflows.items, before.workflows.taskWorkflowCoverage);
+  expect(coveredTaskOverviews(store.getState(), "workspace", DEFAULT_VIEW)).toHaveLength(1);
+});

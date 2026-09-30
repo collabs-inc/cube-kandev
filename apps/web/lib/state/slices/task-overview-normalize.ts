@@ -166,12 +166,16 @@ function projectSnapshot<T extends KanbanState | WorkflowSnapshotData>(
     previous && "taskCoverage" in previous ? previous.taskCoverage : undefined;
   const delta =
     previous && coverage === previousCoverage ? tasks.length - previous.tasks.length : 0;
-  if (coverage && delta) {
+  if (coverage && (delta || (overview.connectionGap && coverage.complete))) {
     return {
       ...snapshot,
       tasks,
       taskIds,
-      taskCoverage: { ...coverage, total: coverage.total + delta },
+      taskCoverage: {
+        ...coverage,
+        total: coverage.total + delta,
+        complete: coverage.complete && !overview.connectionGap,
+      },
     };
   }
   return tasks === snapshot.tasks && sameIds ? snapshot : { ...snapshot, tasks, taskIds };
@@ -219,6 +223,7 @@ function staleCoverage(next: AppState): AppState {
   );
   return {
     ...next,
+    workflows: staleWorkflowCoverage(next.workflows),
     kanbanMulti: { ...next.kanbanMulti, snapshots },
     taskOverview: {
       ...next.taskOverview,
@@ -226,6 +231,13 @@ function staleCoverage(next: AppState): AppState {
       generation: next.taskOverview.generation + 1,
     },
   };
+}
+
+function staleWorkflowCoverage(workflows: AppState["workflows"]): AppState["workflows"] {
+  const coverage = workflows.taskWorkflowCoverage;
+  return coverage?.complete
+    ? { ...workflows, taskWorkflowCoverage: { ...coverage, complete: false } }
+    : workflows;
 }
 
 function reconcileWorkflowCoverage(previous: AppState | undefined, next: AppState): AppState {
@@ -291,22 +303,29 @@ function isolateOverviewSources(previous: AppState | undefined, next: AppState):
   };
 }
 
+function overviewRecovery(previous: AppState | undefined, state: AppState) {
+  const disconnected =
+    previous?.connection.status === "connected" && state.connection.status !== "connected";
+  const reconnected =
+    previous?.taskOverview.connectionGap === true && state.connection.status === "connected";
+  const connectionGap =
+    disconnected || (previous?.taskOverview.connectionGap === true && !reconnected);
+  const overflowed = previous && previous.taskOverview.generation !== state.taskOverview.generation;
+  return { connectionGap, invalidated: disconnected || reconnected || overflowed };
+}
+
 export function normalizeTaskOverviews(previous: AppState | undefined, state: AppState): AppState {
   const scope = taskOverviewScope(state);
   const scopeChanged = previous?.taskOverview.scope !== scope;
-  const disconnected =
-    previous?.connection.status === "connected" && state.connection.status !== "connected";
-  const overflowed = previous && previous.taskOverview.generation !== state.taskOverview.generation;
-  let next = reconcileWorkflowCoverage(
-    previous,
-    disconnected || overflowed ? staleCoverage(state) : state,
-  );
+  const { connectionGap, invalidated } = overviewRecovery(previous, state);
+  let next = reconcileWorkflowCoverage(previous, invalidated ? staleCoverage(state) : state);
+  if (connectionGap) next = { ...next, workflows: staleWorkflowCoverage(next.workflows) };
   if (scopeChanged) next = isolateOverviewSources(previous, next);
   if (!scopeChanged && !overviewInputsChanged(previous, next)) return next;
   const base = scopeChanged
     ? emptyTaskOverviewState(scope, (previous?.taskOverview.generation ?? 0) + 1)
     : next.taskOverview;
-  const overview = { ...base, byId: { ...base.byId }, owners: { ...base.owners } };
+  const overview = { ...base, connectionGap, byId: { ...base.byId }, owners: { ...base.owners } };
   collectBoardOwners(scopeChanged ? undefined : previous, next, overview);
   if (overview.generation !== base.generation) {
     next = staleCoverage(next);

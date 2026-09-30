@@ -131,4 +131,15 @@ Do not invent a shared revision across different field owners.
 
 ## Results
 
-Implementation and regression cases are in progress. The user requires CI-only test execution; no local test or benchmark has been run. Full conformance and combined surface evidence remain required before completion.
+The implementation routes all board writes through `withTaskOverviewNormalization` before publication. Canonical objects and ID memberships cover:
+
+- Initial Go boot payload and frontend hydration (`boot_state.go`, `hydrator.ts`, `store.ts`).
+- Single/all-workflow HTTP snapshots (`use-workflow-snapshot.ts`, `use-all-workflow-snapshots.ts`), with read journals and actual mapped membership counts.
+- Phone workspace switching (`session-task-switcher-sheet-hooks.ts` and its helpers), including a journal spanning workflow metadata and snapshot reads.
+- Live task create/update/move/archive/unarchive/delete and summary revisions (`lib/ws/handlers/tasks.ts`, its split handlers, and `task-status-summary.ts`).
+- Existing board, Office, nesting, optimistic move/removal, and rollback writes through the same store transaction boundary; compatibility arrays retain canonical references.
+- Bounded server-page membership (`sidebar-task-page-cache.ts`, `sidebar-page-overviews.ts`) with separate display, reusable-page, board, and active-detail ownership.
+
+Coverage propagates through backend snapshot DTOs, homepage/task boot mapping, HTTP types, store hydration, and both workflow fetch paths. Workflow scope inventory includes hidden and unassigned active membership while excluding archived, ephemeral, automation-run, and config-mode records. Reconnect gaps invalidate both snapshot coverage and scope inventory; reads begun during the gap cannot survive reconnection. Workflow metadata refreshes with transport recovery.
+
+Regression suites cover canonical identity, explicit clears, independent nanosecond task/summary freshness, optimistic rollback and atomic placement, live membership changes, scope isolation, access denial, bounded journals, and owner eviction. Additional mobile helper, workflow metadata, and SQLite/PostgreSQL scope cases are included. Tests execute only in CI at the user's request; final CI results remain required before completion.

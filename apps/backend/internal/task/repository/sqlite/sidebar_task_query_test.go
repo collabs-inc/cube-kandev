@@ -296,7 +296,7 @@ func benchmarkSidebarPage(b *testing.B, repo *Repository, workspaceID string, qu
 	b.Helper()
 	baselineNative, baselineRSS := sidebarBenchmarkMemory(b, true)
 	started := time.Now()
-	warmup, err := repo.QuerySidebarTaskPage(b.Context(), workspaceID, query, models.SidebarTaskViewPreferences{})
+	warmup, err := benchmarkSidebarColdRead(b, repo, workspaceID, query)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -386,6 +386,7 @@ func insertSidebarBenchmarkTasks(b *testing.B, repo *Repository, workspaceID str
 	b.Helper()
 	ctx := context.Background()
 	base := time.Date(2026, 9, 26, 12, 0, 0, 0, time.UTC)
+	seedSidebarBenchmarkRepositories(b, repo, workspaceID)
 	tx, err := repo.db.BeginTxx(ctx, nil)
 	if err != nil {
 		b.Fatalf("begin sidebar benchmark fixture: %v", err)
@@ -395,7 +396,7 @@ func insertSidebarBenchmarkTasks(b *testing.B, repo *Repository, workspaceID str
 	for start := 0; start < count; start += batchSize {
 		end := min(start+batchSize, count)
 		taskValues := make([]string, 0, end-start)
-		taskArgs := make([]any, 0, (end-start)*7)
+		taskArgs := make([]any, 0, (end-start)*8)
 		summaryValues := make([]string, 0, end-start)
 		summaryArgs := make([]any, 0, (end-start)*5)
 		for index := start; index < end; index++ {
@@ -405,23 +406,27 @@ func insertSidebarBenchmarkTasks(b *testing.B, repo *Repository, workspaceID str
 				parentID = fmt.Sprintf("bench-task-%06d", index-index%10)
 			}
 			activity := base.Add(time.Duration(index) * time.Second)
-			taskValues = append(taskValues, "(?, ?, ?, ?, ?, ?, ?)")
-			taskArgs = append(taskArgs, id, workspaceID, fmt.Sprintf("Sidebar benchmark task %06d", index), parentID, nil, activity, activity)
+			taskValues = append(taskValues, "(?, ?, ?, ?, ?, ?, ?, ?)")
+			state := []string{"TODO", "IN_PROGRESS", "COMPLETED"}[(index/10)%3]
+			taskArgs = append(taskArgs, id, workspaceID, fmt.Sprintf("Sidebar benchmark task %06d", index), parentID, nil, activity, activity, state)
 			summaryValues = append(summaryValues, "(?, ?, ?, ?, ?)")
 			summaryArgs = append(summaryArgs, id, workspaceID, 1, fmt.Sprintf(`{"last_activity_at":%q}`, activity.Format(time.RFC3339Nano)), activity)
 		}
-		if _, err := tx.ExecContext(ctx, repo.db.Rebind(`INSERT INTO tasks (id, workspace_id, title, parent_id, archived_at, created_at, updated_at) VALUES `+strings.Join(taskValues, ", ")), taskArgs...); err != nil {
+		if _, err := tx.ExecContext(ctx, repo.db.Rebind(`INSERT INTO tasks (id, workspace_id, title, parent_id, archived_at, created_at, updated_at, state) VALUES `+strings.Join(taskValues, ", ")), taskArgs...); err != nil {
 			b.Fatalf("insert sidebar benchmark tasks %d through %d: %v", start, end-1, err)
 		}
 		if _, err := tx.ExecContext(ctx, repo.db.Rebind(`INSERT INTO task_status_summaries (task_id, workspace_id, revision, summary, updated_at) VALUES `+strings.Join(summaryValues, ", ")), summaryArgs...); err != nil {
 			b.Fatalf("insert sidebar benchmark summaries %d through %d: %v", start, end-1, err)
 		}
 	}
+	if err := insertSidebarBenchmarkRepositories(b.Context(), tx, repo.db, workspaceID); err != nil {
+		b.Fatal(err)
+	}
 	if err := tx.Commit(); err != nil {
 		b.Fatalf("commit sidebar benchmark fixture: %v", err)
 	}
 	if dialect.IsPostgres(repo.db.DriverName()) {
-		for _, table := range []string{"tasks", "task_status_summaries"} {
+		for _, table := range []string{"tasks", "task_status_summaries", "repositories", "task_repositories"} {
 			if _, err := repo.db.ExecContext(ctx, "ANALYZE "+table); err != nil {
 				b.Fatalf("analyze sidebar benchmark %s: %v", table, err)
 			}
