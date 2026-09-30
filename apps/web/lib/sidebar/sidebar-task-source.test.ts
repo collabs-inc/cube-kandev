@@ -22,7 +22,7 @@ it("uses bounded server reads until active coverage is authoritative", () => {
     sidebarTaskSource(store.getState(), "workspace", {
       ...DEFAULT_VIEW,
       group: "future",
-    } as SidebarView),
+    } as unknown as SidebarView),
   ).toBeNull();
   store.getState().denyTaskOverviewAccess();
   expect(sidebarTaskSource(store.getState(), "workspace", DEFAULT_VIEW)).toBeNull();

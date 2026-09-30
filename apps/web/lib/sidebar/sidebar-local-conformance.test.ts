@@ -44,7 +44,7 @@ function projectScenario(tasks: FixtureTask[]) {
         workflowId: wf.id,
         workflowName: wf.name,
         tasks: [],
-        steps: [{ id: wf.step_id, title: wf.step_id, position: 0 }],
+        steps: [{ id: wf.step_id, title: wf.step_id, color: "", position: 0 }],
       };
   });
   return projectLocalSidebarTasks(

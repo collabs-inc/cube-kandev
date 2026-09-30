@@ -26,7 +26,7 @@ const task = (id: string): Task => ({
   description: "",
   position: 0,
   state: "TODO",
-  priority: "none",
+  priority: "medium",
   created_at: "2026-09-29T00:00:00Z",
   updated_at: "2026-09-29T00:00:00Z",
 });

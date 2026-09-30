@@ -2,6 +2,7 @@ import type { TaskSwitcherItem } from "@/components/task/task-switcher-types";
 import type { AppState } from "@/lib/state/app-state-types";
 import type { TaskOverview } from "@/lib/state/slices/task-overview-types";
 import type { SidebarTaskQuery } from "@/lib/types/http";
+import { repositoryId } from "@/lib/types/ids";
 import { getStateBucket } from "./effective-task-tree-state";
 import { matchesSidebarClause } from "./sidebar-local-filter";
 import { sqliteBinary } from "./sidebar-local-order";
@@ -29,7 +30,7 @@ export function projectLocalSidebarTasks(
     );
     const ids = [...new Set(links.map((link) => link.repository_id))];
     const names = ids.flatMap((id) => {
-      const repo = repos.get(id);
+      const repo = repos.get(repositoryId(id));
       return repo
         ? [
             repo.provider_owner && repo.provider_name

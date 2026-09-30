@@ -57,7 +57,7 @@ beforeEach(() => {
     state.kanbanMulti.snapshots.wf = {
       workflowId: "wf",
       workflowName: "Workflow",
-      steps: [{ id: "step", title: "Step", position: 0 }],
+      steps: [{ id: "step", title: "Step", color: "", position: 0 }],
       tasks: [],
     };
   });
@@ -79,18 +79,26 @@ it("publishes safe first rows after three invalidations with at most one trailin
       ["deleted", null],
       ["archived", { archived_at: "2026-09-29T01:00:00Z" }],
     ] as const) {
-      const action = patch ? "task.updated" : "task.deleted";
-      handlers[action]?.({
-        type: "event",
-        action,
-        payload: {
-          task_id: id,
-          workspace_id: "ws",
-          workflow_id: "wf",
-          workflow_step_id: "step",
-          ...patch,
-        },
-      } as Parameters<NonNullable<(typeof handlers)[string]>>[0]);
+      const payload = {
+        task_id: id,
+        workspace_id: "ws",
+        workflow_id: "wf",
+        workflow_step_id: "step",
+        ...patch,
+      };
+      if (patch) {
+        handlers["task.updated"]?.({
+          type: "notification",
+          action: "task.updated",
+          payload,
+        } as Parameters<NonNullable<(typeof handlers)["task.updated"]>>[0]);
+      } else {
+        handlers["task.deleted"]?.({
+          type: "notification",
+          action: "task.deleted",
+          payload,
+        } as Parameters<NonNullable<(typeof handlers)["task.deleted"]>>[0]);
+      }
     }
   });
   expect(querySidebarTasks).toHaveBeenCalledTimes(1);
@@ -157,10 +165,10 @@ it("shows recovery when live removals empty a replacement instead of retaining a
   act(() => {
     for (const id of ["kept", "deleted", "archived"])
       handlers["task.deleted"]?.({
-        type: "event",
+        type: "notification",
         action: "task.deleted",
         payload: { task_id: id, workspace_id: "ws", workflow_id: "wf" },
-      } as Parameters<NonNullable<(typeof handlers)[string]>>[0]);
+      } as Parameters<NonNullable<(typeof handlers)["task.deleted"]>>[0]);
   });
   await act(async () => replacement.resolve(response()));
   expect(hook.result.current.response?.entries).toEqual([]);

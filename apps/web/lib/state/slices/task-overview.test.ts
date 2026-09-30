@@ -77,7 +77,7 @@ it("merges partial fields, explicit clears and task/summary freshness independen
   store.getState().retainTaskOverviews(DISPLAY_OWNER, [
     task("one", {
       title: "Old",
-      statusSummary: { task_id: "one", revision: 8 } as TaskOverview["statusSummary"],
+      statusSummary: { revision: 8, updated_at: "2026-09-29T15:00:00Z" },
     }),
   ]);
   const accepted = store.getState().taskOverview.byId.one;
@@ -109,7 +109,7 @@ it("reconciles real task updates across an older read without restoring deleted 
   const handlers = registerTasksHandlers(store);
   const read = store.getState().beginTaskOverviewRead();
   handlers["task.updated"]?.({
-    type: "event",
+    type: "notification",
     action: "task.updated",
     payload: {
       task_id: "one",

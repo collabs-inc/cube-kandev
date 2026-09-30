@@ -4,6 +4,9 @@ import { toKanbanTask } from "@/lib/kanban/map-task";
 import { registerTasksHandlers } from "@/lib/ws/handlers/tasks";
 import { reconcileTaskOverviewRead } from "./task-overview-merge";
 
+const TASK_CREATED = "task.created";
+const TASK_UPDATED = "task.updated";
+
 function fixture() {
   const store = createAppStore();
   const task = toKanbanTask({
@@ -22,7 +25,7 @@ function fixture() {
       state.kanbanMulti.snapshots[id] = {
         workflowId: id,
         workflowName: id,
-        steps: [{ id: `step-${id}`, title: id, position: 0 }],
+        steps: [{ id: `step-${id}`, title: id, color: "", position: 0 }],
         tasks: id === "a" ? [task] : [],
         taskCoverage: {
           workspace_id: "ws",
@@ -40,10 +43,20 @@ function fixture() {
     };
   });
   const handlers = registerTasksHandlers(store);
-  const event = (action: string, payload: Record<string, unknown>) =>
-    handlers[action]?.({ type: "event", action, payload } as Parameters<
-      NonNullable<(typeof handlers)[string]>
-    >[0]);
+  const event = (
+    action: typeof TASK_CREATED | typeof TASK_UPDATED,
+    payload: Record<string, unknown>,
+  ) => {
+    if (action === TASK_CREATED) {
+      handlers[action]?.({ type: "notification", action, payload } as Parameters<
+        NonNullable<(typeof handlers)[typeof TASK_CREATED]>
+      >[0]);
+    } else {
+      handlers[action]?.({ type: "notification", action, payload } as Parameters<
+        NonNullable<(typeof handlers)[typeof TASK_UPDATED]>
+      >[0]);
+    }
+  };
   return { store, task, event };
 }
 
@@ -78,7 +91,7 @@ it("keeps atomic placement and step metadata through moves and optimistic rollba
 it("keeps live create, archive and unarchive membership across older workflow reads", () => {
   const { store, task, event } = fixture();
   const read = store.getState().beginTaskOverviewRead();
-  event("task.created", {
+  event(TASK_CREATED, {
     task_id: "created",
     workspace_id: "ws",
     workflow_id: "a",
@@ -86,7 +99,7 @@ it("keeps live create, archive and unarchive membership across older workflow re
     title: "Created",
     state: "TODO",
   });
-  event("task.updated", {
+  event(TASK_UPDATED, {
     task_id: "task",
     workspace_id: "ws",
     workflow_id: "a",
@@ -95,7 +108,7 @@ it("keeps live create, archive and unarchive membership across older workflow re
   });
   const tasks = reconcileTaskOverviewRead(store.getState().taskOverview, [task], read, true)!;
   expect(tasks.filter((item) => !item.isArchived).map((item) => item.id)).toEqual(["created"]);
-  event("task.updated", {
+  event(TASK_UPDATED, {
     task_id: "task",
     workspace_id: "ws",
     workflow_id: "a",
@@ -125,7 +138,7 @@ it("preserves nanosecond task freshness independently of newer summaries", () =>
 it("invalidates workspace-wide coverage for unknown or unassigned live workflow membership", () => {
   for (const workflow of ["hidden", ""]) {
     const { store, event } = fixture();
-    event("task.created", {
+    event(TASK_CREATED, {
       task_id: "new",
       workspace_id: "ws",
       workflow_id: workflow,
@@ -137,7 +150,7 @@ it("invalidates workspace-wide coverage for unknown or unassigned live workflow 
 
 it("extends active scope coverage when live work enters a completely loaded empty workflow", () => {
   const { store, event } = fixture();
-  event("task.created", {
+  event(TASK_CREATED, {
     task_id: "new",
     workspace_id: "ws",
     workflow_id: "b",

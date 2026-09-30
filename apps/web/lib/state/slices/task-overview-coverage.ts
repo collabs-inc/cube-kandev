@@ -77,7 +77,8 @@ function completeSnapshot(
   workspaceId: string,
   workflowId: string,
 ) {
-  const coverage = snapshot?.taskCoverage;
+  if (!snapshot) return false;
+  const coverage = snapshot.taskCoverage;
   return (
     coverage?.complete &&
     !snapshot.isPlaceholder &&
