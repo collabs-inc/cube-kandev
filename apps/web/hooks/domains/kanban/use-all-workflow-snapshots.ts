@@ -340,9 +340,12 @@ function reconcileSnapshotOverview(
   readId: string | undefined,
   workflowId: string,
 ) {
+  const scoped = tasks.map((task) =>
+    task.workflowId === undefined ? { ...task, workflowId } : task,
+  );
   const reconciled = state.taskOverview
-    ? reconcileTaskOverviewRead(state.taskOverview, tasks, readId, true)
-    : tasks;
+    ? reconcileTaskOverviewRead(state.taskOverview, scoped, readId, true)
+    : scoped;
   return reconciled?.filter((task) => task.workflowId === workflowId && !task.isArchived) ?? null;
 }
 

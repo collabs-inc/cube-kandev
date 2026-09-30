@@ -272,6 +272,10 @@ async function verifyQueryRejections(
   } finally {
     await page.unrouteAll({ behavior: "wait" });
   }
+  await page.reload();
+  await new SessionPage(page).waitForLoad();
+  const mobilePicker = page.getByTestId("mobile-task-picker-trigger");
+  if (await mobilePicker.isVisible()) await mobilePicker.tap();
   await filters.selectViewByName("Other");
   await filters.selectViewByName("Repositories");
   for (const id of ids) await expect(surface.locator(`[data-task-row-id="${id}"]`)).toBeVisible();

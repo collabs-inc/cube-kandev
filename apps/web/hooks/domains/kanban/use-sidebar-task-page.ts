@@ -245,7 +245,7 @@ function useSidebarRevisionRefresh(
   workspaceId: string | null,
   queryRevision: number,
   refresh: () => void,
-): void {
+) {
   const seenQueryRevisionRef = useRef<{ workspaceId: string; revision: number } | null>(null);
   const refreshBurstStartedRef = useRef<number | null>(null);
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -290,6 +290,7 @@ function useSidebarRevisionRefresh(
     },
     [],
   );
+  return refreshTimerRef;
 }
 
 function sidebarLoadingState(
@@ -310,13 +311,36 @@ function useProvisionalSidebarRefresh(
   workspaceId: string | null,
   response: SidebarTaskPageResponse | null,
   pending: number | null,
-  refresh: () => void,
+  options: { refresh: () => void; isRefreshScheduled: () => boolean },
 ) {
+  const { refresh, isRefreshScheduled } = options;
   useEffect(() => {
-    if (!workspaceId || !response?.provisional || pending !== null) return;
+    if (!workspaceId || !response?.provisional || pending !== null || isRefreshScheduled()) return;
     const timer = setTimeout(refresh, 250);
     return () => clearTimeout(timer);
-  }, [workspaceId, response, pending, refresh]);
+  }, [workspaceId, response, pending, refresh, isRefreshScheduled]);
+}
+
+function useSidebarLiveRefresh(
+  workspaceId: string | null,
+  revision: number,
+  page: {
+    response: SidebarTaskPageResponse | null;
+    pending: number | null;
+    queued: { current: boolean };
+  },
+  refresh: () => void,
+) {
+  const timer = useSidebarRevisionRefresh(workspaceId, revision, refresh);
+  const { queued } = page;
+  const isRefreshScheduled = useCallback(
+    () => queued.current || timer.current !== null,
+    [queued, timer],
+  );
+  useProvisionalSidebarRefresh(workspaceId, page.response, page.pending, {
+    refresh,
+    isRefreshScheduled,
+  });
 }
 
 type SidebarPageLoader = ReturnType<typeof useSidebarPageLoader>;
@@ -465,12 +489,12 @@ export function useSidebarTaskPage(
   const loader = useSidebarPageLoader(queryWorkspaceId, workspaceGeneration, store, t, viewKeyRef);
   const { loadPage } = loader;
   const cachedResponse = queryWorkspaceId ? sidebarTaskPageCache(store).get(viewKey) : null;
-  const { pendingPage, error, viewResponse } = sidebarResponseState(
-    enabled,
-    loader,
-    cachedResponse,
-    viewKey,
-  );
+  const {
+    pendingPage,
+    error: loadError,
+    viewResponse,
+  } = sidebarResponseState(enabled, loader, cachedResponse, viewKey);
+  const error = accessDenied ? t("sidebar:workspaceContextAccessDenied") : loadError;
   const local = useLocalSidebarPage(
     workspaceId,
     localTasks,
@@ -513,8 +537,12 @@ export function useSidebarTaskPage(
   }, [loader.hasInFlight]);
 
   useForegroundRefresh(refresh, Boolean(queryWorkspaceId), queryWorkspaceId);
-  useSidebarRevisionRefresh(queryWorkspaceId, revision, refresh);
-  useProvisionalSidebarRefresh(queryWorkspaceId, currentResponse, pendingPage, refresh);
+  useSidebarLiveRefresh(
+    queryWorkspaceId,
+    revision,
+    { response: currentResponse, pending: pendingPage, queued: queuedRefreshRef },
+    refresh,
+  );
 
   const goToPage = useSidebarPageNavigation({
     currentResponse,
@@ -536,7 +564,7 @@ export function useSidebarTaskPage(
     ...sidebarLoadingState(Boolean(queryWorkspaceId), currentResponse, pendingPage),
     error,
     hasError: error !== null,
-    canRetry: loader.canRetry,
+    canRetry: !accessDenied && loader.canRetry,
     refresh,
     retry,
     goToPage: local.response ? local.goToPage : goToPage,

@@ -147,6 +147,10 @@ it.each(["workspace", "logout", "reconnect", "access"] as const)(
     await act(async () => initial.resolve(response()));
     expect(hook.result.current.response).toBeNull();
     expect(store.getState().taskOverview.byId.kept).toBeUndefined();
+    if (barrier === "access") {
+      expect(hook.result.current.hasError).toBe(true);
+      expect(hook.result.current.canRetry).toBe(false);
+    }
   },
 );
 

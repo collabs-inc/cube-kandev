@@ -51,7 +51,7 @@ function overviewInputsChanged(previous: AppState | undefined, next: AppState): 
 
 function retainProjection(
   state: TaskOverviewState,
-  owner: string,
+  source: { owner: string; workflowId?: string | null },
   incoming: TaskOverview[],
   previous: TaskOverview[] | undefined,
 ) {
@@ -60,7 +60,11 @@ function retainProjection(
     for (const task of incoming) {
       if (task !== before.get(task.id)) {
         const current = state.byId[task.id];
-        const merged = mergeTaskOverview(current, task);
+        const projection =
+          task.workflowId === undefined && source.workflowId
+            ? { ...task, workflowId: source.workflowId }
+            : task;
+        const merged = mergeTaskOverview(current, projection);
         if (current && merged !== current) {
           const patch = Object.fromEntries(
             Object.entries(merged).filter(
@@ -72,7 +76,7 @@ function retainProjection(
         state.byId[task.id] = merged;
       }
     }
-    state.owners[owner] = incoming.map((task) => task.id);
+    state.owners[source.owner] = incoming.map((task) => task.id);
   }
 }
 
@@ -81,11 +85,16 @@ function collectBoardOwners(
   next: AppState,
   overview: TaskOverviewState,
 ) {
-  retainProjection(overview, "board", next.kanban.tasks, previous?.kanban.tasks);
+  retainProjection(
+    overview,
+    { owner: "board", workflowId: next.kanban.workflowId },
+    next.kanban.tasks,
+    previous?.kanban.tasks,
+  );
   for (const [id, snapshot] of Object.entries(next.kanbanMulti.snapshots)) {
     retainProjection(
       overview,
-      `workflow:${id}`,
+      { owner: `workflow:${id}`, workflowId: snapshot.workflowId ?? id },
       snapshot.tasks,
       previous?.kanbanMulti.snapshots[id]?.tasks,
     );
@@ -93,7 +102,7 @@ function collectBoardOwners(
   for (const [id, tasks] of Object.entries(next.sidebarArchivedTasks.itemsByWorkspaceId)) {
     retainProjection(
       overview,
-      `archive:${id}`,
+      { owner: `archive:${id}` },
       tasks,
       previous?.sidebarArchivedTasks.itemsByWorkspaceId[id],
     );

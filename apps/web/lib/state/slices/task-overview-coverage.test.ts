@@ -49,8 +49,6 @@ function fixture(total = 1) {
     },
   });
   store.setState((state) => {
-    state.workspaceContextRead.workspaceId = "workspace";
-    state.workspaceContextRead.generation = state.workspaceContextGeneration;
     state.repositories.itemsByWorkspaceId.workspace = [];
   });
   return store;

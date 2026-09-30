@@ -77,6 +77,24 @@ test("mobile task drawer surfaces a failed sidebar page and recovers", async ({
     workflow_id: seedData.workflowId,
     workflow_step_id: seedData.startStepId,
   });
+  await apiClient.archiveTask(task.id);
+  await apiClient.saveUserSettings({
+    sidebar_view_state: {
+      workspace_id: seedData.workspaceId,
+      views: [
+        {
+          id: "cold-archive",
+          name: "Cold archive",
+          filters: [{ id: "archive", dimension: "archived", op: "is", value: true }],
+          sort: { key: "title", direction: "asc" },
+          group: "none",
+          collapsed_groups: [],
+        },
+      ],
+      active_view_id: "cold-archive",
+      draft: null,
+    },
+  });
   let sidebarPageUnavailable = true;
   await testPage.route("**/api/v1/**", async (route) => {
     const url = new URL(route.request().url());

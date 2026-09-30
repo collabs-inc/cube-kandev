@@ -16,7 +16,10 @@ function gate() {
 async function contextFixtures(api: ApiClient, seed: SeedData) {
   await api.saveUserSettings({ enable_preview_on_click: false });
   const other = await api.createWorkspace("Shared context B");
-  const workflow = await api.createWorkflow(other.id, "Shared workflow B", "simple");
+  const { workflows } = await api.listWorkflows(other.id);
+  const workflow =
+    workflows.find((workflow) => !workflow.hidden) ??
+    (await api.createWorkflow(other.id, "Shared workflow B", "simple"));
   const { steps } = await api.listWorkflowSteps(workflow.id);
   const step = steps.find((item) => item.is_start_step) ?? steps[0];
   const seeds = [

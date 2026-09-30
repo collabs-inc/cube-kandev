@@ -36,6 +36,27 @@ function sharedStore() {
   });
 }
 
+it("inherits missing task workflow identity from its containing board and snapshot", () => {
+  const store = createAppStore({
+    kanban: { workflowId: "workflow", steps: [], tasks: [task("one", { workflowId: undefined })] },
+    kanbanMulti: {
+      ...defaultKanbanState.kanbanMulti,
+      snapshots: {
+        workflow: {
+          workflowId: "workflow",
+          workflowName: "Workflow",
+          steps: [],
+          tasks: [task("one", { workflowId: undefined })],
+        },
+      },
+    },
+  });
+  const canonical = store.getState().taskOverview.byId.one;
+  expect(canonical.workflowId).toBe("workflow");
+  expect(store.getState().kanban.tasks).toEqual([canonical]);
+  expect(store.getState().kanbanMulti.snapshots.workflow.tasks[0]).toBe(canonical);
+});
+
 it("publishes one accepted object to board, workflow and sidebar owners atomically", () => {
   const store = sharedStore();
   store.getState().retainTaskOverviews(DISPLAY_OWNER, [task("one")]);

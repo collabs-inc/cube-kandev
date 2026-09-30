@@ -229,8 +229,9 @@ describe("useSidebarTaskPage request lifecycle", () => {
     await act(async () => requests[1]?.deferred.resolve(response(2, true, false)));
     expect(requests).toHaveLength(3);
     expect(requests[2]?.query.page).toBe(2);
-    expect(result.current.response?.page).toBe(1);
-    expect(afterNavigation).not.toHaveBeenCalled();
+    expect(result.current.response?.page).toBe(2);
+    expect(result.current.response?.provisional).toBe(true);
+    expect(afterNavigation).toHaveBeenCalledTimes(1);
     await act(async () => requests[2]?.deferred.resolve(response(2, true, false)));
     expect(result.current.requestedPage).toBeNull();
     expect(result.current.response?.page).toBe(2);
@@ -397,7 +398,7 @@ it.each([false, true])(
   },
 );
 
-it("does not display a response invalidated before the trailing refresh starts", async () => {
+it("displays a provisional response while its trailing refresh reconciles soft invalidations", async () => {
   const stale = deferred<SidebarTaskPageResponse>();
   vi.mocked(querySidebarTasks)
     .mockResolvedValueOnce(response(1, false, false))
@@ -409,7 +410,8 @@ it("does not display a response invalidated before the trailing refresh starts",
   mocks.state.sidebarArchivedTasks.revisionByWorkspaceId["ws-1"] = 1;
   hook.rerender();
   await act(async () => stale.resolve({ ...response(1, false, false), query_key: "deleted-row" }));
-  expect(hook.result.current.response?.query_key).toBe("query-1");
+  expect(hook.result.current.response?.query_key).toBe("deleted-row");
+  expect(hook.result.current.response?.provisional).toBe(true);
   vi.mocked(querySidebarTasks).mockResolvedValueOnce({
     ...response(1, false, false),
     query_key: "fresh",

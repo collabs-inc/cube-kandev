@@ -294,6 +294,9 @@ func BenchmarkSidebarTaskPage100K(b *testing.B) {
 
 func benchmarkSidebarPage(b *testing.B, repo *Repository, workspaceID string, query models.SidebarTaskViewQuery) {
 	b.Helper()
+	if dialect.IsPostgres(repo.ro.DriverName()) {
+		logSidebarTaskPageQueryPlan(b, repo, workspaceID, query)
+	}
 	baselineNative, baselineRSS := sidebarBenchmarkMemory(b, true)
 	started := time.Now()
 	warmup, err := benchmarkSidebarColdRead(b, repo, workspaceID, query)
@@ -309,7 +312,9 @@ func benchmarkSidebarPage(b *testing.B, repo *Repository, workspaceID string, qu
 	b.ResetTimer()
 	var responseBytes int
 	for range b.N {
-		result, err := repo.QuerySidebarTaskPage(b.Context(), workspaceID, query, models.SidebarTaskViewPreferences{})
+		ctx, cancel := context.WithTimeout(b.Context(), 30*time.Second)
+		result, err := repo.QuerySidebarTaskPage(ctx, workspaceID, query, models.SidebarTaskViewPreferences{})
+		cancel()
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -325,7 +330,9 @@ func benchmarkSidebarPage(b *testing.B, repo *Repository, workspaceID string, qu
 	b.ReportMetric(float64(cold.Nanoseconds()), "cold-ns")
 	b.ReportMetric(float64(peak-baselineNative), "native-peak-B")
 	b.ReportMetric(float64(rss-baselineRSS), "rss-delta-B")
-	logSidebarTaskPageQueryPlan(b, repo, workspaceID, query)
+	if !dialect.IsPostgres(repo.ro.DriverName()) {
+		logSidebarTaskPageQueryPlan(b, repo, workspaceID, query)
+	}
 }
 
 type sidebarBenchmarkEntry struct {
@@ -448,7 +455,7 @@ func logSidebarTaskPageQueryPlan(b *testing.B, repo *Repository, workspaceID str
 	}
 	pageCTEs, cteArgs := sidebarPageCTEs(driver, query, models.SidebarTaskViewPreferences{})
 	args := append(append([]any(nil), baseArgs...), cteArgs...)
-	explain := "EXPLAIN (ANALYZE, BUFFERS, TIMING OFF) "
+	explain := "EXPLAIN "
 	if !dialect.IsPostgres(driver) {
 		explain = "EXPLAIN QUERY PLAN "
 	}

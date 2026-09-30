@@ -662,11 +662,15 @@ jobs:
           go test -v -race -timeout 15m "${POSTGRES_PACKAGES[@]}"
 
   sidebar-resources:
-    name: Sidebar resource bounds
+    name: Sidebar resource bounds (${{ matrix.mode }})
     needs: changes
     if: needs.changes.outputs.sidebar_resources == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [memory, timing]
     container: ghcr.io/kdlbs/kandev-ci:build-latest
     services:
       postgres:
@@ -699,6 +703,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Measure isolated native memory and pooled retention
+        if: matrix.mode == 'memory'
         env:
           KANDEV_SIDEBAR_MEMORY_MATRIX: "1"
         run: |
@@ -707,6 +712,7 @@ jobs:
             -run '^TestSidebarQuery(PreparationMemory|PoolMemoryPlateau|MaximumInputMemory)$' \
             -timeout 45m -count=1 -v 2>&1 | tee sidebar-memory.log
       - name: Measure populated SQLite and PostgreSQL pages
+        if: matrix.mode == 'timing'
         run: |
           set -euo pipefail
           go test -tags sqlite_fts5 -p 1 ./internal/task/repository/sqlite \
@@ -716,7 +722,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: sidebar-resource-evidence
+          name: sidebar-resource-evidence-${{ matrix.mode }}
           path: apps/backend/sidebar-*.log
           retention-days: 30
 
