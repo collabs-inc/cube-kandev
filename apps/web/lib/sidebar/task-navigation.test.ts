@@ -102,26 +102,26 @@ describe("revealSidebarTask", () => {
     await expect(revealSidebarTask(TEST_TASK_ID, (callback) => callback())).resolves.toBe(true);
     expect(row.scrollIntoView).toHaveBeenCalledWith({
       behavior: "smooth",
-      block: "center",
+      block: "nearest",
       inline: "nearest",
     });
     expect(mockReleasePortalScrollRestoration).toHaveBeenCalledWith(viewport);
     expect(row.classList.contains(TASK_ROW_REVEAL_CLASS)).toBe(true);
   });
 
-  it("centers a partially visible row so its full target is revealed", async () => {
+  it("scrolls a partially visible row fully into view", async () => {
     const viewport = mountViewport();
     const row = mountRow(viewport, TEST_TASK_ID, { x: 0, y: -40, width: 320, height: 52 });
 
     await expect(revealSidebarTask(TEST_TASK_ID, (callback) => callback())).resolves.toBe(true);
     expect(row.scrollIntoView).toHaveBeenCalledWith({
       behavior: "smooth",
-      block: "center",
+      block: "nearest",
       inline: "nearest",
     });
   });
 
-  it("uses immediate centered scrolling and a non-animated cue for reduced motion", async () => {
+  it("uses immediate scrolling and a non-animated cue for reduced motion", async () => {
     setReducedMotion(true);
     const viewport = mountViewport();
     const row = mountRow(viewport, TEST_TASK_ID, { x: 0, y: -24, width: 320, height: 24 });
@@ -129,7 +129,7 @@ describe("revealSidebarTask", () => {
     await expect(revealSidebarTask(TEST_TASK_ID, (callback) => callback())).resolves.toBe(true);
     expect(row.scrollIntoView).toHaveBeenCalledWith({
       behavior: "auto",
-      block: "center",
+      block: "nearest",
       inline: "nearest",
     });
     expect(row.classList.contains(TASK_ROW_REVEAL_CLASS)).toBe(true);
