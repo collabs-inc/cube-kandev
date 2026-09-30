@@ -49,6 +49,7 @@ test.describe("File tree lazy-load on expand", () => {
     git.createFile("lazyfolder/nested/deep.ts", "deep");
     git.stageAll();
     git.commit("seed lazy folder");
+    git.pushMainWithRetry();
 
     const session = await setupTask(testPage, apiClient, seedData, "FT Lazy Load");
 
@@ -88,6 +89,7 @@ test.describe("File tree lazy-load on expand", () => {
     git.createFile("keepfolder/keep-b.ts", "b");
     git.stageAll();
     git.commit("seed keep folder");
+    git.pushMainWithRetry();
 
     const session = await setupTask(testPage, apiClient, seedData, "FT Lazy Keep");
 

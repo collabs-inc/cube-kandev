@@ -311,12 +311,15 @@ test.describe("Config-mode MCP — agent management", () => {
 
     await runAndWait(testPage, apiClient, createSession.task_id, "Profile created");
 
-    // Verify profile was created via API
-    const { agents: afterCreate } = await apiClient.listAgents();
-    const agentAfterCreate = afterCreate.find((a) => a.id === agent.id);
-    const newProfiles = (agentAfterCreate?.profiles ?? []).filter(
-      (p) => p.name === "E2E Created Profile",
-    );
+    // Config chat completion can reach the UI before the profile list reflects
+    // the tool's write. Wait for the API read model before asserting it.
+    const getCreatedProfiles = async () => {
+      const { agents: currentAgents } = await apiClient.listAgents();
+      const currentAgent = currentAgents.find((a) => a.id === agent.id);
+      return (currentAgent?.profiles ?? []).filter((p) => p.name === "E2E Created Profile");
+    };
+    await expect.poll(async () => (await getCreatedProfiles()).length, { timeout: 10_000 }).toBe(1);
+    const newProfiles = await getCreatedProfiles();
     expect(newProfiles.length).toBe(1);
     expect(newProfiles[0].model).toBe("claude-sonnet-4-5-20250514");
 
@@ -334,11 +337,22 @@ test.describe("Config-mode MCP — agent management", () => {
 
     await runAndWait(testPage, apiClient, deleteSession.task_id, "Profile deleted");
 
-    // Verify profile was deleted via API
-    const { agents: afterDelete } = await apiClient.listAgents();
-    const agentAfterDelete = afterDelete.find((a) => a.id === agent.id);
-    expect((agentAfterDelete?.profiles ?? []).length).toBe(initialProfileCount);
-    expect((agentAfterDelete?.profiles ?? []).find((p) => p.id === newProfileId)).toBeUndefined();
+    // Wait for the delete to reach the same API read model used for the create check.
+    const getRemainingProfiles = async () => {
+      const { agents: currentAgents } = await apiClient.listAgents();
+      const currentAgent = currentAgents.find((a) => a.id === agent.id);
+      return currentAgent?.profiles ?? [];
+    };
+    await expect
+      .poll(
+        async () => {
+          const profiles = await getRemainingProfiles();
+          return profiles.some((profile) => profile.id === newProfileId);
+        },
+        { timeout: 10_000 },
+      )
+      .toBe(false);
+    expect(await getRemainingProfiles()).toHaveLength(initialProfileCount);
   });
 
   test("agent can update an agent", async ({ testPage, apiClient, seedData }) => {

@@ -66,9 +66,11 @@ test.describe("mobile agent goal visibility", () => {
     await sendQuickChatMessage(dialog, testPage, "/e2e:goal-active");
     await expect(dialog.getByTestId("agent-goal-chip")).toBeVisible({ timeout: 30_000 });
     await expect(
-      dialog.getByText("The provider goal remains active after the thread becomes idle.", {
-        exact: false,
-      }),
+      dialog
+        .getByText("The provider goal remains active after the thread becomes idle.", {
+          exact: false,
+        })
+        .last(),
     ).toBeVisible({ timeout: 30_000 });
 
     await waitForQuickChatDirectInput(dialog);

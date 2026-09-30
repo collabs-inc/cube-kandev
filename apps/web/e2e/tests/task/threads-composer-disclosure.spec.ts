@@ -358,6 +358,7 @@ test("reveals and collapses immediately with reduced motion", async ({
   ).toBe(0);
   await tile.getByTestId("collapse-composer").click();
   await expect(editor).toBeHidden();
+  await expect(tile).toBeFocused();
   await expect(tile.getByTestId("chat-input-area")).toHaveJSProperty("offsetHeight", 0);
   await testPage.keyboard.press("Enter");
   await expect(editor).toBeVisible();
