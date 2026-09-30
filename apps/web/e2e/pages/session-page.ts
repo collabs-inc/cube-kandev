@@ -777,11 +777,13 @@ export class SessionPage {
    * React re-render (e.g. WS-driven sidebar update) between open and click.
    */
   async openSidebarMenuAndClick(title: string, itemName: string, retries = 3): Promise<void> {
-    const taskRow = this.sidebar.locator('[role="button"]').filter({ hasText: title });
+    const taskRow = this.sidebarTaskItem(title).first();
+    await taskRow.waitFor({ state: "visible", timeout: 10_000 });
     for (let attempt = 0; attempt < retries; attempt++) {
       try {
-        await taskRow.hover();
-        await taskRow.getByRole("button", { name: "Task actions" }).click();
+        await taskRow.scrollIntoViewIfNeeded({ timeout: 3_000 });
+        await taskRow.hover({ timeout: 3_000 });
+        await taskRow.getByRole("button", { name: "Task actions" }).click({ timeout: 3_000 });
         const menuItem = this.page.getByRole("menuitem", { name: itemName });
         await menuItem.waitFor({ state: "visible", timeout: 3_000 });
         await menuItem.click({ timeout: 3_000 });
@@ -798,8 +800,9 @@ export class SessionPage {
       }
     }
     // Final attempt without catch
-    await taskRow.hover();
-    await taskRow.getByRole("button", { name: "Task actions" }).click();
+    await taskRow.scrollIntoViewIfNeeded({ timeout: 3_000 });
+    await taskRow.hover({ timeout: 3_000 });
+    await taskRow.getByRole("button", { name: "Task actions" }).click({ timeout: 3_000 });
     await this.page.getByRole("menuitem", { name: itemName }).click();
   }
 
