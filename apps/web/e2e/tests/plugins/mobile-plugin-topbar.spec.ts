@@ -195,9 +195,15 @@ test.describe("Mobile plugin menu actions", () => {
     await expect(menu.locator("nav.overflow-y-auto")).toHaveCount(1);
     const metrics = menu.getByTestId("app-status-metrics");
     await expect(metrics.getByLabel(/^CPU /)).toBeVisible();
-    const metricsBox = await requireBox(metrics, "system metrics");
-    const pluginBox = await requireBox(pluginSection, "Plugins section");
-    expect(metricsBox.y).toBeGreaterThanOrEqual(pluginBox.y + pluginBox.height);
+    await waitForFiniteAnimations(menu);
+    await expect
+      .poll(async () => {
+        const metricsBox = await metrics.boundingBox();
+        const pluginBox = await pluginSection.boundingBox();
+        if (!metricsBox || !pluginBox) return -1;
+        return metricsBox.y - (pluginBox.y + pluginBox.height);
+      })
+      .toBeGreaterThanOrEqual(0);
     await expect(status).toHaveAttribute("data-task-id", task.id);
     await expect(status).toHaveAttribute("data-workspace-id", seedData.workspaceId);
     await expect(status).toHaveAttribute("data-active-session-id", task.session_id);
