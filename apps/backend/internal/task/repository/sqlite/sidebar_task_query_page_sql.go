@@ -12,84 +12,14 @@ import (
 func sidebarPageCTEs(driver string, query models.SidebarTaskViewQuery, prefs models.SidebarTaskViewPreferences) (string, []any) {
 	page := sidebarPageBuildContextFor(driver, query, prefs)
 	groupCTEs, treeRootSQL := sidebarPageGroupExpressions(query, page)
-	ctes := sidebarPageTreeCTEs(driver, query, page, groupCTEs, treeRootSQL)
-	ctes += sidebarPageCountsAndWindowCTEs(query, &page)
-	ctes += sidebarPageQueueCTEs(driver, page)
+	ctes := sidebarPageTreeCTEs(page) + groupCTEs
+	ctes += sidebarRootWindowCTEs(query, treeRootSQL, &page)
 	page.args = append(page.args, query.PageSize, query.Page)
+	ctes += sidebarSelectedTreeCTEs(query, page)
+	page.args = append(page.args, page.childArgs...)
+	ctes += sidebarPageResultCTEs(query.Group)
+	ctes += sidebarPageQueueCTEs(driver, page)
 	return ctes, page.args
-}
-
-func sidebarPageCountsAndWindowCTEs(query models.SidebarTaskViewQuery, page *sidebarPageBuildContext) string {
-	groupCountSQL := `SELECT root_group_key AS group_key, root_group_label AS group_label, COUNT(*) AS task_count
-			FROM tree WHERE 1=1`
-	if query.Group == sidebarGroupNone {
-		groupCountSQL = `SELECT '__all__' AS group_key, '__all__' AS group_label, COUNT(*) AS task_count
-			FROM tree WHERE 1=1`
-	}
-	ctes := groupCountSQL
-	if len(query.CollapsedTaskIDs) > 0 {
-		ctes += ` AND id NOT IN (SELECT id FROM hidden_tasks)`
-	}
-	if query.Group != sidebarGroupNone {
-		ctes += ` GROUP BY root_group_key, root_group_label`
-	}
-	ctes += `
-		), display_tree AS (
-			SELECT tree.* FROM tree WHERE 1=1`
-	if len(query.CollapsedTaskIDs) > 0 {
-		ctes += ` AND tree.id NOT IN (SELECT id FROM hidden_tasks)`
-	}
-	if len(query.CollapsedGroupKeys) > 0 {
-		ctes += ` AND tree.root_group_key NOT IN (` + placeholders(len(query.CollapsedGroupKeys)) + `)`
-		for _, key := range query.CollapsedGroupKeys {
-			page.args = append(page.args, key)
-		}
-	}
-	ctes += `
-	), page_summary AS (
-		SELECT (SELECT COUNT(*) FROM filtered) AS total_tasks,
-			(SELECT COUNT(*) FROM display_tree) AS total_visible_tasks,
-			` + sidebarTotalGroupCountSQL(query.Group) + ` AS total_groups
-	), page_options AS (
-		SELECT request.page_size,
-			CASE
-				WHEN summary.total_visible_tasks = 0 THEN 1
-				WHEN request.requested_page <= ((summary.total_visible_tasks + request.page_size - 1) / request.page_size)
-					THEN request.requested_page
-				ELSE ((summary.total_visible_tasks + request.page_size - 1) / request.page_size)
-			END AS page
-		FROM (SELECT CAST(? AS BIGINT) AS page_size, CAST(? AS BIGINT) AS requested_page) request
-		CROSS JOIN page_summary summary
-	), page_window AS MATERIALIZED (
-		SELECT * FROM display_tree
-		ORDER BY group_order ASC, order_path ASC
-		LIMIT (SELECT page_size FROM page_options)
-		OFFSET (SELECT (page - 1) * page_size FROM page_options)
-	)` + sidebarPageGroupStartsCTE(query.Group) + `, page_subtask_walk(ancestor_id, descendant_id) AS (
-		SELECT page.id, page.id FROM page_window page
-		UNION ALL
-		SELECT walk.ancestor_id, child.id
-		FROM page_subtask_walk walk
-		JOIN filtered child ON child.parent_id = walk.descendant_id
-		LEFT JOIN cycle_roots cycle_root ON cycle_root.root_key = child.id
-		WHERE cycle_root.root_key IS NULL
-		), page_subtask_counts AS (
-			SELECT ancestor_id, COUNT(*) - 1 AS subtask_count
-			FROM page_subtask_walk
-			GROUP BY ancestor_id
-		)`
-	return ctes
-}
-
-func sidebarPageGroupStartsCTE(group string) string {
-	if group == sidebarGroupNone {
-		return `, page_group_starts AS (SELECT 1 AS group_order, MIN(order_path) AS first_order_path FROM display_tree)`
-	}
-	return `, page_group_starts AS (
-		SELECT group_order, MIN(order_path) AS first_order_path FROM display_tree
-		WHERE group_order IN (SELECT group_order FROM page_window)
-		GROUP BY group_order
-	)`
 }
 
 func sidebarPageQueueCTEs(driver string, page sidebarPageBuildContext) string {
@@ -194,7 +124,7 @@ func sidebarPageGroupExpressions(query models.SidebarTaskViewQuery, page sidebar
 	return groupCTEs, treeRootSQL
 }
 
-func sidebarPageTreeCTEs(driver string, query models.SidebarTaskViewQuery, page sidebarPageBuildContext, groupCTEs, treeRootSQL string) string {
+func sidebarPageTreeCTEs(page sidebarPageBuildContext) string {
 	//nolint:dupword // SQL CTE keys follow the task identifier schema.
 	cycleCTEs := `, cycle_probe(start_key, current_key, parent_key, visited, closed_by_key, min_key) AS (
 			SELECT id, id, parent_id, '/' || id || '/', NULL, id
@@ -210,47 +140,29 @@ func sidebarPageTreeCTEs(driver string, query models.SidebarTaskViewQuery, page 
 		), cycle_roots(root_key) AS (
 			SELECT DISTINCT min_key FROM cycle_probe WHERE closed_by_key = start_key
 		)`
-	globalRootOrder := sidebarSQLNull
-	if query.Group != sidebarGroupNone {
-		globalRootOrder = `CASE WHEN ` + page.rootCondition + ` THEN ROW_NUMBER() OVER (ORDER BY ` + page.sortExpr + `, v.updated_at DESC, ` + taskTitleOrder(driver, "v.", "ASC") + `, v.id ASC) END`
-	}
-	ctes := cycleCTEs + page.ancestorCTEs + page.stateCTEs + page.activityCTEs + `, ranked_ordered AS (
-			SELECT v.id, v.workflow_id, v.workflow_step_id, v.parent_id,
-				CASE WHEN ` + page.rootCondition + ` THEN NULL ELSE parent.id END AS display_parent_id,
-				` + page.groupKey + ` AS task_group_key, ` + page.groupLabel + ` AS task_group_label,
-				ROW_NUMBER() OVER (PARTITION BY CASE
-					WHEN ` + page.rootCondition + ` THEN 'root:' || ` + page.groupKey + ` ELSE 'parent:' || parent.id END
-					ORDER BY ` + page.order + `) AS sibling_order,
-				` + globalRootOrder + ` AS global_root_sort_order,
-				CASE WHEN ` + page.rootCondition + ` THEN ` + page.rootPinExpr + ` END AS root_pin_order
-			FROM filtered v LEFT JOIN filtered parent ON parent.id = v.parent_id
-			LEFT JOIN cycle_roots cycle_root ON cycle_root.root_key = v.id
-			` + page.activityJoin + page.stateJoin + `
-		), ranked AS (
-			SELECT ranked_ordered.*,
-				CASE WHEN display_parent_id IS NULL THEN sibling_order END AS root_sort_order
-			FROM ranked_ordered
-		)` + groupCTEs + `, tree AS (
-			` + treeRootSQL + `
-			UNION ALL
-			SELECT child.id, tree.root_id, tree.root_group_key, tree.root_group_label,
-				tree.group_order, child.workflow_id, child.workflow_step_id,
-				child.parent_id, tree.depth + 1, tree.order_path || '.' || ` + page.childPathPart + `
-			FROM tree
-			JOIN filtered child_source ON child_source.parent_id = tree.id
-			JOIN ranked child ON child.id = child_source.id AND child.display_parent_id = tree.id
-		), group_task_counts AS (`
-	return ctes
+	return cycleCTEs + page.ancestorCTEs + page.stateCTEs + page.activityCTEs + `, ranked_ordered AS (
+		SELECT v.id, v.workflow_id, v.workflow_step_id, CAST(NULL AS TEXT) AS display_parent_id,
+			` + page.groupKey + ` AS task_group_key, ` + page.groupLabel + ` AS task_group_label,
+			ROW_NUMBER() OVER (ORDER BY ` + page.rootOrder + `) AS global_root_sort_order,
+			` + page.rootPinExpr + ` AS root_pin_order
+		FROM filtered v LEFT JOIN filtered parent ON parent.id = v.parent_id
+		LEFT JOIN cycle_roots cycle_root ON cycle_root.root_key = v.id
+		` + page.activityJoin + page.stateJoin + `
+		WHERE ` + page.rootCondition + `
+	), ranked AS (
+		SELECT ranked_ordered.*, global_root_sort_order AS sibling_order,
+			global_root_sort_order AS root_sort_order FROM ranked_ordered
+	)`
 }
 
 type sidebarPageBuildContext struct {
-	sortExpr, groupOrder, rootPathPart, childPathPart string
-	rootPinExpr                                       string
-	cycleProbeGuard                                   string
-	wipAdmittedFalse, order, groupKey, groupLabel     string
-	stateJoin, rootCondition, stateCTEs               string
-	ancestorCTEs, activityCTEs, activityJoin          string
-	args                                              []any
+	groupOrder, rootPathPart, childPathPart                  string
+	rootPinExpr                                              string
+	cycleProbeGuard                                          string
+	wipAdmittedFalse, order, rootOrder, groupKey, groupLabel string
+	stateJoin, rootCondition, stateCTEs                      string
+	ancestorCTEs, activityCTEs, activityJoin                 string
+	args, childArgs                                          []any
 }
 
 func sidebarPageBuildContextFor(driver string, query models.SidebarTaskViewQuery, prefs models.SidebarTaskViewPreferences) sidebarPageBuildContext {
@@ -268,22 +180,20 @@ func sidebarPageBuildContextFor(driver string, query models.SidebarTaskViewQuery
 		childPathPart = `LPAD(CAST(child.sibling_order AS TEXT), 10, '0')`
 	}
 	wipAdmittedFalse := `COALESCE(queue_task.wip_admitted, 0) = 0`
-	rootPinOrder := `CASE WHEN parent.id IS NULL OR cycle_root.root_key IS NOT NULL THEN ` + pinExpr + ` ELSE 0 END`
-	manualChildOrder := `CASE WHEN parent.id IS NOT NULL AND cycle_root.root_key IS NULL
-			AND (` + subtaskExpr + `) IS NOT NULL THEN 0 ELSE 1 END,
-		CASE WHEN parent.id IS NOT NULL AND cycle_root.root_key IS NULL THEN ` + subtaskExpr + ` ELSE 0 END`
-	order := rootPinOrder + ` ASC, ` + manualChildOrder + ` ASC,
-			` + sortExpr + `, v.updated_at DESC, ` + taskTitleOrder(driver, "v.", "ASC") + `, v.id ASC`
-	orderArgs := make([]any, 0, len(pinArgs)+2*len(subtaskArgs)+len(sortArgs))
-	orderArgs = append(orderArgs, pinArgs...)
-	orderArgs = append(orderArgs, subtaskArgs...)
-	orderArgs = append(orderArgs, subtaskArgs...)
-	orderArgs = append(orderArgs, sortArgs...)
-	args := append([]any(nil), orderArgs...)
-	if query.Group != sidebarGroupNone {
-		args = append(args, sortArgs...)
+	canonicalOrder := sortExpr + `, v.updated_at DESC, ` + taskTitleOrder(driver, "v.", "ASC") + `, v.id ASC`
+	rootOrder := canonicalOrder
+	rootPinExpr := pinExpr
+	args := append([]any(nil), sortArgs...)
+	if query.Group == sidebarGroupNone {
+		rootOrder = pinExpr + ` ASC, ` + canonicalOrder
+		rootPinExpr = sidebarSQLNull
+		args = append(append([]any(nil), pinArgs...), sortArgs...)
+	} else {
+		args = append(args, pinArgs...)
 	}
-	args = append(args, pinArgs...)
+	order := `CASE WHEN (` + subtaskExpr + `) IS NOT NULL THEN 0 ELSE 1 END,
+		` + subtaskExpr + ` ASC, ` + canonicalOrder
+	childArgs := append(append(append([]any(nil), subtaskArgs...), subtaskArgs...), sortArgs...)
 
 	groupKey := "v.group_key"
 	groupLabel := "v.group_label"
@@ -299,12 +209,12 @@ func sidebarPageBuildContextFor(driver string, query models.SidebarTaskViewQuery
 	stateCTEs := sidebarStateCTEs(query)
 	activityCTEs, activityJoin := sidebarActivityCTEs(query)
 	return sidebarPageBuildContext{
-		sortExpr: sortExpr, groupOrder: groupOrder, rootPathPart: rootPathPart, childPathPart: childPathPart,
-		rootPinExpr:      pinExpr,
+		groupOrder: groupOrder, rootPathPart: rootPathPart, childPathPart: childPathPart,
+		rootPinExpr:      rootPinExpr,
 		cycleProbeGuard:  cycleProbeGuard,
-		wipAdmittedFalse: wipAdmittedFalse, order: order, groupKey: groupKey, groupLabel: groupLabel,
+		wipAdmittedFalse: wipAdmittedFalse, order: order, rootOrder: rootOrder, groupKey: groupKey, groupLabel: groupLabel,
 		stateJoin: stateJoin, rootCondition: rootCondition, stateCTEs: stateCTEs,
-		ancestorCTEs: sidebarAncestorCTE(driver, query), activityCTEs: activityCTEs, activityJoin: activityJoin, args: args,
+		ancestorCTEs: sidebarAncestorCTE(driver, query), activityCTEs: activityCTEs, activityJoin: activityJoin, args: args, childArgs: childArgs,
 	}
 }
 
