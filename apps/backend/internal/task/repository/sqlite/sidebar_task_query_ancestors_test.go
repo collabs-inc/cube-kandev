@@ -75,8 +75,11 @@ func TestSidebarTreeActivityKeepsNewerParentActivity(t *testing.T) {
 			} {
 				require.NoError(t, repo.CreateTask(t.Context(), &models.Task{
 					ID: row.id, WorkspaceID: "parent-activity", Title: row.id, ParentID: row.parent,
-					State: "TODO", CreatedAt: base, UpdatedAt: base.Add(row.activity),
+					State: "TODO", CreatedAt: base,
 				}))
+				_, err := repo.db.ExecContext(t.Context(), repo.db.Rebind(`UPDATE tasks SET updated_at = ? WHERE id = ?`),
+					base.Add(row.activity), row.id)
+				require.NoError(t, err)
 			}
 			for _, group := range []string{"none", "state"} {
 				query := sidebarTaskQuery(1)
