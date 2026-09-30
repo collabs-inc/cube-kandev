@@ -29,30 +29,37 @@ test.describe("mobile session entry recovery", () => {
     );
 
     if (!task.session_id) throw new Error("created recovery task has no session");
-    proxy.dropNextResponses("message.list", 2, { sessionId: task.session_id });
+    proxy.rejectResponsesUntilReleased("message.list", "Simulated temporary history failure", {
+      sessionId: task.session_id,
+    });
 
-    const session = await openTaskSession(testPage, task.id);
-    const chat = session.activeChat();
-    const historyNotice = chat.getByTestId("session-history-unavailable");
-    await expect
-      .poll(() => proxy.droppedResponseCount("message.list"), {
-        timeout: 45_000,
-        message: "Waiting for both message.list responses to be dropped for this session",
-      })
-      .toBe(2);
-    await expect(historyNotice).toBeVisible({ timeout: 45_000 });
+    try {
+      const session = await openTaskSession(testPage, task.id);
+      const chat = session.activeChat();
+      const historyNotice = chat.getByTestId("session-history-unavailable");
+      await expect
+        .poll(() => proxy.rejectedResponseCount("message.list"), {
+          timeout: 45_000,
+          message: "Waiting for a session-scoped message.list failure",
+        })
+        .toBeGreaterThan(0);
+      await expect(historyNotice).toBeVisible({ timeout: 45_000 });
 
-    const retry = historyNotice.getByTestId("session-history-retry");
-    const retryBox = await retry.boundingBox();
-    expect(retryBox?.height).toBeGreaterThanOrEqual(44);
-    const detailsSummary = historyNotice.getByTestId("session-history-details-summary");
-    const detailsBox = await detailsSummary.boundingBox();
-    expect(detailsBox?.height).toBeGreaterThanOrEqual(44);
-    await assertNoDocumentHorizontalOverflow(testPage, "mobile session history recovery");
+      const retry = historyNotice.getByTestId("session-history-retry");
+      const retryBox = await retry.boundingBox();
+      expect(retryBox?.height).toBeGreaterThanOrEqual(44);
+      const detailsSummary = historyNotice.getByTestId("session-history-details-summary");
+      const detailsBox = await detailsSummary.boundingBox();
+      expect(detailsBox?.height).toBeGreaterThanOrEqual(44);
+      await assertNoDocumentHorizontalOverflow(testPage, "mobile session history recovery");
 
-    await retry.click();
-    await expect(historyNotice).toHaveCount(0);
-    await expect(chat).toContainText("simple mock response", { timeout: 30_000 });
-    expect(proxy.droppedResponseCount("message.list")).toBe(2);
+      proxy.releaseRejectedResponses("message.list");
+      await retry.tap();
+      await expect(historyNotice).toHaveCount(0);
+      await expect(chat).toContainText("simple mock response", { timeout: 30_000 });
+      expect(proxy.rejectedResponseCount("message.list")).toBeGreaterThan(0);
+    } finally {
+      proxy.releaseRejectedResponses("message.list");
+    }
   });
 });

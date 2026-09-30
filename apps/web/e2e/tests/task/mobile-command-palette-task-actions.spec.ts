@@ -21,7 +21,8 @@ test("uses nested task commands and the move drawer on a phone", async ({
   );
   await expect(testPage.getByTestId("mobile-task-picker-trigger")).toBeVisible();
   await testPage.keyboard.press("Control+k");
-  const palette = testPage.getByRole("dialog").filter({ has: testPage.getByRole("combobox") });
+  const palette = testPage.getByRole("dialog", { name: "Command Palette", exact: true });
+  await expect(palette).toBeVisible();
   const search = palette.getByRole("combobox");
   await search.fill("Move to");
   const move = palette
@@ -55,16 +56,25 @@ test("uses nested task commands and the move drawer on a phone", async ({
     .poll(async () => (await apiClient.getTask(fixture.taskId)).workflow_step_id)
     .toBe(fixture.targetStepId);
   await testPage.keyboard.press("Control+k");
-  await testPage.getByRole("combobox").fill("Archive task");
-  await testPage
-    .getByRole("option")
-    .filter({ has: testPage.getByText("Archive task", { exact: true }) })
-    .tap();
-  // Tapping the command starts the archive action asynchronously. Wait for
-  // the palette portal to close before locating the confirmation dialog.
-  await expect(palette).toBeHidden({ timeout: 10_000 });
+  await expect(palette).toBeVisible();
+  const archiveSearch = palette.getByRole("combobox");
+  await archiveSearch.fill("Archive task");
+  const archiveCommand = palette.getByRole("option", { name: "Archive task", exact: true });
+  await expect(archiveCommand).toBeVisible();
+  await archiveCommand.scrollIntoViewIfNeeded();
+  const archiveReceivesCenterTap = await archiveCommand.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    const target = document.elementFromPoint(
+      rect.left + rect.width / 2,
+      rect.top + rect.height / 2,
+    );
+    return target === element || (target instanceof Node && element.contains(target));
+  });
+  expect(archiveReceivesCenterTap).toBe(true);
+  await archiveCommand.tap();
   const confirm = testPage.getByRole("dialog", { name: "Archive task?", exact: true });
   await expect(confirm).toBeVisible();
+  await expect(palette).toBeHidden({ timeout: 10_000 });
   await expect(testPage.getByRole("combobox")).toHaveCount(0);
   const cancel = confirm.getByRole("button", { name: "Cancel", exact: true });
   expect((await cancel.boundingBox())!.height).toBeGreaterThanOrEqual(44);

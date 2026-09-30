@@ -202,6 +202,17 @@ test.describe("Mobile plugin menu actions", () => {
         document.removeEventListener("click", observeWorkspaceAction);
       });
     });
+    await workspaceAction.scrollIntoViewIfNeeded();
+    await waitForFiniteAnimations(menu);
+    const workspaceActionReceivesCenterTap = await workspaceAction.evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      const target = document.elementFromPoint(
+        rect.left + rect.width / 2,
+        rect.top + rect.height / 2,
+      );
+      return target === element || (target instanceof Node && element.contains(target));
+    });
+    expect(workspaceActionReceivesCenterTap).toBe(true);
     await workspaceAction.tap();
     await expect
       .poll(() => testPage.locator("html").getAttribute("data-e2e-workspace-action-clicked"))

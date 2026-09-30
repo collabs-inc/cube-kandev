@@ -164,7 +164,17 @@ test.describe("Mobile workspace repository sets", () => {
     expect(refreshButtonBox).not.toBeNull();
     expect(refreshButtonBox!.height).toBeGreaterThanOrEqual(44);
     expect(refreshButtonBox!.width).toBeGreaterThanOrEqual(44);
+    await refreshButton.scrollIntoViewIfNeeded();
     await waitForFiniteAnimations(dropdown);
+    const refreshReceivesCenterTap = await refreshButton.evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      const target = document.elementFromPoint(
+        rect.left + rect.width / 2,
+        rect.top + rect.height / 2,
+      );
+      return target === element || (target instanceof Node && element.contains(target));
+    });
+    expect(refreshReceivesCenterTap).toBe(true);
     await refreshButton.tap({ timeout: 5_000 });
     await expect(dropdown.getByRole("option", { name: /^origin\/main origin/ })).toBeVisible();
 

@@ -41,6 +41,12 @@ test("task details omit native coordination controls for ordinary and configured
     },
   );
   expect(criteriaResponse.ok).toBe(true);
+  const criteriaSnapshot = (await criteriaResponse.json()) as {
+    blocked: boolean;
+    criteria: Array<{ id: string }>;
+  };
+  expect(criteriaSnapshot.blocked).toBe(true);
+  expect(criteriaSnapshot.criteria.map((criterion) => criterion.id)).toEqual(["required-review"]);
 
   const coordinationReads: string[] = [];
   testPage.on("request", (request) => {
@@ -82,6 +88,15 @@ test("task details omit native coordination controls for ordinary and configured
 
     const completingStep = seedData.steps.find((step) => step.complete_task_on_enter);
     if (!completingStep) throw new Error("seed workflow has no completing step");
+    const [currentTask, persistedGateResponse] = await Promise.all([
+      apiClient.getTask(configuredTask.id),
+      apiClient.rawRequest("GET", `/api/v1/tasks/${configuredTask.id}/completion-gate`),
+    ]);
+    expect(currentTask.workflow_step_id).toBe(seedData.startStepId);
+    expect(currentTask.state).not.toBe("COMPLETED");
+    expect(persistedGateResponse.ok).toBe(true);
+    const persistedGate = (await persistedGateResponse.json()) as { blocked: boolean };
+    expect(persistedGate.blocked).toBe(true);
     const stepButton = testPage.getByTestId(`workflow-step-${completingStep.name}`);
     const moveResponse = testPage.waitForResponse(
       (response) =>
