@@ -538,6 +538,7 @@ export type AppState = KanbanSlice & {
   setPendingModel: (sessionId: string, modelId: string) => void;
   clearPendingModel: (sessionId: string) => void;
   setActiveModel: (sessionId: string, modelId: string) => void;
+  clearActiveModel: (sessionId: string) => void;
   // Task plan actions
   setTaskPlan: (taskId: string, plan: TaskPlan | null) => void;
   setTaskPlanLoading: (taskId: string, loading: boolean) => void;
@@ -587,6 +588,7 @@ export type AppState = KanbanSlice & {
     modeId: string,
     availableModes?: SessionModeEntry[],
     requestedModeId?: string,
+    settingsPolicy?: "provider_restored" | "strict",
   ) => void;
   clearSessionMode: (sessionId: string) => void;
   // Agent capabilities actions
@@ -599,6 +601,7 @@ export type AppState = KanbanSlice & {
       models: SessionModelEntry[];
       configOptions: ConfigOptionEntry[];
       configBaseline?: Record<string, string>;
+      settingsPolicy?: "provider_restored";
       /** Set when the session started on the profile's fallback model. */
       fallbackModel?: string;
     },
