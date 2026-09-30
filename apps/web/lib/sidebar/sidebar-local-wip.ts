@@ -1,5 +1,5 @@
 import type { LocalSidebarTask } from "./sidebar-local-projection";
-import { sqliteBinary } from "./sidebar-local-order";
+import { sqliteBinary, sqliteTaskTime } from "./sidebar-local-order";
 
 const priority: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3, none: 4 };
 
@@ -25,8 +25,11 @@ export function localSidebarQueues(tasks: LocalSidebarTask[]) {
         a.position - b.position ||
         (priority[(a.priority ?? "none").toLowerCase()] ?? 4) -
           (priority[(b.priority ?? "none").toLowerCase()] ?? 4) ||
-        sqliteBinary(a.queuedAt ?? a.createdAt ?? "", b.queuedAt ?? b.createdAt ?? "") ||
-        sqliteBinary(a.createdAt ?? "", b.createdAt ?? "") ||
+        sqliteBinary(
+          sqliteTaskTime(a.queuedAt ?? a.createdAt),
+          sqliteTaskTime(b.queuedAt ?? b.createdAt),
+        ) ||
+        sqliteBinary(sqliteTaskTime(a.createdAt), sqliteTaskTime(b.createdAt)) ||
         sqliteBinary(a.id, b.id),
     );
     queue.forEach((task, index) =>

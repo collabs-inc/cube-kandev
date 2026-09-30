@@ -38,7 +38,7 @@ export function sqliteActivityKey(value: string): string {
 }
 
 /** Task timestamps are stored as Go's SQLite datetime text, independently of summary timestamps. */
-function taskTime(value: string | undefined): string {
+export function sqliteTaskTime(value: string | undefined): string {
   return (value ?? "").replace("T", " ").replace(/Z$/, "+00:00");
 }
 
@@ -67,21 +67,22 @@ export function localTaskComparator(
       case "title":
         return sqliteNoCase(a.title, b.title);
       case "createdAt":
-        return sqliteBinary(taskTime(a.createdAt), taskTime(b.createdAt));
+        return sqliteBinary(sqliteTaskTime(a.createdAt), sqliteTaskTime(b.createdAt));
       case "updatedAt":
-        return sqliteBinary(taskTime(a.updatedAt), taskTime(b.updatedAt));
+        return sqliteBinary(sqliteTaskTime(a.updatedAt), sqliteTaskTime(b.updatedAt));
       case "lastActivityAt":
         return sqliteBinary(activities.get(a.id) ?? "", activities.get(b.id) ?? "");
       case "custom":
         return (
-          order(a.id) - order(b.id) || sqliteBinary(taskTime(b.createdAt), taskTime(a.createdAt))
+          order(a.id) - order(b.id) ||
+          sqliteBinary(sqliteTaskTime(b.createdAt), sqliteTaskTime(a.createdAt))
         );
     }
   };
   const direction = sort.key !== "custom" && sort.direction === "desc" ? -1 : 1;
   return (a: TaskSwitcherItem, b: TaskSwitcherItem) =>
     compare(a, b) * direction ||
-    sqliteBinary(taskTime(b.updatedAt), taskTime(a.updatedAt)) ||
+    sqliteBinary(sqliteTaskTime(b.updatedAt), sqliteTaskTime(a.updatedAt)) ||
     sqliteNoCase(a.title, b.title) ||
     sqliteBinary(a.id, b.id);
 }

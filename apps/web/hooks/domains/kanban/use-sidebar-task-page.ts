@@ -135,14 +135,8 @@ function currentSidebarRequest(
   );
 }
 
-function acceptedSidebarResponse(
-  result: SidebarTaskPageResponse,
-  context: { revisionChanged: boolean; sameView: boolean },
-) {
-  const provisional = result.provisional || context.revisionChanged;
-  const allRemoved =
-    result.total_visible_tasks > 0 && !result.entries.some((entry) => entry.kind === "task");
-  return provisional && allRemoved && context.sameView ? null : { ...result, provisional };
+function acceptedSidebarResponse(result: SidebarTaskPageResponse, revisionChanged: boolean) {
+  return { ...result, provisional: result.provisional || revisionChanged };
 }
 
 function sidebarResponseState(
@@ -216,11 +210,9 @@ function useSidebarPageLoader(
       try {
         const result = await request.promise;
         if (!isCurrent()) return false;
-        const accepted = acceptedSidebarResponse(result, {
-          revisionChanged: queryRevision(store, workspaceId) !== startingRevision,
-          sameView: responseViewKeyRef.current === key,
-        });
-        if (accepted) setResponse(accepted);
+        setResponse(
+          acceptedSidebarResponse(result, queryRevision(store, workspaceId) !== startingRevision),
+        );
         setResponseViewKey(key);
         responseViewKeyRef.current = key;
         pageNumberRef.current = result.page;

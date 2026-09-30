@@ -141,3 +141,41 @@ it.each(["workspace", "logout", "reconnect", "access"] as const)(
     expect(store.getState().taskOverview.byId.kept).toBeUndefined();
   },
 );
+
+it("shows recovery when live removals empty a replacement instead of retaining an authoritative old page", async () => {
+  const replacement = deferred<SidebarTaskPageResponse>(),
+    trailing = deferred<SidebarTaskPageResponse>();
+  vi.mocked(querySidebarTasks)
+    .mockResolvedValueOnce(response())
+    .mockReturnValueOnce(replacement.promise)
+    .mockReturnValueOnce(trailing.promise);
+  const hook = renderHook(() => useSidebarTaskPage("ws"));
+  await waitFor(() => expect(hook.result.current.response?.entries).toHaveLength(3));
+  act(() => hook.result.current.refresh());
+  await waitFor(() => expect(querySidebarTasks).toHaveBeenCalledTimes(2));
+  const handlers = registerTasksHandlers(store);
+  act(() => {
+    for (const id of ["kept", "deleted", "archived"])
+      handlers["task.deleted"]?.({
+        type: "event",
+        action: "task.deleted",
+        payload: { task_id: id, workspace_id: "ws", workflow_id: "wf" },
+      } as Parameters<NonNullable<(typeof handlers)[string]>>[0]);
+  });
+  await act(async () => replacement.resolve(response()));
+  expect(hook.result.current.response?.entries).toEqual([]);
+  expect(hook.result.current.response?.provisional).toBe(true);
+  expect(hook.result.current.isLoading).toBe(true);
+  await waitFor(() => expect(querySidebarTasks).toHaveBeenCalledTimes(3));
+  await act(async () =>
+    trailing.resolve({
+      ...response(),
+      entries: [],
+      total_tasks: 0,
+      total_visible_tasks: 0,
+      total_entries: 0,
+    }),
+  );
+  await waitFor(() => expect(hook.result.current.isLoading).toBe(false));
+  expect(hook.result.current.response?.provisional).toBe(false);
+});
