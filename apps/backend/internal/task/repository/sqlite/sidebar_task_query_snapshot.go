@@ -62,7 +62,7 @@ func (s *sidebarQuerySnapshot) prepare(
 		return "", nil, err
 	}
 	visibleSQL, visibleArgs := sidebarVisibleCTE(query)
-	return "WITH RECURSIVE filtered AS MATERIALIZED (SELECT * FROM " + sidebarScratchTable + ")" + visibleSQL, visibleArgs, nil
+	return "WITH RECURSIVE filtered AS NOT MATERIALIZED (SELECT * FROM " + sidebarScratchTable + ")" + visibleSQL, visibleArgs, nil
 }
 
 func (s *sidebarQuerySnapshot) commit(ctx context.Context) error {

@@ -3053,7 +3053,14 @@
             "p",
             "c",
             "q"
-          ]
+          ],
+          "expected_subtask_counts": {
+            "a": 1,
+            "b": 0,
+            "p": 1,
+            "c": 0,
+            "q": 0
+          }
         },
         {
           "name": "filtered-parent",
@@ -3085,6 +3092,10 @@
           ],
           "expected_depths": {
             "c": 0
+          },
+          "expected_subtask_counts": {
+            "c": 0,
+            "q": 0
           }
         },
         {
@@ -3109,7 +3120,13 @@
             "b",
             "p",
             "q"
-          ]
+          ],
+          "expected_subtask_counts": {
+            "a": 1,
+            "b": 0,
+            "p": 1,
+            "q": 0
+          }
         },
         {
           "name": "continuation",
@@ -3132,6 +3149,9 @@
           "expected_continuation": "p",
           "expected_depths": {
             "c": 1
+          },
+          "expected_subtask_counts": {
+            "c": 0
           }
         },
         {
@@ -3155,7 +3175,14 @@
             "a",
             "b",
             "q"
-          ]
+          ],
+          "expected_subtask_counts": {
+            "p": 1,
+            "c": 0,
+            "a": 1,
+            "b": 0,
+            "q": 0
+          }
         }
       ]
     },

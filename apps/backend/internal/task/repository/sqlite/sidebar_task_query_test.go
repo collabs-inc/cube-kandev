@@ -448,7 +448,7 @@ func logSidebarTaskPageQueryPlan(b *testing.B, repo *Repository, workspaceID str
 	}
 	pageCTEs, cteArgs := sidebarPageCTEs(driver, query, models.SidebarTaskViewPreferences{})
 	args := append(append([]any(nil), baseArgs...), cteArgs...)
-	explain := "EXPLAIN "
+	explain := "EXPLAIN (ANALYZE, BUFFERS, TIMING OFF) "
 	if !dialect.IsPostgres(driver) {
 		explain = "EXPLAIN QUERY PLAN "
 	}
@@ -459,7 +459,7 @@ func logSidebarTaskPageQueryPlan(b *testing.B, repo *Repository, workspaceID str
 	}
 	defer func() { _ = rows.Close() }()
 	var plan []string
-	for rows.Next() && len(plan) < 100 {
+	for rows.Next() && len(plan) < 500 {
 		if dialect.IsPostgres(driver) {
 			var line string
 			if err := rows.Scan(&line); err != nil {
@@ -478,7 +478,7 @@ func logSidebarTaskPageQueryPlan(b *testing.B, repo *Repository, workspaceID str
 	if err := rows.Err(); err != nil {
 		b.Fatalf("read sidebar benchmark query plan: %v", err)
 	}
-	b.Logf("%s page query plan (first 100 nodes):\n%s", driver, strings.Join(plan, "\n"))
+	b.Logf("%s page query plan (first 500 nodes):\n%s", driver, strings.Join(plan, "\n"))
 }
 
 func TestQuerySidebarTaskPageClampsAndAppliesCollapsedVisibility(t *testing.T) {

@@ -30,9 +30,10 @@ func (s *sidebarQuerySnapshot) preparePreferences(ctx context.Context, prefs mod
 	if err != nil {
 		return fmt.Errorf("encode sidebar preferences: %w", err)
 	}
-	_, err = s.tx.ExecContext(ctx, "INSERT OR IGNORE INTO "+sidebarPreferenceTable+`
+	_, err = s.tx.ExecContext(ctx, s.tx.Rebind("INSERT INTO "+sidebarPreferenceTable+`
  SELECT json_extract(value, '$[0]'), json_extract(value, '$[1]'),
-  json_extract(value, '$[2]'), json_extract(value, '$[3]') FROM json_each(?)`, string(payload))
+  json_extract(value, '$[2]'), json_extract(value, '$[3]') FROM json_each(?) WHERE 1=1
+ ON CONFLICT (kind, parent_id, task_id) DO NOTHING`), string(payload))
 	if err != nil {
 		return fmt.Errorf("stage sidebar preferences: %w", err)
 	}

@@ -18,6 +18,7 @@ type FixtureCase = {
   expected_group_keys?: string[];
   expected_queues?: Record<string, [number, number]>;
   expected_depths?: Record<string, number>;
+  expected_subtask_counts?: Record<string, number>;
   expected_continuation?: string;
   expected_total_visible?: number;
 };
@@ -65,6 +66,17 @@ function projectScenario(tasks: FixtureTask[]) {
   );
 }
 
+function assertRowMetadata(page: ReturnType<typeof localSidebarPage>, fixture: FixtureCase) {
+  for (const [id, queue] of Object.entries(fixture.expected_queues ?? {})) {
+    const row = page.entries.find((row) => row.task_id === id)!;
+    expect([row.wip_queue_position, row.wip_queue_total]).toEqual(queue);
+  }
+  for (const [id, depth] of Object.entries(fixture.expected_depths ?? {}))
+    expect(page.entries.find((row) => row.task_id === id)?.depth ?? 0).toBe(depth);
+  for (const [id, count] of Object.entries(fixture.expected_subtask_counts ?? {}))
+    expect(page.entries.find((row) => row.task_id === id)?.subtask_count ?? 0).toBe(count);
+}
+
 for (const scenario of fixtures.scenarios) {
   it.each(scenario.cases as FixtureCase[])(
     `${scenario.name}: $name agrees with actual SQLite`,
@@ -83,12 +95,7 @@ for (const scenario of fixtures.scenarios) {
         expect(
           page.entries.filter((row) => row.kind === "group").map((row) => row.group_key),
         ).toEqual(fixture.expected_group_keys);
-      for (const [id, queue] of Object.entries(fixture.expected_queues ?? {})) {
-        const row = page.entries.find((row) => row.task_id === id)!;
-        expect([row.wip_queue_position, row.wip_queue_total]).toEqual(queue);
-      }
-      for (const [id, depth] of Object.entries(fixture.expected_depths ?? {}))
-        expect(page.entries.find((row) => row.task_id === id)?.depth ?? 0).toBe(depth);
+      assertRowMetadata(page, fixture);
       if (fixture.expected_continuation)
         expect(
           page.entries.filter((row) => row.kind === "continuation").map((row) => row.parent_id),

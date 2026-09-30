@@ -36,11 +36,11 @@ func sidebarBaseCTE(driver, groupExpr, groupLabelExpr string, query models.Sideb
 	needs := sidebarBaseNeedsFor(query)
 	summaryJoin, workflowJoins := sidebarBaseJoins(needs)
 	candidateFields := sidebarBaseCandidateFields(driver, needs)
-	return `WITH RECURSIVE candidate_raw AS (
+	return `WITH RECURSIVE candidate_raw AS MATERIALIZED (
 		SELECT ` + strings.Join(candidateFields, ",\n\t\t\t") + `
 		FROM tasks t
 		` + workflowJoins + summaryJoin + `
-		WHERE t.workspace_id = ? AND COALESCE(t.is_ephemeral, 0) = 0
+		WHERE t.workspace_id = ? AND (t.is_ephemeral = 0 OR t.is_ephemeral IS NULL)
 			AND COALESCE(t.origin, '') <> 'automation_run'
 			AND ` + excludeConfigModePredicate(driver, "t.metadata") + `
 	), candidate AS (
@@ -291,7 +291,7 @@ func sidebarVisibleCTE(query models.SidebarTaskViewQuery) (string, []any) {
 			SELECT child.id FROM filtered child JOIN hidden_tasks hidden ON child.parent_id = hidden.id
 		)`)
 	}
-	visible := `visible AS MATERIALIZED (SELECT * FROM filtered WHERE 1=1`
+	visible := `visible AS MATERIALIZED (SELECT id FROM filtered WHERE 1=1`
 	if len(query.CollapsedTaskIDs) > 0 {
 		visible += ` AND id NOT IN (SELECT id FROM hidden_tasks)`
 	}

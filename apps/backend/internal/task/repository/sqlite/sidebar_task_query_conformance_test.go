@@ -18,15 +18,16 @@ type sidebarLocalFixtureTask struct {
 	RepositoryIDs []string        `json:"repository_ids"`
 }
 type sidebarLocalFixtureCase struct {
-	Name         string                            `json:"name"`
-	Query        models.SidebarTaskViewQuery       `json:"query"`
-	Preferences  models.SidebarTaskViewPreferences `json:"preferences"`
-	IDs          []string                          `json:"expected_task_ids"`
-	Groups       []string                          `json:"expected_group_keys"`
-	Queues       map[string][2]int                 `json:"expected_queues"`
-	Depths       map[string]int                    `json:"expected_depths"`
-	Continuation string                            `json:"expected_continuation"`
-	TotalVisible *int                              `json:"expected_total_visible"`
+	Name          string                            `json:"name"`
+	Query         models.SidebarTaskViewQuery       `json:"query"`
+	Preferences   models.SidebarTaskViewPreferences `json:"preferences"`
+	IDs           []string                          `json:"expected_task_ids"`
+	Groups        []string                          `json:"expected_group_keys"`
+	Queues        map[string][2]int                 `json:"expected_queues"`
+	Depths        map[string]int                    `json:"expected_depths"`
+	SubtaskCounts map[string]int                    `json:"expected_subtask_counts"`
+	Continuation  string                            `json:"expected_continuation"`
+	TotalVisible  *int                              `json:"expected_total_visible"`
 }
 
 func TestSidebarLocalViewSQLiteConformance(t *testing.T) {
@@ -117,6 +118,9 @@ func assertSidebarLocalConformance(t *testing.T, page *models.SidebarTaskPageRes
 		}
 		if depth, ok := expected.Depths[entry.TaskID]; ok {
 			require.Equal(t, depth, entry.Depth)
+		}
+		if count, ok := expected.SubtaskCounts[entry.TaskID]; ok {
+			require.Equal(t, count, entry.SubtaskCount)
 		}
 	}
 	if expected.Groups != nil {
