@@ -1,0 +1,85 @@
+{
+  "generated_at": "2026-10-01T02:44:53.937Z",
+  "assets": [
+    {
+      "name": "login",
+      "type": "screenshot",
+      "format": "png",
+      "file": "mobile-minimax-agent-conflict--login.png",
+      "test": "mobile-minimax-agent-conflict.spec.ts",
+      "caption": "Competing region sign-in preserves the original terminal"
+    },
+    {
+      "name": "install",
+      "type": "screenshot",
+      "format": "png",
+      "file": "mobile-minimax-agent--install.png",
+      "test": "mobile-minimax-agent.spec.ts",
+      "caption": "MiniMax native CLI installation"
+    },
+    {
+      "name": "region",
+      "type": "screenshot",
+      "format": "png",
+      "file": "mobile-minimax-agent--region.png",
+      "test": "mobile-minimax-agent.spec.ts",
+      "caption": "Choose the MiniMax subscription account region"
+    },
+    {
+      "name": "login",
+      "type": "screenshot",
+      "format": "png",
+      "file": "mobile-minimax-agent--login.png",
+      "test": "mobile-minimax-agent.spec.ts",
+      "caption": "MiniMax subscription login for the selected account region"
+    },
+    {
+      "name": "profile",
+      "type": "screenshot",
+      "format": "png",
+      "file": "mobile-minimax-agent--profile.png",
+      "test": "mobile-minimax-agent.spec.ts",
+      "caption": "MiniMax native model saved in an agent profile"
+    },
+    {
+      "name": "login",
+      "type": "screenshot",
+      "format": "png",
+      "file": "minimax-agent-conflict--login.png",
+      "test": "minimax-agent-conflict.spec.ts",
+      "caption": "Competing region sign-in preserves the original terminal"
+    },
+    {
+      "name": "install",
+      "type": "screenshot",
+      "format": "png",
+      "file": "minimax-agent--install.png",
+      "test": "minimax-agent.spec.ts",
+      "caption": "MiniMax native CLI installation"
+    },
+    {
+      "name": "region",
+      "type": "screenshot",
+      "format": "png",
+      "file": "minimax-agent--region.png",
+      "test": "minimax-agent.spec.ts",
+      "caption": "Choose the MiniMax subscription account region"
+    },
+    {
+      "name": "login",
+      "type": "screenshot",
+      "format": "png",
+      "file": "minimax-agent--login.png",
+      "test": "minimax-agent.spec.ts",
+      "caption": "MiniMax subscription login for the selected account region"
+    },
+    {
+      "name": "profile",
+      "type": "screenshot",
+      "format": "png",
+      "file": "minimax-agent--profile.png",
+      "test": "minimax-agent.spec.ts",
+      "caption": "MiniMax native model saved in an agent profile"
+    }
+  ]
+}
