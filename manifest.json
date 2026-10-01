@@ -1,0 +1,29 @@
+{
+  "generated_at": "2026-10-01T00:00:00Z",
+  "assets": [
+    {
+      "name": "desktop-pr-sidebar-overflow-scrolled",
+      "type": "screenshot",
+      "format": "png",
+      "file": "pr-sidebar-hover-hydration--desktop-pr-sidebar-overflow-scrolled.png",
+      "test": "pr-sidebar-hover-hydration.spec.ts",
+      "caption": "Desktop task sidebar scrolls long PR summaries and automation details internally"
+    },
+    {
+      "name": "desktop-pr-sidebar-overflow-keyboard-focus",
+      "type": "screenshot",
+      "format": "png",
+      "file": "pr-sidebar-hover-hydration--desktop-pr-sidebar-overflow-keyboard-focus.png",
+      "test": "pr-sidebar-hover-hydration.spec.ts",
+      "caption": "Desktop PR summary shows a visible focus indicator on the keyboard scroll region"
+    },
+    {
+      "name": "sidebar-pr-summary-overflow-mobile",
+      "type": "screenshot",
+      "format": "png",
+      "file": "mobile-pr-sidebar-automation-indicators--sidebar-pr-summary-overflow-mobile.png",
+      "test": "mobile-pr-sidebar-automation-indicators.spec.ts",
+      "caption": "Mobile PR drawer keeps its header fixed while long PR and automation details scroll"
+    }
+  ]
+}
