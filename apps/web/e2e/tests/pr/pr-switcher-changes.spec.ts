@@ -1,4 +1,4 @@
-import { test, expect } from "../../fixtures/test-base";
+import { test, expect, resetSeedRepositoryCheckout } from "../../fixtures/test-base";
 import { GitHelper, makeGitEnv } from "../../helpers/git-helper";
 import { watchWs } from "../../helpers/causal-waits";
 import { KanbanPage } from "../../pages/kanban-page";
@@ -24,6 +24,7 @@ test.describe("PR switcher changes panel", () => {
     backend,
   }) => {
     test.setTimeout(180_000);
+    resetSeedRepositoryCheckout(seedData, backend.tmpDir);
 
     // --- Seed workflow ---
     const workflow = await apiClient.createWorkflow(seedData.workspaceId, "PR Switcher Workflow");
