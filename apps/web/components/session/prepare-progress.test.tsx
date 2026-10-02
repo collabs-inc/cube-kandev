@@ -44,12 +44,14 @@ vi.mock("@/components/state-provider", () => ({
 
 import { PrepareProgress } from "./prepare-progress";
 
+function resetPrepareProgressMocks() {
+  cleanup();
+  mockMessages = [];
+  mockPrepareError = undefined;
+}
+
 describe("PrepareProgress", () => {
-  afterEach(() => {
-    cleanup();
-    mockMessages = [];
-    mockPrepareError = undefined;
-  });
+  afterEach(resetPrepareProgressMocks);
 
   it("hides skipped steps that have no useful details", () => {
     mockPrepareStatus = "preparing";
@@ -156,6 +158,117 @@ describe("PrepareProgress", () => {
 
     expect(screen.getByText(/branch feature\/very-long-name not found/)).toBeTruthy();
     expect(screen.getByText(CREATE_WORKTREE)).toBeTruthy();
+  });
+});
+
+describe("PrepareProgress imported MCP warnings", () => {
+  afterEach(resetPrepareProgressMocks);
+
+  it("presents auth-required imported MCP verification as a warning when overall prepare completes", () => {
+    mockPrepareStatus = "completed";
+    mockSessionState = "RUNNING";
+    mockSteps = [
+      {
+        name: "",
+        kind: "agent_mcp_verification",
+        mcpServerId: "plugin-atlassian-atlassian",
+        failureCode: "authentication_required",
+        status: "failed",
+      },
+    ];
+
+    render(<PrepareProgress sessionId="session-1" />);
+
+    expect(screen.getByText("Environment prepared with warnings")).toBeTruthy();
+    expect(screen.getByText("Verify connection: plugin-atlassian-atlassian")).toBeTruthy();
+    expect(screen.getByTestId("prepare-step-warning-icon")).toBeTruthy();
+  });
+
+  it("preserves error header when an auth warning coexists with a genuine step failure", () => {
+    mockPrepareStatus = "completed";
+    mockSessionState = "RUNNING";
+    mockSteps = [
+      {
+        name: CREATE_WORKTREE,
+        status: "failed",
+      },
+      {
+        name: "",
+        kind: "agent_mcp_verification",
+        mcpServerId: "plugin-atlassian-atlassian",
+        failureCode: "authentication_required",
+        status: "failed",
+      },
+    ];
+
+    render(<PrepareProgress sessionId="session-1" />);
+
+    expect(screen.getByText("Environment setup finished with errors")).toBeTruthy();
+  });
+
+  it("preserves error header for non-authentication MCP verification failure", () => {
+    mockPrepareStatus = "completed";
+    mockSessionState = "RUNNING";
+    mockSteps = [
+      {
+        name: "",
+        kind: "agent_mcp_verification",
+        mcpServerId: "plugin-atlassian-atlassian",
+        failureCode: "connection_failed",
+        status: "failed",
+      },
+    ];
+
+    render(<PrepareProgress sessionId="session-1" />);
+
+    expect(screen.getByText("Environment setup finished with errors")).toBeTruthy();
+  });
+});
+
+describe("PrepareProgress remote helper feedback", () => {
+  afterEach(resetPrepareProgressMocks);
+
+  it("shows a localized typed helper download row with no raw step name", () => {
+    mockPrepareStatus = "preparing";
+    mockSessionState = "STARTING";
+    mockSteps = [
+      {
+        name: "",
+        kind: "remote_helper_download",
+        remotePlatform: "linux/amd64",
+        status: "running",
+      },
+    ];
+
+    render(<PrepareProgress sessionId="session-1" />);
+
+    expect(screen.getByText("Downloading remote helper (linux/amd64)")).toBeTruthy();
+  });
+
+  it("shows localized helper timeout recovery and keeps the raw failure as detail", () => {
+    mockPrepareStatus = "failed";
+    mockSessionState = "FAILED";
+    mockSteps = [
+      {
+        name: "",
+        kind: "remote_helper_download",
+        remotePlatform: "linux/amd64",
+        failureCode: "timeout",
+        status: "failed",
+        error: "context deadline exceeded",
+      },
+    ];
+
+    render(<PrepareProgress sessionId="session-1" />);
+    fireEvent.click(screen.getByRole("button", { name: "Show preparation details" }));
+
+    expect(screen.getByText("Remote helper download timed out (linux/amd64)")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Use the full offline runtime archive or configure an explicit helper path.",
+      ),
+    ).toBeTruthy();
+    expect(screen.getByText("context deadline exceeded")).toBeTruthy();
   });
 });
 

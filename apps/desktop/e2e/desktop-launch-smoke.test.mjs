@@ -1,4 +1,5 @@
-import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -11,15 +12,21 @@ import { setTimeout as delay } from "node:timers/promises";
 import {
   HEALTH_REQUESTED_TIMEOUT_MS,
   ROOT_REQUESTED_TIMEOUT_MS,
+  parseProcessStatuses,
+  waitForHttp,
   writeJsonAtomically,
   createAtomicRecordWriter,
   waitForFile,
+  writeInstanceRecord,
+  writeFakeRuntime,
+  writeReleaseShapedRuntime,
 } from "./desktop-launch-smoke.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const desktopRoot = resolve(__dirname, "..");
 const repoRoot = resolve(desktopRoot, "../..");
 const backendRsPath = resolve(__dirname, "../src-tauri/src/backend.rs");
+const smokeScriptPath = resolve(__dirname, "desktop-launch-smoke.mjs");
 const mainRsPath = resolve(__dirname, "../src-tauri/src/main.rs");
 const shellRsPath = resolve(__dirname, "../src-tauri/src/shell.rs");
 const startupHtmlPath = resolve(__dirname, "../index.html");
@@ -50,6 +57,36 @@ const STARTUP_COPY_KEYS = [
   "spawnError",
   "startupFailureTitle",
 ];
+
+test("process-status parsing preserves PID ownership and zombie state", () => {
+  assert.deepEqual(parseProcessStatuses(" 123 45 Sl+\n 124 45 Z\n"), [
+    { pid: 123, parentPid: 45, state: "Sl+" },
+    { pid: 124, parentPid: 45, state: "Z" },
+  ]);
+  assert.deepEqual(parseProcessStatuses("\n"), []);
+  assert.throws(() => parseProcessStatuses("not a process row"), /invalid process status row/);
+});
+
+test("empty status-1 ps failures mean there are no child processes", () => {
+  const noChildren = Object.assign(new Error("ps found no child processes"), {
+    status: 1,
+    stdout: " \n",
+  });
+  let statuses;
+  assert.doesNotThrow(() => {
+    statuses = parseProcessStatuses(noChildren);
+  });
+  assert.deepEqual(statuses, []);
+
+  const partialOutputFailure = Object.assign(new Error("ps failed after partial output"), {
+    status: 1,
+    stdout: "not a process row",
+  });
+  assert.throws(() => parseProcessStatuses(partialOutputFailure), partialOutputFailure);
+
+  const otherFailure = Object.assign(new Error("ps failed"), { status: 2, stdout: "" });
+  assert.throws(() => parseProcessStatuses(otherFailure), otherFailure);
+});
 
 async function withTempDir(run) {
   const dir = await mkdtemp(join(tmpdir(), "wait-for-file-"));
@@ -87,6 +124,21 @@ test("waitForFile resolves once the target file appears", async () => {
     const target = join(dir, "marker");
     const write = new Promise((r) => setTimeout(r, 50)).then(() => writeFile(target, "1"));
     await Promise.all([waitForFile(target, 2_000), write]);
+  });
+});
+
+test("instance records remain valid during concurrent updates", async () => {
+  await withTempDir(async (dir) => {
+    const target = join(dir, "instance.json");
+    await writeInstanceRecord(dir, { pid: 1, payload: "a".repeat(100_000) });
+    const writes = Array.from({ length: 30 }, (_, i) =>
+      writeInstanceRecord(dir, { pid: i + 2, payload: "b".repeat(100_000) }),
+    );
+    const reads = Array.from({ length: 100 }, async () => {
+      const record = JSON.parse(await readFile(target, "utf8"));
+      assert.equal(record.payload.length, 100_000);
+    });
+    await Promise.all([...writes, ...reads]);
   });
 });
 
@@ -182,6 +234,74 @@ test("waitForHttp backs off after an unsuccessful HTTP response", async () => {
 
   assert.equal(attempts, 2);
   assert.deepEqual(pauses, [100]);
+});
+
+test("desktop smoke runtime uses standard resources without bundled remote helpers", async () => {
+  await withTempDir(async (dir) => {
+    const runtimeDir = resolve(dir, "runtime");
+    const stateDir = resolve(dir, "state");
+    await mkdir(resolve(runtimeDir, "bin"), { recursive: true });
+    await mkdir(stateDir, { recursive: true });
+    await writeFakeRuntime(runtimeDir, stateDir, "happy");
+
+    assert.deepEqual(
+      (await readdir(resolve(runtimeDir, "bin"))).sort(),
+      process.platform === "win32" ? ["agentctl.cmd", "kandev.cmd"] : ["agentctl", "kandev"],
+    );
+    const manifest = JSON.parse(await readFile(resolve(runtimeDir, "remote-helpers.json"), "utf8"));
+    assert.equal(manifest.variant, "standard");
+    assert.equal(manifest.schema_version, 1);
+  });
+});
+
+test("release-shaped Desktop runtime seeds a verified helper outside the standard bundle", async () => {
+  await withTempDir(async (dir) => {
+    const sourceBinDir = resolve(dir, "source-bin");
+    const runtimeDir = resolve(dir, "runtime");
+    const homeDir = resolve(dir, "home");
+    await mkdir(sourceBinDir, { recursive: true });
+    for (const name of [
+      "kandev",
+      "agentctl",
+      "agentctl-linux-amd64",
+      "agentctl-linux-arm64",
+      "agentctl-darwin-amd64",
+      "agentctl-darwin-arm64",
+    ]) {
+      const path = resolve(sourceBinDir, name);
+      await writeFile(path, `#!/bin/sh\n# ${name}\n`);
+      await chmod(path, 0o755);
+    }
+
+    const runtime = await writeReleaseShapedRuntime({
+      sourceBinDir,
+      runtimeDir,
+      homeDir,
+      version: "1.2.3",
+      commit: "a".repeat(40),
+    });
+
+    assert.deepEqual((await readdir(resolve(runtimeDir, "bin"))).sort(), ["agentctl", "kandev"]);
+    assert.equal(runtime.manifest.variant, "standard");
+    assert.equal(runtime.manifest.version, "1.2.3");
+    assert.equal(runtime.manifest.commit, "a".repeat(40));
+    const helper = runtime.manifest.helpers.find(({ platform }) => platform === "linux/amd64");
+    assert.ok(helper);
+    const cachedHelper = await readFile(runtime.cachePath);
+    assert.equal(createHash("sha256").update(cachedHelper).digest("hex"), helper.sha256);
+    assert.equal(cachedHelper.length, helper.size_bytes);
+    assert.ok((await stat(runtime.cachePath)).mode & 0o111);
+  });
+});
+
+test("release-shaped Desktop smoke runs the real launcher with a preseeded helper cache", async () => {
+  const source = await readFile(smokeScriptPath, "utf8");
+  assert.match(source, /spawn\(launcherBinary, \["--headless", "--port", String\(launcherPort\)\]/);
+  assert.match(source, /KANDEV_BUNDLE_DIR: runtimeDir/);
+  assert.match(source, /KANDEV_AGENTCTL_LINUX_AMD64_BINARY: ""/);
+  assert.match(source, /KANDEV_DESKTOP_RUNTIME_DIR: runtimeDir/);
+  assert.match(source, /TestAgentctlResolverPackagedDesktopBundleUsesPreseededCache/);
+  assert.match(source, /await runReleaseShapedSmoke\(appBinary\)/);
 });
 
 test("health-requested timeout stays above the Rust backend's own HEALTH_TIMEOUT", async () => {
@@ -370,7 +490,7 @@ test(
 
     let browser;
     try {
-      await waitForHttp("http://127.0.0.1:4178", 15_000, () => {
+      await waitForPreviewHttp("http://127.0.0.1:4178", 15_000, () => {
         if (preview.exitCode !== null) throw new Error(serverOutput);
       });
       browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
@@ -556,7 +676,7 @@ test(
   },
 );
 
-async function waitForHttp(url, timeoutMs, tick, pause = delay) {
+async function waitForPreviewHttp(url, timeoutMs, tick, pause = delay) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     tick?.();
