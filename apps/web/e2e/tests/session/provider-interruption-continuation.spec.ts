@@ -239,6 +239,7 @@ test("desktop: disabled continuation preserves manual recovery without native re
     expect(recovery.metadata?.recovery_actions).toBe(true);
     expect(recovery.metadata?.runtime_retained).not.toBe(true);
     expect(recovery.metadata?.attempts_started ?? 0).toBe(0);
+    expect(recovery.metadata?.recovery_disposition).not.toBe("exhausted");
     await expect(session.recoveryResumeButton()).toBeVisible();
     await expect(session.transientRetryCard()).toBeHidden();
     const trace = fs.readFileSync(fixture.tracePath, "utf8");
