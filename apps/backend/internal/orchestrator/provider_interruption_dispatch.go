@@ -38,6 +38,11 @@ func (s *Service) retryInterruptedContinuation(ctx context.Context, taskID, sess
 			return
 		}
 	}
+	_, binding := entry.recovery()
+	if binding == nil {
+		s.finishContinuationManual(ctx, taskID, sessionID, execID, entry)
+		return
+	}
 	entry.mu.Lock()
 	entry.started++
 	stopped := entry.predecessorStopped
@@ -64,7 +69,7 @@ func (s *Service) retryInterruptedContinuation(ctx context.Context, taskID, sess
 	prepareCtx = context.WithValue(prepareCtx, continuationOwnedContextKey{}, true)
 	dispatchStarted := false
 	execution, err := s.resumeTaskSessionWithContinuation(prepareCtx, taskID, sessionID,
-		executor.ResumeOptions{RequiredNativeConversationID: entry.continuation.nativeID, Origin: string(launchOriginAutomatic)},
+		executor.ResumeOptions{RequiredNativeConversationID: binding.nativeID, Origin: string(launchOriginAutomatic)},
 		func(promptCtx context.Context, attempt *resumeAttempt, _ *executor.TaskExecution) error {
 			entry.mu.Lock()
 			entry.restoredExecution = attempt.execution()
@@ -169,21 +174,22 @@ func (s *Service) validateContinuationOwner(ctx context.Context, taskID, session
 		return ctx.Err()
 	}
 	current, ok := s.transientRetries.Load(sessionID)
-	if !ok || current != entry || !s.config.ProviderInterruptionContinuation || entry.continuation == nil {
+	_, binding := entry.recovery()
+	if !ok || current != entry || !s.config.ProviderInterruptionContinuation || binding == nil {
 		return ErrResumeAttemptCancelled
 	}
 	session, err := s.repo.GetTaskSession(ctx, sessionID)
 	if err != nil {
 		return err
 	}
-	if !continuationSessionMatches(taskID, session, entry.continuation) {
+	if !continuationSessionMatches(taskID, session, binding) {
 		return errors.New("interrupted conversation identity changed")
 	}
 	task, err := s.repo.GetTask(ctx, taskID)
 	if err != nil {
 		return err
 	}
-	if !continuationTaskMatches(task, entry.continuation) {
+	if !continuationTaskMatches(task, binding) {
 		return errors.New("interrupted task is no longer eligible")
 	}
 	if s.messageQueue != nil {

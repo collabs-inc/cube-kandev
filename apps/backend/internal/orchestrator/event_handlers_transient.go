@@ -106,6 +106,7 @@ type transientRetryEntry struct {
 	attempt            int
 	mode               string
 	continuation       *continuationBinding
+	failureData        *watcher.AgentEventData
 	providerID         string
 	modelID            string
 	cancel             func()
@@ -156,6 +157,12 @@ func (e *transientRetryEntry) arm() bool {
 	}
 	e.armed = true
 	return true
+}
+
+func (e *transientRetryEntry) recovery() (string, *continuationBinding) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.mode, e.continuation
 }
 
 // rememberTurnPrompt caches the raw outbound prompt so a transient retry can
@@ -211,10 +218,15 @@ func (s *Service) handleTransientFailure(ctx context.Context, data watcher.Agent
 	var binding *continuationBinding
 	previous, _ := s.transientRetries.Load(data.SessionID)
 	previousEntry, _ := previous.(*transientRetryEntry)
-	continuing := previousEntry != nil && previousEntry.mode == recoveryModeContinue
+	previousMode := ""
+	var previousBinding *continuationBinding
+	if previousEntry != nil {
+		previousMode, previousBinding = previousEntry.recovery()
+	}
+	continuing := previousMode == recoveryModeContinue
 	if continuing || !s.promptAttemptPreResultSafe(data) {
 		binding = s.continuationBindingForFailure(ctx, data)
-		if continuing && binding != nil && *binding != *previousEntry.continuation {
+		if continuing && binding != nil && (previousBinding == nil || *binding != *previousBinding) {
 			binding = nil
 		}
 		if binding != nil {
@@ -276,6 +288,8 @@ func (s *Service) handleTransientFailure(ctx context.Context, data watcher.Agent
 	entry := s.reserveTransientRetryWithMetadataLocked(noticeState, data.SessionID, attempt, func(entry *transientRetryEntry) {
 		entry.mode = mode
 		entry.continuation = binding
+		failureSnapshot := data
+		entry.failureData = &failureSnapshot
 		entry.providerID = data.AgentID
 		if data.ProviderError != nil {
 			if data.ProviderError.ProviderID != "" {
@@ -402,6 +416,7 @@ func (s *Service) reserveTransientRetryWithMetadataLocked(
 			previous.mu.Lock()
 			entry.started = previous.started
 			entry.mode, entry.continuation = previous.mode, previous.continuation
+			entry.failureData = previous.failureData
 			entry.providerID, entry.modelID = previous.providerID, previous.modelID
 			previous.mu.Unlock()
 		}
@@ -412,6 +427,22 @@ func (s *Service) reserveTransientRetryWithMetadataLocked(
 	state.owned.Store(true)
 	s.transientRetries.Store(sessionID, entry)
 	return entry
+}
+
+func (s *Service) transientReplayOwnsPromptAttempt(data watcher.AgentEventData) bool {
+	value, ok := s.transientRetries.Load(data.SessionID)
+	if !ok {
+		return false
+	}
+	entry, ok := value.(*transientRetryEntry)
+	if !ok {
+		return false
+	}
+	entry.mu.Lock()
+	defer entry.mu.Unlock()
+	return entry.mode == recoveryModeReplay && entry.failureData != nil &&
+		entry.failureData.AgentExecutionID == data.AgentExecutionID &&
+		entry.failureData.PromptGeneration == data.PromptGeneration
 }
 
 func (s *Service) armTransientRetryEntryLocked(
@@ -457,9 +488,46 @@ func (s *Service) retryTransientPrompt(ctx context.Context, taskID, sessionID, e
 	if value, ok := s.transientRetries.Load(sessionID); ok {
 		if entry, ok := value.(*transientRetryEntry); ok {
 			retryEntry = entry
-			if entry.mode == recoveryModeContinue {
+			mode, _ := entry.recovery()
+			if mode == recoveryModeContinue {
 				s.retryInterruptedContinuation(ctx, taskID, sessionID, execID, entry)
 				return
+			}
+			if entry.retainedRuntime == nil {
+				if failure, tracked := s.transientReplayFailure(ctx, entry); tracked {
+					if !s.promptAttemptPreResultSafe(failure) {
+						if binding := s.continuationBindingForFailure(ctx, failure); binding != nil {
+							failure.RecoveryMode = recoveryModeContinue
+							if err := s.settleContinuationInterruption(ctx, failure); err != nil {
+								entry.mu.Lock()
+								entry.mode = recoveryModeContinue
+								entry.continuation = binding
+								entry.failureData = nil
+								entry.mu.Unlock()
+								if cleanup := s.settleContinuationFailureLocked(ctx, failure, entry); cleanup != nil {
+									go cleanup(context.WithoutCancel(ctx))
+								}
+								return
+							}
+							s.lastTurnPrompt.Delete(sessionID)
+							entry.mu.Lock()
+							entry.mode = recoveryModeContinue
+							entry.continuation = binding
+							entry.failureData = nil
+							entry.mu.Unlock()
+							s.clearPromptAttemptEvidence(sessionID, failure.AgentExecutionID, failure.PromptGeneration)
+							s.retryInterruptedContinuation(ctx, taskID, sessionID, execID, entry)
+							return
+						}
+						failure.RecoveryMode = ""
+						failure.RecoveryDisposition = recoveryDispositionManual
+						s.handleRecoverableFailure(context.WithoutCancel(ctx), failure)
+						s.resetTransientRetry(sessionID)
+						s.clearPromptAttemptEvidence(sessionID, failure.AgentExecutionID, failure.PromptGeneration)
+						return
+					}
+					s.clearPromptAttemptEvidence(sessionID, failure.AgentExecutionID, failure.PromptGeneration)
+				}
 			}
 		}
 	}
@@ -563,6 +631,41 @@ func (s *Service) retryTransientPrompt(ctx context.Context, taskID, sessionID, e
 			ErrorMessage:     "Automatic provider retry could not be started. Resume or start fresh to continue.",
 		})
 	}
+}
+
+type promptAttemptEvidenceReader interface {
+	GetPromptAttemptEvidenceForSession(
+		context.Context,
+		string,
+	) (executionID string, generation uint64, evidence agentruntime.PromptAttemptEvidence, found bool)
+}
+
+func (s *Service) transientReplayFailure(ctx context.Context, entry *transientRetryEntry) (watcher.AgentEventData, bool) {
+	entry.mu.Lock()
+	if entry.mode != recoveryModeReplay || entry.failureData == nil {
+		entry.mu.Unlock()
+		return watcher.AgentEventData{}, false
+	}
+	failure := *entry.failureData
+	entry.mu.Unlock()
+
+	if reader, ok := s.agentManager.(promptAttemptEvidenceReader); ok {
+		executionID, generation, evidence, found := reader.GetPromptAttemptEvidenceForSession(ctx, failure.SessionID)
+		if !found || executionID != failure.AgentExecutionID || generation != failure.PromptGeneration {
+			failure.EvidenceKnown = false
+			failure.OutputObserved = false
+			failure.EffectObserved = false
+		} else {
+			failure.EvidenceKnown = evidence.EvidenceKnown
+			failure.OutputObserved = failure.OutputObserved || evidence.OutputObserved
+			failure.EffectObserved = failure.EffectObserved || evidence.EffectObserved
+			if evidence.ProviderDiagnosticCandidate {
+				failure.ProviderDiagnosticCandidate = true
+				failure.ProviderDiagnosticText = evidence.ProviderDiagnosticText
+			}
+		}
+	}
+	return s.withPromptAttemptEvidence(failure), true
 }
 
 func (s *Service) stopTransientRetryExecution(ctx context.Context, executionID string) error {
