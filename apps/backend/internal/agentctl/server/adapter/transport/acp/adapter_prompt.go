@@ -218,16 +218,15 @@ func (a *Adapter) sendPrompt(
 		// agent_message_chunk cannot be overtaken by the terminal failure event.
 		notificationsDrained := a.syncNotifQueue()
 		if a.dialect.continuationError != nil && a.dialect.continuationError(err) {
-			if snapshot := a.continuationSafetySnapshot(turn); snapshot != nil {
-				a.cancelAsyncTurnComplete(sessionID)
-				a.sendUpdate(AgentEvent{Type: streams.EventTypeError, SessionID: sessionID,
-					PromptGeneration: promptGeneration, Error: "peer disconnected before response", ContinuationSafety: snapshot,
-					PromptFailureDisposition: a.promptFailureDisposition(
-						conn, sessionID, turn, promptGeneration, notificationsDrained,
-					),
-				})
-				return nil
-			}
+			snapshot := a.continuationSafetySnapshot(turn)
+			a.cancelAsyncTurnComplete(sessionID)
+			a.sendUpdate(AgentEvent{Type: streams.EventTypeError, SessionID: sessionID,
+				PromptGeneration: promptGeneration, Error: "peer disconnected before response", ContinuationSafety: snapshot,
+				PromptFailureDisposition: a.promptFailureDisposition(
+					conn, sessionID, turn, promptGeneration, notificationsDrained,
+				),
+			})
+			return nil
 		}
 		normalizedErr := normalizePromptErrorAfterCancel(traceCtx, err)
 		if a.agentID == codexAgentID &&

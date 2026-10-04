@@ -11,12 +11,12 @@ import (
 
 func TestMockInterruptionContinuationWireError(t *testing.T) {
 	for _, tc := range []struct {
-		name, agentID     string
-		enabled, attested bool
+		name, agentID              string
+		enabled, attested, handled bool
 	}{
-		{"enabled mock", mockAgentID, true, true},
-		{"disabled mock", mockAgentID, false, false},
-		{"untrusted provider marker", "other-acp", true, false},
+		{"enabled mock", mockAgentID, true, true, true},
+		{"disabled mock", mockAgentID, false, false, true},
+		{"untrusted provider marker", "other-acp", true, false, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			a, fake, conn := setupHandoffFakeAgent(t)
@@ -39,7 +39,7 @@ func TestMockInterruptionContinuationWireError(t *testing.T) {
 			fake.releasePrompts()
 			select {
 			case err := <-done:
-				if !tc.attested {
+				if !tc.handled {
 					require.Error(t, err)
 					return
 				}
@@ -52,9 +52,13 @@ func TestMockInterruptionContinuationWireError(t *testing.T) {
 			for _, event := range events {
 				if event.Type == streams.EventTypeError {
 					failures++
-					require.True(t, event.ContinuationSafety.SafeFor(7))
-					require.Equal(t, uint16(1), event.ContinuationSafety.CompletedReads)
-					require.Equal(t, streams.PromptFailureDispositionRetainRuntime, event.PromptFailureDisposition)
+					if tc.attested {
+						require.True(t, event.ContinuationSafety.SafeFor(7))
+						require.Equal(t, uint16(1), event.ContinuationSafety.CompletedReads)
+						require.Equal(t, streams.PromptFailureDispositionRetainRuntime, event.PromptFailureDisposition)
+					} else {
+						require.Nil(t, event.ContinuationSafety)
+					}
 				}
 				require.NotEqual(t, streams.EventTypeComplete, event.Type)
 			}

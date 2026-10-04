@@ -280,7 +280,8 @@ export async function installRuntimeUpdateFixture(
         'npm exec --yes --prefer-online --package=@agentclientprotocol/claude-agent-acp -- node -e ""',
     } satisfies UpdatePreview);
   let socket: WebSocketRoute | undefined;
-  let clientReady = false;
+  let connectionGeneration = 0;
+  let readyGeneration = 0;
 
   await page.route("**/api/v1/agents/discovery", (route) =>
     route.fulfill({
@@ -373,10 +374,11 @@ export async function installRuntimeUpdateFixture(
     }),
   );
   await page.routeWebSocket(/\/ws$/, (ws) => {
+    const generation = ++connectionGeneration;
     socket = ws;
     const server = ws.connectToServer();
     ws.onMessage((message) => {
-      clientReady = true;
+      if (socket === ws) readyGeneration = generation;
       server.send(message);
     });
     server.onMessage((message) => ws.send(message));
@@ -423,9 +425,22 @@ export async function installRuntimeUpdateFixture(
     statusRequestCount: () => statusRequestCount,
     previewTargets: () => [...previewTargets],
     postTargets: () => [...postTargets],
+    connectionGeneration: () => connectionGeneration,
+    async waitForConnectionAfter(previousGeneration: number) {
+      await expect
+        .poll(() =>
+          Boolean(
+            socket &&
+            connectionGeneration > previousGeneration &&
+            readyGeneration === connectionGeneration,
+          ),
+        )
+        .toBe(true);
+    },
     async emit(action: string, payload: unknown) {
-      await expect.poll(() => Boolean(socket)).toBe(true);
-      await expect.poll(() => clientReady).toBe(true);
+      await expect
+        .poll(() => Boolean(socket && readyGeneration === connectionGeneration))
+        .toBe(true);
       socket?.send(event(action, payload));
     },
     async emitUpdate(job: UpdateJob) {
