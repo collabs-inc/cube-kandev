@@ -102,6 +102,14 @@ describe("notification handler registration", () => {
       notification_kind: "agent_runtime_summary",
       runtime_updates: [
         {
+          occurrence_id: "codex-3",
+          agent_name: "codex-app-server",
+          runtime_id: "npm:@openai/codex",
+          display_name: "Codex",
+          previous_version: "1.0.0",
+          version: "3.0.0",
+        },
+        {
           occurrence_id: "gemini-2",
           agent_name: "gemini",
           runtime_id: "npm:@google/gemini-cli",

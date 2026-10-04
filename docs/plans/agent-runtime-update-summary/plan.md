@@ -40,13 +40,13 @@ Update `providers.Message`, local WS payloads, frontend notification types, queu
 Use a typed notification member list and keep singular payload compatibility.
 Follow the [system design](../../specs/agents/system-design/runtime-update-summary.md) for revalidation, claims, and cancellation.
 
-| Channel | Identity and behavior | Evidence / fallback |
-| --- | --- | --- |
-| Local WS | User-scoped message; one summary with typed members | Provider tests; disconnected subscriber releases child claims |
-| Browser/native client | Summary from local delivery; existing transport selection | Toast hook test captures one native/browser send |
-| Backend system | Existing title/body send; one message per provider | Capturing provider test; existing unavailable-provider behavior |
-| External provider | Existing title/body interface; one summary | Capturing provider test; subscriptions remain authoritative |
-| Legacy singular/release | Existing identity and action | Existing handler/toast tests; no generic grouping |
+| Channel                 | Identity and behavior                                     | Evidence / fallback                                             |
+| ----------------------- | --------------------------------------------------------- | --------------------------------------------------------------- |
+| Local WS                | User-scoped message; one summary with typed members       | Provider tests; disconnected subscriber releases child claims   |
+| Browser/native client   | Summary from local delivery; existing transport selection | Toast hook test captures one native/browser send                |
+| Backend system          | Existing title/body send; one message per provider        | Capturing provider test; existing unavailable-provider behavior |
+| External provider       | Existing title/body interface; one summary                | Capturing provider test; subscriptions remain authoritative     |
+| Legacy singular/release | Existing identity and action                              | Existing handler/toast tests; no generic grouping               |
 
 ## ASCII UI preview
 
@@ -106,7 +106,7 @@ Design validation on 2026-10-04:
 - `python3 scripts/lint-spec-files.test.py`: passed (36 tests).
 - `python3 scripts/lint-spec-files.py --all`: passed.
 - PR documentation `validateCoverage` preflight: docs-only diff is exempt. Simulated planned runtime change validates this work order and all linked references as covered.
-- `git diff --check`: passed. All package files remain unstaged and uncommitted.
+- `git diff --check`: passed at the design handoff.
 
 Implementation validation on 2026-10-04:
 
@@ -115,7 +115,7 @@ Implementation validation on 2026-10-04:
 - Focused frontend tests passed (76 tests across four files), as did web typecheck, Traditional Chinese generation, pseudo-locale generation, i18n checks, and the new-code i18n ratchet.
 - Desktop runtime-notification E2E passed all five cases; mobile Chrome passed both cases. Focused capture runs produced desktop and phone summary frames. Both were visually checked against UI-01: one viewport-contained notice, direct Settings action, and a touch-sized phone action.
 - Public documentation validation passed (62 validator tests and 47 published pages). Specification validation passed (348 decisions and 1338 specifications), and all specification files passed lint.
-- `git diff --check` passed. All package files remain unstaged and uncommitted.
+- `git diff --check` passed after the initial implementation.
 
 Review remediation validation on 2026-10-04:
 
@@ -123,7 +123,18 @@ Review remediation validation on 2026-10-04:
 - Focused backendapp E2E-hook tests and `make -C apps/backend build` passed. The build reported unavailable Darwin codesign tools for helper artifacts.
 - Desktop runtime-notification E2E passed 6/6 cases; mobile Chrome passed 3/3. The added real backend flow covers reconnect replay, a terminal outcome during the pending availability window, the delayed grouped summary, direct Settings navigation, and per-member deduplication after reload. Existing injected-summary coverage remains.
 - After the final change preserving availability when a status also carries a terminal outcome, the real backend startup/reconnect test passed against the final backend build on Chromium (1/1) and mobile Chrome (1/1).
-- `git diff --check` passed. The package remains uncommitted.
+- `git diff --check` passed after the initial review remediation.
+
+Additional PR-review remediation on 2026-10-05:
+
+- Summary revalidation and provider delivery now run on one lifecycle-owned worker. The collector continues to process observations while provider sends are blocked; a bounded queue coalesces one pending notice per trusted runtime, and shutdown cancels active sends and clears pending work.
+- Removing the last eligible member preserves the original 30-second deadline. A barrier regression proves a later group reaches the bounded delivery queue while the first provider send is blocked, and a terminal outcome is delivered before the first send is released.
+- The system provider localizes grouped OS copy from its configured locale or the host locale. Its tests cover every shipped language and English fallback.
+- The backend readiness test now synchronizes with `testing/synctest`. The manual-runtime background test starts the actual collector and verifies the delayed Kimi member, versions, and Settings URL; the WebSocket payload fixture contains both members matching its count.
+- The real startup/reconnect E2E records its conservative early-window timestamp before restart, arms the terminal-outcome wait after reconnect, and allows reload overhead in the replay timeout. Presentation injection coverage remains in the existing suite.
+- Controller, notification service, and provider race tests passed. Backend E2E-hook tests, backend build and lint passed. Focused notification Vitest tests passed (76/76), web typecheck passed, and focused ESLint/Prettier passed.
+- Desktop runtime-notification E2E passed 6/6 cases; mobile Chrome passed 3/3. The first result used the real backend startup/reconnect route and replay-after-reload flow.
+- `git diff --check` passed.
 
 ## Risks
 

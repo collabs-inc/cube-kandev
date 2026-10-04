@@ -34,8 +34,15 @@ type runtimeAvailabilityCollector struct {
 	closed bool
 }
 
+type runtimeUpdateDeliveryQueue struct {
+	mu     sync.Mutex
+	latest map[string]agents.RuntimeUpdateNotice
+	wake   chan struct{}
+	closed bool
+}
+
 type runtimeAvailabilityBatch struct {
-	controller *Controller
+	deliveries *runtimeUpdateDeliveryQueue
 	ctx        context.Context
 	pending    map[string]agents.RuntimeUpdateNotice
 	timer      *time.Timer
@@ -85,6 +92,51 @@ func (c *runtimeAvailabilityCollector) close() {
 	c.closed = true
 	clear(c.latest)
 	c.mu.Unlock()
+}
+
+func newRuntimeUpdateDeliveryQueue() *runtimeUpdateDeliveryQueue {
+	return &runtimeUpdateDeliveryQueue{
+		latest: make(map[string]agents.RuntimeUpdateNotice),
+		wake:   make(chan struct{}, 1),
+	}
+}
+
+func (q *runtimeUpdateDeliveryQueue) admit(ctx context.Context, notices []agents.RuntimeUpdateNotice) bool {
+	if len(notices) == 0 || ctx.Err() != nil {
+		return false
+	}
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	if q.closed || ctx.Err() != nil {
+		return false
+	}
+	for _, notice := range notices {
+		key := notice.AgentID + "\x00" + notice.RuntimeID
+		q.latest[key] = notice
+	}
+	select {
+	case q.wake <- struct{}{}:
+	default:
+	}
+	return true
+}
+
+func (q *runtimeUpdateDeliveryQueue) takeLatest() []agents.RuntimeUpdateNotice {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	notices := make([]agents.RuntimeUpdateNotice, 0, len(q.latest))
+	for _, notice := range q.latest {
+		notices = append(notices, notice)
+	}
+	clear(q.latest)
+	return notices
+}
+
+func (q *runtimeUpdateDeliveryQueue) close() {
+	q.mu.Lock()
+	q.closed = true
+	clear(q.latest)
+	q.mu.Unlock()
 }
 
 func (c *Controller) SetRuntimeUpdateNotifier(notifier RuntimeUpdateNotifier) {
@@ -143,10 +195,14 @@ func (c *Controller) observeRuntimeAvailability(ctx context.Context, agentID, ru
 	})
 }
 
-func (c *Controller) runRuntimeAvailabilityCollector(ctx context.Context, collector *runtimeAvailabilityCollector) {
+func (c *Controller) runRuntimeAvailabilityCollector(
+	ctx context.Context,
+	collector *runtimeAvailabilityCollector,
+	deliveries *runtimeUpdateDeliveryQueue,
+) {
 	defer collector.close()
 	batch := runtimeAvailabilityBatch{
-		controller: c,
+		deliveries: deliveries,
 		ctx:        ctx,
 		pending:    make(map[string]agents.RuntimeUpdateNotice),
 	}
@@ -188,7 +244,7 @@ func (b *runtimeAvailabilityBatch) flush() {
 	}
 	clear(b.pending)
 	b.stopTimer()
-	b.controller.revalidateAndDeliverRuntimeUpdateSummary(b.ctx, notices)
+	b.deliveries.admit(b.ctx, notices)
 }
 
 func (b *runtimeAvailabilityBatch) applyObservations(observations []runtimeAvailabilityObservation) {
@@ -214,15 +270,25 @@ func (b *runtimeAvailabilityBatch) applyObservation(observation runtimeAvailabil
 	key := observation.agentID + "\x00" + observation.runtimeID
 	if observation.notice == nil {
 		delete(b.pending, key)
-		if len(b.pending) == 0 {
-			b.stopTimer()
-		}
 		return
 	}
-	if len(b.pending) == 0 {
+	if b.deadline.IsZero() {
 		b.startTimer(observation.observedAt)
 	}
 	b.pending[key] = *observation.notice
+}
+
+func (c *Controller) runRuntimeUpdateDeliveryWorker(ctx context.Context, deliveries *runtimeUpdateDeliveryQueue) {
+	defer deliveries.close()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-deliveries.wake:
+			notices := deliveries.takeLatest()
+			c.revalidateAndDeliverRuntimeUpdateSummary(ctx, notices)
+		}
+	}
 }
 
 func (b *runtimeAvailabilityBatch) startTimer(observedAt time.Time) {

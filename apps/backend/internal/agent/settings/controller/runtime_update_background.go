@@ -10,11 +10,12 @@ const runtimeUpdateBackgroundInterval = 15 * time.Minute
 const runtimeUpdateAvailabilityWindow = 30 * time.Second
 
 type runtimeUpdateBackground struct {
-	cancel    context.CancelFunc
-	ctx       context.Context
-	collector *runtimeAvailabilityCollector
-	wg        sync.WaitGroup
-	once      sync.Once
+	cancel     context.CancelFunc
+	ctx        context.Context
+	collector  *runtimeAvailabilityCollector
+	deliveries *runtimeUpdateDeliveryQueue
+	wg         sync.WaitGroup
+	once       sync.Once
 }
 
 // StartRuntimeUpdateBackground owns the single install-wide update sweep.
@@ -26,15 +27,20 @@ func (c *Controller) StartRuntimeUpdateBackground(parent context.Context, readin
 	}
 	ctx, cancel := context.WithCancel(parent)
 	worker := &runtimeUpdateBackground{
-		cancel:    cancel,
-		ctx:       ctx,
-		collector: newRuntimeAvailabilityCollector(),
+		cancel:     cancel,
+		ctx:        ctx,
+		collector:  newRuntimeAvailabilityCollector(),
+		deliveries: newRuntimeUpdateDeliveryQueue(),
 	}
 	c.runtimeBackground = worker
-	worker.wg.Add(2)
+	worker.wg.Add(3)
 	go func() {
 		defer worker.wg.Done()
-		c.runRuntimeAvailabilityCollector(ctx, worker.collector)
+		c.runRuntimeAvailabilityCollector(ctx, worker.collector, worker.deliveries)
+	}()
+	go func() {
+		defer worker.wg.Done()
+		c.runRuntimeUpdateDeliveryWorker(ctx, worker.deliveries)
 	}()
 	go func() {
 		defer worker.wg.Done()
@@ -65,6 +71,8 @@ func (c *Controller) runtimeBackgroundStop(worker *runtimeUpdateBackground) func
 	return func() {
 		worker.once.Do(func() {
 			worker.cancel()
+			worker.collector.close()
+			worker.deliveries.close()
 			worker.wg.Wait()
 			c.runtimeUpdatePassMu.Lock()
 			if c.updateJobStore != nil {
