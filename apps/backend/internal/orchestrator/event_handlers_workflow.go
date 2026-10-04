@@ -666,28 +666,34 @@ func (s *Service) admitStepTransition(
 		s.workflowStore.pullNextTaskOnVacate(ctx, fromStep.ID, taskID)
 	}
 	if queued {
-		// A queued transition still needs one ledger row and must consume the
-		// signal that supplied its handoff before a later promotion can start
-		// the destination session.
-		trigger := wfmodels.StepTransitionTriggerTurnStart
-		if triggerOnEnter {
-			trigger = wfmodels.StepTransitionTriggerAutoComplete
-		}
-		s.recordAutoStepTransition(ctx, sessionID, fromStep.ID, toStepID, consumedSignal, trigger)
-		if triggerOnEnter {
-			s.clearPendingStepSignalByID(ctx, sessionID)
-			s.setSessionWaitingForInput(ctx, taskID, sessionID)
-		} else {
-			s.reportWorkflowTurnStartPreparationError(
-				ctx,
-				taskID,
-				sessionID,
-				s.prepareWorkflowTurnStartSessionState(ctx, taskID, sessionID),
-			)
-		}
+		s.finishQueuedStepTransition(ctx, taskID, sessionID, fromStep.ID, toStepID, consumedSignal, triggerOnEnter)
 		return nil, false
 	}
 	return task, true
+}
+
+func (s *Service) finishQueuedStepTransition(
+	ctx context.Context,
+	taskID, sessionID, fromStepID, toStepID string,
+	consumedSignal *models.PendingStepCompletionSignal,
+	triggerOnEnter bool,
+) {
+	trigger := wfmodels.StepTransitionTriggerTurnStart
+	if triggerOnEnter {
+		trigger = wfmodels.StepTransitionTriggerAutoComplete
+	}
+	s.recordAutoStepTransition(ctx, sessionID, fromStepID, toStepID, consumedSignal, trigger)
+	if triggerOnEnter {
+		s.clearPendingStepSignalByID(ctx, sessionID)
+		s.setSessionWaitingForInput(ctx, taskID, sessionID)
+		return
+	}
+	s.reportWorkflowTurnStartPreparationError(
+		ctx,
+		taskID,
+		sessionID,
+		s.prepareWorkflowTurnStartSessionState(ctx, taskID, sessionID),
+	)
 }
 
 func (s *Service) finishStepTransition(
