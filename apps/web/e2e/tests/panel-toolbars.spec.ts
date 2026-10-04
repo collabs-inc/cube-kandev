@@ -5,6 +5,10 @@ import type { ApiClient } from "../helpers/api-client";
 import { SessionPage } from "../pages/session-page";
 import { GitHelper, makeGitEnv } from "../helpers/git-helper";
 import { waitForFiniteAnimations } from "../helpers/animations";
+import {
+  openHistoryRegression,
+  seedHistoryRelation,
+} from "./git/changes-history-regression-helpers";
 import { enableCanvasFeature, removeCanvas, seedTaskCanvas } from "./canvas/canvas-fixture";
 import {
   expectFileBrowserIconCentered,
@@ -148,6 +152,33 @@ async function constrainDockviewPanel(panel: import("@playwright/test").Locator,
 }
 
 test.describe("shared panel toolbars", () => {
+  test("keeps Review clickable in a narrow Changes panel with diverged history", async ({
+    testPage,
+    apiClient,
+    seedData,
+  }) => {
+    const session = await openHistoryRegression(testPage, apiClient, seedData, false);
+    await seedHistoryRelation(testPage, "diverged");
+    await expect(session.changes.getByTestId("header-remote-contribution-warning")).toBeVisible();
+    await constrainDockviewPanel(session.changes, 240);
+    const review = session.changes.getByRole("button", { name: "Review", exact: true });
+    await expect(review).toBeVisible();
+    await expect
+      .poll(() =>
+        review.evaluate((element) => {
+          const box = element.getBoundingClientRect();
+          return element.contains(
+            document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2),
+          );
+        }),
+      )
+      .toBe(true);
+    await review.click();
+    await expect(
+      testPage.getByRole("dialog", { name: "Review Changes", exact: true }),
+    ).toBeVisible();
+  });
+
   test("centers Files copy path icons in every state", async ({
     testPage,
     apiClient,
@@ -277,17 +308,21 @@ test.describe("shared panel toolbars", () => {
     await expect(session.changes.getByTestId("panel-header-overflow").first()).toBeVisible();
     await session.changes.getByTestId("panel-header-overflow").first().click();
     await expect(testPage.getByRole("menuitem", { name: "Diff", exact: true })).toBeVisible();
-    await expect(testPage.getByRole("menuitem")).toHaveCount(1);
+    await expect(testPage.getByRole("menuitem")).toHaveCount(2);
+    await expect(
+      testPage.getByRole("menuitem", { name: "Walk me through these changes", exact: true }),
+    ).toBeVisible();
     await expect(testPage.getByRole("menuitem", { name: "Review", exact: true })).toHaveCount(0);
     await waitForFiniteAnimations(testPage.getByRole("menu"));
     await prCapture.screenshot("changes-diff-overflow", {
-      caption: "Narrow desktop Changes offers only the hidden Diff action in its overflow menu.",
+      caption:
+        "Narrow desktop Changes offers hidden Diff and Walkthrough actions without duplicating Review.",
     });
     await testPage.keyboard.press("Escape");
     await expect(
       session.changes.getByRole("button", { name: "Review", exact: true }),
     ).toBeVisible();
-    await expect(session.changes.getByTestId("changes-request-walkthrough")).toBeVisible();
+    await expect(session.changes.getByTestId("changes-request-walkthrough")).toBeHidden();
     await expectHeadersAtHeight(session.changes, 30, "narrow Changes");
 
     await session.addBrowserPanel();

@@ -520,8 +520,11 @@ function ChangesPanelWalkthroughButton({
     : t(WALKTHROUGH_LABEL_KEY);
   return (
     <Tooltip>
-      <TooltipTrigger asChild className="order-first @[350px]/changes-panel:order-none">
-        <span className="inline-flex" tabIndex={requestWalkthroughDisabled ? 0 : undefined}>
+      <TooltipTrigger asChild>
+        <span
+          className="hidden @[350px]/changes-panel:inline-flex"
+          tabIndex={requestWalkthroughDisabled ? 0 : undefined}
+        >
           <Button
             size="sm"
             variant="ghost"
@@ -544,11 +547,15 @@ function ChangesPanelWalkthroughButton({
 export type ChangesPanelHeaderActionProps = {
   showDiffReview?: boolean;
   onOpenDiffAll?: () => void;
+  onRequestWalkthrough?: () => void;
+  requestWalkthroughDisabled?: boolean;
 };
 
 export function ChangesPanelHeaderOverflowActions({
   showDiffReview = true,
   onOpenDiffAll,
+  onRequestWalkthrough,
+  requestWalkthroughDisabled,
 }: ChangesPanelHeaderActionProps) {
   const { t } = useTranslation();
   if (!showDiffReview) return null;
@@ -562,6 +569,19 @@ export function ChangesPanelHeaderOverflowActions({
         <IconGitMerge className="size-4" />
         {t("task:diff")}
       </DropdownMenuItem>
+      {onRequestWalkthrough && (
+        <DropdownMenuItem
+          className={ACTION_MENU_ITEM_CLASS}
+          disabled={requestWalkthroughDisabled}
+          title={
+            requestWalkthroughDisabled ? t("task:loadingChangedFiles") : t(WALKTHROUGH_LABEL_KEY)
+          }
+          onSelect={onRequestWalkthrough}
+        >
+          <IconRoute className="size-4" />
+          {t(WALKTHROUGH_LABEL_KEY)}
+        </DropdownMenuItem>
+      )}
     </PanelHeaderOverflowMenu>
   );
 }

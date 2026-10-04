@@ -6,6 +6,10 @@ import { SessionPage } from "../pages/session-page";
 import { GitHelper, makeGitEnv } from "../helpers/git-helper";
 import { waitForFiniteAnimations } from "../helpers/animations";
 import {
+  openHistoryRegression,
+  seedHistoryRelation,
+} from "./git/changes-history-regression-helpers";
+import {
   expectFileBrowserIconCentered,
   readTaskWorkspacePath,
 } from "../helpers/panel-toolbar-geometry";
@@ -124,6 +128,40 @@ async function expectTouchControls(page: Page, surface: string) {
 }
 
 test.describe("touch panel toolbars", () => {
+  test("keeps Review and Diff reachable on a narrow phone with diverged history", async ({
+    testPage,
+    apiClient,
+    seedData,
+  }) => {
+    await testPage.setViewportSize({ width: 320, height: 844 });
+    await openHistoryRegression(testPage, apiClient, seedData, true);
+    await seedHistoryRelation(testPage, "diverged");
+    const changes = testPage.getByTestId("mobile-changes-panel");
+    const warning = changes.getByTestId("header-remote-contribution-warning");
+    await expect(warning).toBeVisible();
+    const review = changes.getByRole("button", { name: "Review", exact: true });
+    const overflow = changes.getByTestId("panel-header-overflow");
+    for (const control of [review, warning, overflow]) {
+      await expect
+        .poll(() =>
+          control.evaluate((element) => {
+            const box = element.getBoundingClientRect();
+            return element.contains(
+              document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2),
+            );
+          }),
+        )
+        .toBe(true);
+    }
+    await overflow.tap();
+    await expect(testPage.getByRole("menu").getByRole("menuitem")).toHaveCount(2);
+    await testPage.keyboard.press("Escape");
+    await review.tap();
+    await expect(
+      testPage.getByRole("dialog", { name: "Review Changes", exact: true }),
+    ).toBeVisible();
+  });
+
   test("shows only hidden Changes actions in the phone overflow menu", async ({
     testPage,
     apiClient,
@@ -157,10 +195,12 @@ test.describe("touch panel toolbars", () => {
     expect(box?.height).toBeGreaterThanOrEqual(44);
     await overflow.tap();
     const menu = testPage.getByRole("menu");
-    await expect(menu.getByRole("menuitem")).toHaveCount(1);
+    await expect(menu.getByRole("menuitem")).toHaveCount(2);
+    await expect(changes.getByTestId("changes-request-walkthrough")).toBeHidden();
     await waitForFiniteAnimations(menu);
     await prCapture.screenshot("changes-diff-overflow", {
-      caption: "A narrow phone keeps Diff reachable through a menu with no duplicate actions.",
+      caption:
+        "A narrow phone keeps Diff and Walkthrough reachable through a menu without duplicating Review.",
     });
     await menu.getByRole("menuitem", { name: "Diff", exact: true }).tap();
     await expect(testPage.getByRole("dialog")).toBeVisible();

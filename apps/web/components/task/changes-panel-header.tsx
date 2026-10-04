@@ -160,6 +160,7 @@ export function ChangesPanelHeader(props: ChangesPanelHeaderProps) {
   const showDiffReview = hasChanges || hasCommits || !!hasPRFiles;
   return (
     <PanelHeaderBarSplit
+      leftClassName="shrink-0"
       left={
         <ChangesPanelHeaderLeft
           refreshStatus={props.refreshStatus}
@@ -175,7 +176,13 @@ export function ChangesPanelHeader(props: ChangesPanelHeaderProps) {
       }
       right={<ChangesPanelHeaderRight props={props} branchRows={branchRows} />}
       overflow={
-        showDiffReview ? <ChangesPanelHeaderOverflowActions onOpenDiffAll={onOpenDiffAll} /> : null
+        showDiffReview ? (
+          <ChangesPanelHeaderOverflowActions
+            onOpenDiffAll={onOpenDiffAll}
+            onRequestWalkthrough={onRequestWalkthrough}
+            requestWalkthroughDisabled={requestWalkthroughDisabled}
+          />
+        ) : null
       }
       overflowAt={350}
       hideRightWhenOverflow={false}
