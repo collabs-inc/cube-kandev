@@ -11,7 +11,7 @@ import (
 
 func pinnedDirectoryInfo(handle DirectoryHandle) (os.FileInfo, error) {
 	directory, ok := handle.(*windowsDirectoryHandle)
-	if !ok || directory.targetHandle == 0 {
+	if !ok || directory == nil || directory.targetHandle == 0 {
 		return nil, errors.New("directory handle does not expose pinned Windows metadata")
 	}
 	var duplicate windows.Handle

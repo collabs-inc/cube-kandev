@@ -1,15 +1,12 @@
 package worktree
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
-	"strings"
 
 	"github.com/kandev/kandev/internal/system/storage/workspaces"
 )
@@ -53,9 +50,7 @@ func recoveryRequiredIdentityManifest(root string) (string, error) {
 	if err := handle.VerifyPath(root); err != nil {
 		return "", err
 	}
-	sort.Strings(entries)
-	digest := sha256.Sum256([]byte(strings.Join(entries, "\n")))
-	return hex.EncodeToString(digest[:]), nil
+	return recoveryEntriesManifest(entries), nil
 }
 
 func appendRecoveryRequiredIdentityEntries(

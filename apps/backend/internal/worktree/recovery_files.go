@@ -132,15 +132,20 @@ func copyRecoveryRegularFile(source, target string, sourceInfo os.FileInfo, repl
 		_ = out.Close()
 		return err
 	}
-	if err := applyRecoveryFileAttributes(out, currentSourceInfo); err != nil {
-		_ = out.Close()
-		return err
-	}
-	if err := out.Sync(); err != nil {
+	if err := syncRecoveryContentBeforeAttributes(out.Sync, func() error {
+		return applyRecoveryFileAttributes(out, currentSourceInfo)
+	}); err != nil {
 		_ = out.Close()
 		return err
 	}
 	return out.Close()
+}
+
+func syncRecoveryContentBeforeAttributes(syncContent, applyAttributes func() error) error {
+	if err := syncContent(); err != nil {
+		return err
+	}
+	return applyAttributes()
 }
 
 func prepareRecoveryFileReplacement(target string) error {
@@ -214,9 +219,13 @@ func checkoutManifest(root string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	return recoveryEntriesManifest(entries), nil
+}
+
+func recoveryEntriesManifest(entries []string) string {
 	sort.Strings(entries)
 	hash := sha256.Sum256([]byte(strings.Join(entries, "\n")))
-	return hex.EncodeToString(hash[:]), nil
+	return hex.EncodeToString(hash[:])
 }
 
 func restoreSnapshot(original, source, destination, expectedManifest string) error {

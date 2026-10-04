@@ -151,7 +151,7 @@ task base branch when the exact commit is unavailable.
 This extension implements AC-TASKS-MANAGED-CLONE-RELOCATION-002.5. It uses the
 [shared snapshot mode policy](worktree-metadata-recovery.md#snapshot-permission-preservation)
 and the [retry boundary decision](../../../decisions/2026-10-04-permission-only-snapshot-retry.md).
-Implementation remains pending in the
+Implementation and verification are recorded in the
 [permission fix package](../../../plans/workspace-recovery-permissions/plan.md).
 
 Ordinary resume, restore, fresh start, and automatic metadata recovery must not

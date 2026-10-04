@@ -56,10 +56,10 @@ Continue one historical permission-only blocked snapshot through a new explicit 
 Run this block from the repository root after Red, Green, and Refactor.
 
 ```bash
-(cd apps/backend && go test -trimpath ./internal/worktree -run '^TestPermissionOnlyBlockedRelocation' -count=1 -v)
-(cd apps/backend && go test -trimpath -race ./internal/worktree -run '^TestPermissionOnlyBlockedRelocation' -count=1)
-(cd apps/backend && go test -trimpath ./internal/worktree -run '^(TestPrepareRecoverySnapshotRejectsRequiredIdentityDriftAfterCopy|TestRebuildRecoverySnapshotRejectsRequiredIdentityDriftAfterEntryCopy)$' -count=1 -v)
-(cd apps/backend && go test -trimpath ./internal/worktree -count=1)
+(cd apps/backend && go test -trimpath -tags fts5 ./internal/worktree -run '^TestPermissionOnlyBlockedRelocation' -count=1 -v)
+(cd apps/backend && go test -trimpath -tags fts5 -race ./internal/worktree -run '^TestPermissionOnlyBlockedRelocation' -count=1)
+(cd apps/backend && go test -trimpath -tags fts5 ./internal/worktree -run '^(TestPrepareRecoverySnapshotRejectsRequiredIdentityDriftAfterCopy|TestRebuildRecoverySnapshotRejectsRequiredIdentityDriftAfterEntryCopy|TestInterruptedPermissionRetryRejectsOriginalIdentityDriftAfterSnapshot)$' -count=1 -v)
+(cd apps/backend && go test -trimpath -tags fts5 ./internal/worktree -count=1)
 git diff --check
 ```
 
@@ -108,9 +108,9 @@ required identity from the current original and verify it stays stable. Fresh
 snapshots and replacements must preserve that identity. The v1 manifest remains
 unchanged, with separate identity checks at snapshot adoption and publication.
 
-- `go test -trimpath ./internal/worktree -run '^TestPermissionOnlyBlockedRelocation' -count=1 -v`: passed.
-- `go test -trimpath -race ./internal/worktree -run '^TestPermissionOnlyBlockedRelocation' -count=1`: passed.
-- `go test -trimpath ./internal/worktree -count=1`: passed.
+- `go test -trimpath -tags fts5 ./internal/worktree -run '^TestPermissionOnlyBlockedRelocation' -count=1 -v`: passed.
+- `go test -trimpath -tags fts5 -race ./internal/worktree -run '^TestPermissionOnlyBlockedRelocation' -count=1`: passed.
+- `go test -trimpath -tags fts5 ./internal/worktree -count=1`: passed.
 - The named regressions pass for historical retry, provenance integrity,
   restart from snapshotting/rematerializing, unsafe source and snapshot drift,
   setuid owner drift, replacement edits and HEAD changes, repeated retry,
@@ -122,7 +122,9 @@ unchanged, with separate identity checks at snapshot adoption and publication.
 - Rematerializing restart refuses UID-only setuid and GID-only setgid snapshot
   drift without canonical publication. Tests also refuse original UID/GID drift
   after copy, both at snapshot adoption and during snapshot creation, while the
-  v1 bytes/mode manifest stays unchanged. Successful restart verifies IDs.
-- `go test -trimpath ./internal/worktree -run '^(TestPrepareRecoverySnapshotRejectsRequiredIdentityDriftAfterCopy|TestRebuildRecoverySnapshotRejectsRequiredIdentityDriftAfterEntryCopy)$' -count=1 -v`: passed.
+  v1 bytes/mode manifest stays unchanged. An interrupted retry also refuses
+  matching source and completed-snapshot identity drift against its stored
+  pinned proof. Successful restart verifies IDs.
+- `go test -trimpath -tags fts5 ./internal/worktree -run '^(TestPrepareRecoverySnapshotRejectsRequiredIdentityDriftAfterCopy|TestRebuildRecoverySnapshotRejectsRequiredIdentityDriftAfterEntryCopy|TestInterruptedPermissionRetryRejectsOriginalIdentityDriftAfterSnapshot)$' -count=1 -v`: passed.
 - All four review-specific historical, restart, adoption, and copy-boundary identity regressions passed under `go test -trimpath -race`.
 - `git diff --check`: passed.

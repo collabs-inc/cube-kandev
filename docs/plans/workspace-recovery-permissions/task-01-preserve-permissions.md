@@ -88,15 +88,17 @@ None.
 
 Implemented descriptor-based permission and required set-ID identity preservation.
 New snapshots keep their root private, copy file content before applying mode,
-and apply directory attributes after their children. Source identity is checked
-before and after copying, and ownership or mode readback failures stop recovery.
+sync file content before applying privileged set-ID attributes, and apply
+directory attributes after their children. Source identity is checked before
+and after copying, and ownership or mode readback failures stop recovery.
 The v1 manifest remains unchanged; pinned identity checks separately compare the
 authoritative original with completed snapshots and replacements at adoption
 and before canonical publication.
 
 - Targeted permission tests: passed, including the umask child-process case,
   set-ID UID/GID and sticky mode preservation, and an injected ownership denial.
-- Full worktree package: `go test -trimpath ./internal/worktree -count=1` passed.
+- `go test -trimpath -tags fts5 ./internal/worktree -run '^TestSyncRecoveryContentBeforeAttributes' -count=1 -v`: passed.
+- Full worktree package: `go test -trimpath -tags fts5 ./internal/worktree -count=1` passed.
 - `git diff --check`: passed.
 - Windows cross-build was attempted. It stops in the existing SQLite repository
   package because `sqlite3.Error` and `sqlite3.ErrConstraintUnique` are undefined

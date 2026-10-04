@@ -107,6 +107,62 @@ func TestPermissionRecoveryResumeIntegration(t *testing.T) {
 	}
 }
 
+func TestPermissionRecoveryIdentityRefusalPreventsProviderStartup(t *testing.T) {
+	fixture := newExecutorPermissionRecoveryFixture(t)
+	setuidOriginal := filepath.Join(fixture.worktreePath, "setuid-file")
+	setuidSnapshot := filepath.Join(fixture.oldSnapshot, "setuid-file")
+	if err := os.WriteFile(setuidOriginal, []byte("setuid identity evidence\n"), 0o755); err != nil {
+		t.Fatalf("write source setuid file: %v", err)
+	}
+	if err := chmodPermissionRecoveryUnixMode(setuidOriginal, 0o4755); err != nil {
+		t.Fatalf("set source setuid mode: %v", err)
+	}
+	if info, err := os.Stat(setuidOriginal); err != nil {
+		t.Fatalf("stat source setuid file: %v", err)
+	} else if info.Mode()&os.ModeSetuid == 0 {
+		t.Skipf("host filesystem does not retain setuid mode: %s", info.Mode())
+	}
+	if err := os.WriteFile(setuidSnapshot, []byte("setuid identity evidence\n"), 0o755); err != nil {
+		t.Fatalf("write historical setuid snapshot: %v", err)
+	}
+	otherUID := 65534
+	if otherUID == os.Geteuid() {
+		otherUID = 65533
+	}
+	if err := os.Chown(setuidSnapshot, otherUID, -1); err != nil {
+		t.Skipf("host cannot seed a copied setuid owner mismatch: %v", err)
+	}
+	if err := chmodPermissionRecoveryUnixMode(setuidSnapshot, 0o4755); err != nil {
+		t.Fatalf("restore historical setuid mode: %v", err)
+	}
+	if info, err := os.Stat(setuidSnapshot); err != nil || info.Mode()&os.ModeSetuid == 0 {
+		t.Skip("host filesystem does not retain setuid mode after ownership changes")
+	}
+
+	repo := newMockRepository()
+	seedSelectedWorktreeRecoveryEnvironment(repo, fixture.taskID, fixture.sessionID, models.TaskSessionStateCancelled)
+	configureExecutorPermissionRecoveryRepository(repo, fixture)
+	manager := &mockAgentManager{}
+	executor := newTestExecutor(t, manager, repo)
+	executor.SetRepoCloner(fixture.cloner, nil)
+	executor.SetSelectedWorktreeRecoveryAdmission(fixture.manager.AdmitRecovery)
+	ctx := worktree.WithDirtyCloneRelocation(context.Background())
+	ctx = worktree.WithManagedCloneRelocationAuthorization(ctx, func(context.Context) error { return nil })
+	if _, err := executor.ResumeSessionWithOptions(ctx, repo.sessions[fixture.sessionID], true, ResumeOptions{}); err == nil {
+		t.Fatal("explicit retry accepted a retained setuid identity mismatch")
+	}
+	if manager.launchAgentCallCount != 0 {
+		t.Fatalf("identity refusal started the provider %d times", manager.launchAgentCallCount)
+	}
+	published, err := fixture.store.GetWorktreeByID(context.Background(), fixture.worktreeID)
+	if err != nil || published == nil || published.Path != fixture.worktreePath {
+		t.Fatalf("identity refusal changed canonical worktree = %+v, %v", published, err)
+	}
+	if info, err := os.Stat(setuidOriginal); err != nil || info.Mode()&os.ModeSetuid == 0 {
+		t.Fatalf("original setuid checkout changed after refusal: info=%v err=%v", info, err)
+	}
+}
+
 type executorPermissionRecoveryFixture struct {
 	db                    *sqlx.DB
 	taskRepo              *tasksqlite.Repository
@@ -441,4 +497,18 @@ func permissionRetryMode(t *testing.T, path string) uint32 {
 		t.Fatalf("stat recovered permission fixture: %v", err)
 	}
 	return uint32(info.Mode().Perm())
+}
+
+func chmodPermissionRecoveryUnixMode(path string, mode uint32) error {
+	fileMode := os.FileMode(mode & 0o777)
+	if mode&0o4000 != 0 {
+		fileMode |= os.ModeSetuid
+	}
+	if mode&0o2000 != 0 {
+		fileMode |= os.ModeSetgid
+	}
+	if mode&0o1000 != 0 {
+		fileMode |= os.ModeSticky
+	}
+	return os.Chmod(path, fileMode)
 }

@@ -3,6 +3,8 @@ package worktree
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -20,10 +22,12 @@ import (
 const permissionOnlyRecoveryFailure = "recovery snapshot does not match original checkout"
 
 type recoveryModeRetry struct {
-	Version           int       `json:"version"`
-	PreviousSnapshot  string    `json:"previous_snapshot"`
-	PreviousError     string    `json:"previous_error"`
-	PreviousUpdatedAt time.Time `json:"previous_updated_at"`
+	Version                int       `json:"version"`
+	PreviousSnapshot       string    `json:"previous_snapshot"`
+	PreviousError          string    `json:"previous_error"`
+	PreviousUpdatedAt      time.Time `json:"previous_updated_at"`
+	SourceManifest         string    `json:"source_manifest"`
+	SourceIdentityManifest string    `json:"source_identity_manifest"`
 }
 
 func permissionRetrySnapshotPath(original, operationID string) string {
@@ -34,7 +38,9 @@ func validRecoveryModeRetry(record recoveryRecord, original string) bool {
 	retry := record.ModeRetry
 	if retry == nil || retry.Version != 1 || retry.PreviousSnapshot == "" ||
 		retry.PreviousSnapshot == record.Snapshot || retry.PreviousError != permissionOnlyRecoveryFailure ||
-		retry.PreviousUpdatedAt.IsZero() || record.Snapshot != permissionRetrySnapshotPath(original, record.OperationID) {
+		retry.PreviousUpdatedAt.IsZero() || !validRecoveryDigest(retry.SourceManifest) ||
+		!validRecoveryDigest(retry.SourceIdentityManifest) ||
+		record.Snapshot != permissionRetrySnapshotPath(original, record.OperationID) {
 		return false
 	}
 	if _, err := uuid.Parse(record.OperationID); err != nil {
@@ -45,6 +51,14 @@ func validRecoveryModeRetry(record recoveryRecord, original string) bool {
 	}
 	info, err := os.Lstat(retry.PreviousSnapshot)
 	return err == nil && info.IsDir() && info.Mode()&os.ModeSymlink == 0
+}
+
+func validRecoveryDigest(value string) bool {
+	if len(value) != sha256.Size*2 {
+		return false
+	}
+	_, err := hex.DecodeString(value)
+	return err == nil
 }
 
 func blockedPermissionRetryCandidate(
@@ -193,7 +207,7 @@ func (m *Manager) verifyBlockedPermissionRetryUnderLock(
 	if err := blockedPermissionRetryCandidate(*req, *slot, freshRecovery, freshRelocation); err != nil {
 		return err
 	}
-	if err := m.verifyPermissionOnlyRetry(ctx, slot.Worktree, slot.CloneRelocation, freshRecovery, freshRelocation); err != nil {
+	if _, err := m.verifyPermissionOnlyRetry(ctx, slot.Worktree, slot.CloneRelocation, freshRecovery, freshRelocation); err != nil {
 		return managedCloneRelocationError(slot.Worktree.TaskID, "historical snapshot is not a proven permission-only failure")
 	}
 	return nil
@@ -205,21 +219,25 @@ func (m *Manager) verifyPermissionOnlyRetry(
 	proof *ManagedCloneRelocationProof,
 	recovery recoveryRecord,
 	relocation managedCloneRelocationRecord,
-) error {
+) (recoveryPermissionProof, error) {
 	if err := validateDirtyCloneRelocationAuthorization(ctx); err != nil {
-		return err
+		return recoveryPermissionProof{}, err
 	}
 	if wt == nil || proof == nil || relocation.State != managedCloneRelocationStateMaterialized ||
 		relocation.Original != wt.Path || relocation.TaskID != wt.TaskID || relocation.WorktreeID != wt.ID {
-		return errors.New("relocation identity changed")
+		return recoveryPermissionProof{}, errors.New("relocation identity changed")
 	}
 	if err := m.verifyPermissionRetryReplacement(ctx, relocation); err != nil {
-		return err
+		return recoveryPermissionProof{}, err
 	}
-	if err := provePermissionOnlySnapshot(ctx, wt.Path, recovery.Snapshot); err != nil {
-		return err
+	sourceProof, err := provePermissionOnlySnapshot(ctx, wt.Path, recovery.Snapshot)
+	if err != nil {
+		return recoveryPermissionProof{}, err
 	}
-	return validateDirtyCloneRelocationAuthorization(ctx)
+	if err := validateDirtyCloneRelocationAuthorization(ctx); err != nil {
+		return recoveryPermissionProof{}, err
+	}
+	return sourceProof, nil
 }
 
 func (m *Manager) verifyPermissionRetryReplacement(ctx context.Context, record managedCloneRelocationRecord) error {
@@ -245,35 +263,44 @@ func (m *Manager) verifyPermissionRetryReplacement(ctx context.Context, record m
 	return nil
 }
 
-func provePermissionOnlySnapshot(ctx context.Context, original, snapshot string) error {
+func provePermissionOnlySnapshot(ctx context.Context, original, snapshot string) (recoveryPermissionProof, error) {
 	if err := validateRecoverySnapshotPath(original, snapshot); err != nil {
-		return err
+		return recoveryPermissionProof{}, err
 	}
 	originalRoot, err := workspaces.OpenDirectoryNoFollow(filepath.Dir(original), original)
 	if err != nil {
-		return err
+		return recoveryPermissionProof{}, err
 	}
 	defer func() { _ = originalRoot.Close() }()
 	snapshotRoot, err := workspaces.OpenDirectoryNoFollow(filepath.Dir(snapshot), snapshot)
 	if err != nil {
-		return err
+		return recoveryPermissionProof{}, err
 	}
 	defer func() { _ = snapshotRoot.Close() }()
 	proof := recoveryPermissionProof{}
 	if err := compareRecoveryDirectories(ctx, originalRoot, snapshotRoot, "", &proof); err != nil {
-		return err
+		return recoveryPermissionProof{}, err
 	}
 	if proof.differences == 0 {
-		return errors.New("historical snapshot has no permission differences")
+		return recoveryPermissionProof{}, errors.New("historical snapshot has no permission differences")
 	}
 	if err := originalRoot.VerifyPath(original); err != nil {
-		return err
+		return recoveryPermissionProof{}, err
 	}
-	return snapshotRoot.VerifyPath(snapshot)
+	if err := snapshotRoot.VerifyPath(snapshot); err != nil {
+		return recoveryPermissionProof{}, err
+	}
+	proof.manifest = recoveryEntriesManifest(proof.manifestEntries)
+	proof.identityManifest = recoveryEntriesManifest(proof.identityEntries)
+	return proof, nil
 }
 
 type recoveryPermissionProof struct {
-	differences int
+	differences      int
+	manifest         string
+	identityManifest string
+	manifestEntries  []string
+	identityEntries  []string
 }
 
 func compareRecoveryDirectories(
@@ -347,7 +374,12 @@ func compareRecoveryEntry(
 		return compareRecoverySubdirectories(ctx, original, snapshot, name, relative, originalMode, snapshotMode, proof)
 	}
 	if originalMode&os.ModeSymlink != 0 {
-		return compareRecoverySymlinks(original, snapshot, name, relative, originalMode, snapshotMode)
+		target, err := compareRecoverySymlinks(original, snapshot, name, relative, originalMode, snapshotMode)
+		if err != nil {
+			return err
+		}
+		proof.manifestEntries = append(proof.manifestEntries, relative+"|"+originalMode.String()+"|"+target)
+		return nil
 	}
 	return compareRecoveryRegularEntry(ctx, original, snapshot, name, relative, originalMode, snapshotMode, proof)
 }
@@ -356,19 +388,19 @@ func compareRecoverySymlinks(
 	original, snapshot workspaces.DirectoryHandle,
 	name, relative string,
 	originalMode, snapshotMode os.FileMode,
-) error {
+) (string, error) {
 	if snapshotMode&os.ModeSymlink == 0 || originalMode != snapshotMode {
-		return fmt.Errorf("historical snapshot link mode changed: %s", relative)
+		return "", fmt.Errorf("historical snapshot link mode changed: %s", relative)
 	}
 	originalTarget, err := original.ReadLink(name)
 	if err != nil {
-		return err
+		return "", err
 	}
 	snapshotTarget, err := snapshot.ReadLink(name)
 	if err != nil || originalTarget != snapshotTarget {
-		return fmt.Errorf("historical snapshot link target changed: %s", relative)
+		return "", fmt.Errorf("historical snapshot link target changed: %s", relative)
 	}
-	return nil
+	return originalTarget, nil
 }
 
 func compareRecoveryRegularEntry(
@@ -388,7 +420,7 @@ func compareRecoveryRegularEntry(
 	if changed {
 		proof.differences++
 	}
-	return compareRecoveryRegularFiles(ctx, original, snapshot, name, originalMode, snapshotMode)
+	return compareRecoveryRegularFiles(ctx, original, snapshot, name, relative, originalMode, snapshotMode, proof)
 }
 
 func compareRecoverySubdirectories(
@@ -429,6 +461,10 @@ func compareRecoverySubdirectories(
 	if err := verifyHistoricalRecoveryIdentity(originalInfo, snapshotInfo); err != nil {
 		return fmt.Errorf("historical snapshot directory identity changed: %s", relative)
 	}
+	proof.manifestEntries = append(proof.manifestEntries, relative+"|"+originalInfo.Mode().String())
+	if err := appendRecoveryIdentityEntry(relative, originalInfo, &proof.identityEntries); err != nil {
+		return err
+	}
 	if err := compareRecoveryDirectories(ctx, originalDir, snapshotDir, relative, proof); err != nil {
 		return err
 	}
@@ -460,8 +496,9 @@ func permissionOnlyModeDifference(original, snapshot os.FileMode, regular bool) 
 func compareRecoveryRegularFiles(
 	ctx context.Context,
 	original, snapshot workspaces.DirectoryHandle,
-	name string,
+	name, relative string,
 	originalMode, snapshotMode os.FileMode,
+	proof *recoveryPermissionProof,
 ) error {
 	originalReader, err := original.OpenFile(name)
 	if err != nil {
@@ -500,7 +537,12 @@ func compareRecoveryRegularFiles(
 	if originalInfo.Size() != snapshotInfo.Size() {
 		return errors.New("historical snapshot file content changed")
 	}
-	if err := compareRecoveryFileBytes(ctx, originalFile, snapshotFile); err != nil {
+	contentHash, err := compareRecoveryFileBytes(ctx, originalFile, snapshotFile)
+	if err != nil {
+		return err
+	}
+	proof.manifestEntries = append(proof.manifestEntries, relative+"|"+originalInfo.Mode().String()+"|"+contentHash)
+	if err := appendRecoveryIdentityEntry(relative, originalInfo, &proof.identityEntries); err != nil {
 		return err
 	}
 	originalAfter, err := originalFile.Stat()
@@ -527,31 +569,33 @@ func verifyHistoricalRecoveryIdentity(source, snapshot os.FileInfo) error {
 	return nil
 }
 
-func compareRecoveryFileBytes(ctx context.Context, original, snapshot io.Reader) error {
+func compareRecoveryFileBytes(ctx context.Context, original, snapshot io.Reader) (string, error) {
 	originalBuffer := make([]byte, 32*1024)
 	snapshotBuffer := make([]byte, len(originalBuffer))
+	hash := sha256.New()
 	for {
 		if err := ctx.Err(); err != nil {
-			return err
+			return "", err
 		}
 		originalCount, originalErr := io.ReadFull(original, originalBuffer)
 		snapshotCount, snapshotErr := io.ReadFull(snapshot, snapshotBuffer)
 		if originalCount != snapshotCount || !bytes.Equal(originalBuffer[:originalCount], snapshotBuffer[:snapshotCount]) {
-			return errors.New("historical snapshot file content changed")
+			return "", errors.New("historical snapshot file content changed")
 		}
+		_, _ = hash.Write(originalBuffer[:originalCount])
 		originalEOF := errors.Is(originalErr, io.EOF) || errors.Is(originalErr, io.ErrUnexpectedEOF)
 		snapshotEOF := errors.Is(snapshotErr, io.EOF) || errors.Is(snapshotErr, io.ErrUnexpectedEOF)
 		if originalEOF || snapshotEOF {
 			if originalEOF && snapshotEOF {
-				return nil
+				return hex.EncodeToString(hash.Sum(nil)), nil
 			}
-			return errors.New("historical snapshot file content changed")
+			return "", errors.New("historical snapshot file content changed")
 		}
 		if originalErr != nil {
-			return originalErr
+			return "", originalErr
 		}
 		if snapshotErr != nil {
-			return snapshotErr
+			return "", snapshotErr
 		}
 	}
 }
@@ -581,6 +625,13 @@ func beginDirtyCloneRecovery(
 		return recoveryRecord{}, "", nil, recoveryAlreadyClaimedError(wt, "recovery record is unreadable")
 	}
 	if existing.State != RecoveryStateBlocked {
+		if existing.ModeRetry != nil {
+			if err := verifyInterruptedPermissionRetry(ctx, wt.Path, existing); err != nil {
+				_ = lock.Close()
+				return recoveryRecord{}, "", nil,
+					managedCloneRelocationError(wt.TaskID, "interrupted permission retry no longer matches original evidence")
+			}
+		}
 		return adoptDirtyCloneRecovery(wt, claim, existing, lock)
 	}
 	return beginBlockedDirtyCloneRecovery(ctx, m, wt, jobPath, claim, proof, relocation, existing, lock)
@@ -617,6 +668,24 @@ func adoptDirtyCloneRecovery(
 		recoveryAlreadyClaimedError(wt, "recovery record operation ID does not match the durable claim")
 }
 
+func verifyInterruptedPermissionRetry(ctx context.Context, original string, record recoveryRecord) error {
+	if !validRecoveryModeRetry(record, original) {
+		return errors.New("interrupted permission retry record is invalid")
+	}
+	if err := validateDirtyCloneRelocationAuthorization(ctx); err != nil {
+		return err
+	}
+	proof, err := provePermissionOnlySnapshot(ctx, original, record.ModeRetry.PreviousSnapshot)
+	if err != nil {
+		return err
+	}
+	if proof.manifest != record.ModeRetry.SourceManifest ||
+		proof.identityManifest != record.ModeRetry.SourceIdentityManifest {
+		return errors.New("original checkout changed since permission retry proof")
+	}
+	return validateDirtyCloneRelocationAuthorization(ctx)
+}
+
 func beginBlockedDirtyCloneRecovery(
 	ctx context.Context,
 	m *Manager,
@@ -637,7 +706,8 @@ func beginBlockedDirtyCloneRecovery(
 		_ = lock.Close()
 		return recoveryRecord{}, "", nil, recoveryAlreadyClaimedError(wt, "blocked recovery operation ID does not match the durable claim")
 	}
-	if err := m.verifyPermissionOnlyRetry(ctx, wt, proof, existing, relocation); err != nil {
+	sourceProof, err := m.verifyPermissionOnlyRetry(ctx, wt, proof, existing, relocation)
+	if err != nil {
 		_ = lock.Close()
 		return recoveryRecord{}, "", nil, managedCloneRelocationError(wt.TaskID, "historical snapshot is not a proven permission-only failure")
 	}
@@ -648,7 +718,8 @@ func beginBlockedDirtyCloneRecovery(
 	}
 	retry := &recoveryModeRetry{
 		Version: 1, PreviousSnapshot: existing.Snapshot, PreviousError: existing.Error,
-		PreviousUpdatedAt: existing.UpdatedAt,
+		PreviousUpdatedAt: existing.UpdatedAt, SourceManifest: sourceProof.manifest,
+		SourceIdentityManifest: sourceProof.identityManifest,
 	}
 	existing.Snapshot, existing.Manifest, existing.State, existing.Error = newSnapshot, "", RecoveryStateSnapshotting, ""
 	existing.ModeRetry, existing.UpdatedAt = retry, time.Now().UTC()

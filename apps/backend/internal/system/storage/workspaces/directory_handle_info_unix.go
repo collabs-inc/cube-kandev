@@ -11,7 +11,7 @@ import (
 
 func pinnedDirectoryInfo(handle DirectoryHandle) (os.FileInfo, error) {
 	directory, ok := handle.(*unixDirectoryHandle)
-	if !ok || directory.targetFD < 0 {
+	if !ok || directory == nil || directory.targetFD < 0 {
 		return nil, errors.New("directory handle does not expose pinned Unix metadata")
 	}
 	fd, err := unix.Dup(directory.targetFD)

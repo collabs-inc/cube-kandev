@@ -435,6 +435,10 @@ func rebuildRecoverySnapshotWithCopier(
 	if err != nil {
 		return "", blockRecovery(recordPath, record, err)
 	}
+	if retry := record.ModeRetry; retry != nil &&
+		(sourceBefore != retry.SourceManifest || sourceIdentityBefore != retry.SourceIdentityManifest) {
+		return "", blockRecovery(recordPath, record, fmt.Errorf("original checkout changed since permission retry proof"))
+	}
 	if err := copySnapshot(source, snapshot); err != nil {
 		record.State, record.Error, record.UpdatedAt = RecoveryStateBlocked, err.Error(), time.Now().UTC()
 		_ = writeRecoveryRecord(recordPath, record)

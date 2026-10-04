@@ -175,16 +175,16 @@ The dependency order is 01, then 02, then 03. Every work order is sequential.
 
 Implementation verification on 2026-10-04 passed:
 
-- `go test -trimpath ./internal/worktree ./internal/system/storage/workspaces ./internal/orchestrator ./internal/orchestrator/executor -count=1`: passed after review fixes.
-- `go test -trimpath ./internal/orchestrator -run '^TestRecoverSessionPermissionRetryRetiresMatchingError$' -count=1 -v`: passed.
+- `go test -trimpath -tags fts5 ./internal/worktree ./internal/system/storage/workspaces ./internal/orchestrator ./internal/orchestrator/executor -count=1`: passed after review fixes.
+- `go test -trimpath -tags fts5 ./internal/orchestrator -run '^TestRecoverSessionPermissionRetryRetiresMatchingError$' -count=1 -v`: passed.
 - `make -C apps/backend build`: passed after the final refactor.
 - Targeted `golangci-lint` for worktree, workspace storage, orchestrator, and executor packages: passed with zero issues.
-- Public documentation tests (62), public page validation (47 pages), specification catalog validation (348 decisions and 1,334 specifications), specification-linter tests (36), and full specification lint: passed.
+- Public documentation tests (62), public page validation (47 pages), specification catalog validation (349 decisions and 1,337 specifications), specification-linter tests (36), and full specification lint: passed.
 - Planned-source documentation coverage, changed-Go formatting check, and `git diff --check`: passed.
 
 Design-package validation on 2026-10-04 also passed:
 
-- `python3 scripts/list-docs.py validate`: 348 decisions and 1,334 specifications.
+- `python3 scripts/list-docs.py validate`: 349 decisions and 1,337 specifications.
 - `python3 scripts/lint-spec-files.test.py`: 36 tests passed.
 - `python3 scripts/lint-spec-files.py --all`: all specification files passed.
 - `git diff --check -- docs/specs docs/decisions docs/plans/workspace-recovery-permissions`: passed.

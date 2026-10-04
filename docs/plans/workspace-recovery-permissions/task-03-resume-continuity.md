@@ -34,6 +34,7 @@ Prove the corrected repair through the existing resume flow. Add public guidance
 - Add `TestRecoverSessionPermissionRetryRetiresMatchingError` in a new orchestrator test file. Record external provider startup rather than invoking an agent.
 - Cover a CANCELLED session, ordinary resume refusal, a current explicit action, stale stamp refusal, reload of the blocked record, and provider resume-token preservation.
 - Prove one unaffected sibling stays unchanged and an invalid sibling prevents all new mutation. Retire only the matched error after relaunch.
+- Prove identity verification failures prevent canonical publication and provider startup.
 - Update `docs/public/git-operations.md` with supported permissions, manual retry after upgrade, retained copies, staging limits, and refusal for content or ownership drift.
 - Keep existing desktop and phone controls and localized copy. Use backend end-to-end evidence because rendered UI does not change.
 - Record exact results and synchronize only this package. Validate traceability and public documentation.
@@ -55,9 +56,9 @@ Prove the corrected repair through the existing resume flow. Add public guidance
 Run this block from the repository root after Red, Green, and Refactor.
 
 ```bash
-(cd apps/backend && go test -trimpath ./internal/orchestrator/executor -run '^TestPermissionRecoveryResumeIntegration$' -count=1 -v)
-(cd apps/backend && go test -trimpath ./internal/orchestrator -run '^TestRecoverSessionPermissionRetryRetiresMatchingError$' -count=1 -v)
-(cd apps/backend && go test -trimpath ./internal/worktree ./internal/orchestrator/executor -count=1)
+(cd apps/backend && go test -trimpath -tags fts5 ./internal/orchestrator/executor -run '^TestPermissionRecoveryResumeIntegration$' -count=1 -v)
+(cd apps/backend && go test -trimpath -tags fts5 ./internal/orchestrator -run '^TestRecoverSessionPermissionRetryRetiresMatchingError$' -count=1 -v)
+(cd apps/backend && go test -trimpath -tags fts5 ./internal/worktree ./internal/orchestrator/executor -count=1)
 node --test scripts/validate-public-docs.test.mjs
 node scripts/validate-public-docs.mjs
 python3 scripts/list-docs.py validate
@@ -107,13 +108,15 @@ The worktree regressions also prove that an unaffected healthy sibling retains
 its path, Git state, and untracked content, while a separate invalid sibling
 blocks every retry mutation in a mixed inventory.
 
-- `go test -trimpath ./internal/orchestrator/executor -run '^TestPermissionRecoveryResumeIntegration$' -count=1 -v`: passed.
-- `go test -trimpath ./internal/orchestrator -run '^TestRecoverSessionPermissionRetryRetiresMatchingError$' -count=1 -v`: passed.
-- `go test -trimpath ./internal/worktree ./internal/orchestrator/executor -count=1`: passed after the final refactor.
+- `go test -trimpath -tags fts5 ./internal/orchestrator/executor -run '^TestPermissionRecoveryResumeIntegration$' -count=1 -v`: passed.
+- `go test -trimpath -tags fts5 ./internal/orchestrator/executor -run '^TestPermissionRecoveryIdentityRefusalPreventsProviderStartup$' -count=1 -v`: passed.
+- `go test -trimpath -tags fts5 ./internal/orchestrator -run '^TestRecoverSessionPermissionRetryRetiresMatchingError$' -count=1 -v`: passed.
+- `go test -trimpath -tags fts5 ./internal/worktree ./internal/system/storage/workspaces ./internal/orchestrator ./internal/orchestrator/executor -count=1`: passed.
+- Targeted recovery regressions under `go test -trimpath -tags fts5 -race ./internal/worktree`: passed.
 - `make -C apps/backend build`: passed after the final refactor.
 - `golangci-lint run ./internal/worktree ./internal/system/storage/workspaces ./internal/orchestrator ./internal/orchestrator/executor --timeout=5m`: passed with zero issues.
 - `node --test scripts/validate-public-docs.test.mjs`: 62 tests passed; `node scripts/validate-public-docs.mjs`: 47 published pages validated.
-- `python3 scripts/list-docs.py validate`: 348 decisions and 1,334 specifications validated.
+- `python3 scripts/list-docs.py validate`: 349 decisions and 1,337 specifications validated.
 - `python3 scripts/lint-spec-files.test.py`: 36 tests passed; `python3 scripts/lint-spec-files.py --all`: passed.
 - Documentation coverage preflight, `gofmt -l` on changed Go files, and `git diff --check`: passed.
-- Native Windows execution was not available. The earlier Windows cross-build attempt is recorded under Task 01; its failure is in the existing SQLite package.
+- Native Windows execution was not available locally. The worktree-package cross-build is blocked by existing undefined `sqlite3.Error` and `sqlite3.ErrConstraintUnique` references in `internal/task/repository/sqlite/repository_branch_policy_admission.go`. The Windows backend job now runs `./internal/worktree` with `-tags fts5` so the native runner covers it.
