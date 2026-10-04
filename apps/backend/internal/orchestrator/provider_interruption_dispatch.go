@@ -142,6 +142,7 @@ func (s *Service) retryRetainedRuntimeContinuation(
 			disableDispatchRetry:      true,
 			requireNonterminalSession: true,
 			reserveTurnUntilDispatch:  true,
+			deliverySubmissionID:      "continuation:" + uuid.NewString(),
 			beforeDispatch:            beforeDispatch,
 			onAccepted:                onAccepted,
 		})

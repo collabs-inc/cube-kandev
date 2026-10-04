@@ -439,7 +439,8 @@ test.describe("MCP subtask creation", () => {
         { timeout: 30_000, message: "Waiting for the agent-created subtask" },
       )
       .toBeTruthy();
-    expect((await apiClient.getTask(subtaskId!)).parent_id).toBe(parentTaskId);
+    const subtask = await apiClient.getTask(subtaskId!);
+    expect(subtask.parent_id).toBe(parentTaskId);
 
     const settings = (await apiClient.getUserSettings()).settings;
     const originalWorkflowFilter =
@@ -451,14 +452,14 @@ test.describe("MCP subtask creation", () => {
       : [];
 
     try {
-      // The test task uses the create-dialog workflow. Clear saved board filters
-      // so a previous workflow/repository selection cannot hide either task.
+      // Pin the create-dialog workflow in both settings and navigation so a
+      // previous board selection cannot hide the agent-created subtask.
       await apiClient.saveUserSettings({
         workspace_id: seedData.workspaceId,
-        workflow_filter_id: "",
+        workflow_filter_id: subtask.workflow_id,
         repository_ids: [],
       });
-      await kanban.goto();
+      await kanban.goto(subtask.workflow_id);
 
       const subtaskCard = kanban.taskCardByTitle(subtaskTitle);
       await expect(subtaskCard).toBeVisible({ timeout: 10_000 });

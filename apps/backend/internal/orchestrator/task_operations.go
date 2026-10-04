@@ -10922,12 +10922,17 @@ func (s *Service) cancelAgentWhileUnlocked(
 func (s *Service) finishCancelledAgentTurn(ctx context.Context, sessionID string, prepared cancelAgentPreparation) error {
 	session := prepared.session
 	if session != nil {
+		requireWaiting := prepared.completionEligible
+		if expected, _ := ctx.Value(continuationCancelContextKey{}).(*transientRetryEntry); expected != nil && expected.retainedRuntime != nil {
+			// Cancelling an owned live continuation parks the session without advancing its workflow.
+			requireWaiting = true
+		}
 		reconciled, err := s.reconcileCancelledTurnOwned(
 			ctx,
 			session.TaskID,
 			sessionID,
 			session,
-			prepared.completionEligible,
+			requireWaiting,
 			prepared.capturedTurnID,
 		)
 		if err != nil {

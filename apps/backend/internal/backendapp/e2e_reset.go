@@ -441,6 +441,12 @@ func handleE2EReset(
 			})
 			return
 		}
+		tasks, err = tasksForE2EResetDeletion(tasks)
+		if err != nil {
+			log.Error("e2e reset: invalid task hierarchy", zap.Error(err))
+			c.JSON(http.StatusInternalServerError, gin.H{errKey: err.Error()})
+			return
+		}
 		var deletedTasks int64
 		deletedTaskIDs := append([]string(nil), taskIDsForCleanup...)
 		deletedTaskIDSet := make(map[string]struct{}, len(deletedTaskIDs))
