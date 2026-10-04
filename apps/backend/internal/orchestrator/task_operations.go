@@ -46,6 +46,7 @@ var (
 func (s *Service) resolveAgentProjectLaunch(
 	ctx context.Context,
 	task *models.Task,
+	existingSession *models.TaskSession,
 	profileID, executorID, executorProfileID string,
 ) (string, string, string, error) {
 	if task == nil || task.AgentProjectID == "" {
@@ -57,7 +58,7 @@ func (s *Service) resolveAgentProjectLaunch(
 	if s.agentProjectLaunchResolver == nil {
 		return "", "", "", ErrAgentProjectLaunchUnavailable
 	}
-	return s.agentProjectLaunchResolver(ctx, task, profileID, executorID, executorProfileID)
+	return s.agentProjectLaunchResolver(ctx, task, existingSession, profileID, executorID, executorProfileID)
 }
 
 // PromptResult contains the result of a prompt operation
@@ -360,7 +361,7 @@ func (s *Service) PrepareTaskSession(ctx context.Context, taskID string, agentPr
 		}
 	}
 	agentProfileID, executorID, executorProfileID, err = s.resolveAgentProjectLaunch(
-		ctx, projectLaunchTask, agentProfileID, executorID, executorProfileID,
+		ctx, projectLaunchTask, nil, agentProfileID, executorID, executorProfileID,
 	)
 	if err != nil {
 		return "", err
@@ -762,7 +763,9 @@ func (s *Service) startCreatedSession(
 	if profileID == "" {
 		profileID = session.AgentProfileID
 	}
-	profileID, _, _, err = s.resolveAgentProjectLaunch(ctx, launchTask, profileID, session.ExecutorID, session.ExecutorProfileID)
+	profileID, _, _, err = s.resolveAgentProjectLaunch(
+		ctx, launchTask, session, profileID, session.ExecutorID, session.ExecutorProfileID,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -1527,7 +1530,7 @@ func (s *Service) startTask(ctx context.Context, taskID string, agentProfileID s
 			return nil, err
 		}
 		agentProfileID, executorID, executorProfileID, err = s.resolveAgentProjectLaunch(
-			ctx, task, agentProfileID, executorID, executorProfileID,
+			ctx, task, nil, agentProfileID, executorID, executorProfileID,
 		)
 		if err != nil {
 			return nil, err
@@ -4160,7 +4163,7 @@ func (s *Service) attemptColdResume(
 			return false, taskErr
 		}
 		if _, _, _, launchErr := s.resolveAgentProjectLaunch(
-			ctx, task, session.AgentProfileID, session.ExecutorID, session.ExecutorProfileID,
+			ctx, task, session, session.AgentProfileID, session.ExecutorID, session.ExecutorProfileID,
 		); launchErr != nil {
 			return false, launchErr
 		}

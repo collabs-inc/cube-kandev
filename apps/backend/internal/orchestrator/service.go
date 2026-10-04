@@ -765,7 +765,7 @@ type Service struct {
 	// safe: both call sites guard on it. See SetSubagentContextRecorder.
 	subagentContexts           SubagentContextRecorder
 	agentProjectsEnabled       bool
-	agentProjectLaunchResolver func(context.Context, *models.Task, string, string, string) (string, string, string, error)
+	agentProjectLaunchResolver func(context.Context, *models.Task, *models.TaskSession, string, string, string) (string, string, string, error)
 
 	// agentProfileRecentUseRecorder optionally persists the task_create profile
 	// selected by a deferred launch after its agent starts successfully.
@@ -2000,7 +2000,8 @@ func (s *Service) SetAgentProjectsEnabled(enabled bool) {
 
 // SetAgentProjectLaunchResolver supplies the stored project profile and
 // executor after validating the task's project membership and caller choices.
-func (s *Service) SetAgentProjectLaunchResolver(resolver func(context.Context, *models.Task, string, string, string) (string, string, string, error)) {
+// existingSession is non-nil only when admission loaded a persisted session.
+func (s *Service) SetAgentProjectLaunchResolver(resolver func(context.Context, *models.Task, *models.TaskSession, string, string, string) (string, string, string, error)) {
 	s.agentProjectLaunchResolver = resolver
 }
 
