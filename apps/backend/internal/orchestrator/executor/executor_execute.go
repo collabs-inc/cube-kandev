@@ -480,7 +480,9 @@ func (e *Executor) stopFailedStartExecutionIfCurrentAttempt(
 		return false
 	}
 	if owned || cleanupSafe {
-		e.stopFailedStartExecution(ctx, agentExecutionID, phase)
+		if e.claimForcedExecutionCleanup(sessionID, agentExecutionID) {
+			e.stopFailedStartExecution(ctx, agentExecutionID, phase)
+		}
 	}
 	return owned
 }
