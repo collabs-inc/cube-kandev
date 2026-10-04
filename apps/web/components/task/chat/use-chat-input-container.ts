@@ -245,7 +245,6 @@ export function useChatInputContainer(params: UseChatInputContainerParams) {
   const { t } = useTranslation("chat");
   const { ref, sessionId, isSending, isStarting, isPreparingEnvironment, isMoving } = params;
   const { isFailed, needsRecovery, executorUnavailable, isAgentBusy, hasAgentCommands } = params;
-  const { supportsSteering } = params;
   const { placeholder, pendingClarification, onClarificationResolved } = params;
   const { pendingCommentsByFile, showRequestChangesTooltip } = params;
 
@@ -326,7 +325,7 @@ export function useChatInputContainer(params: UseChatInputContainerParams) {
     placeholder,
     isAgentBusy,
     hasAgentCommands,
-    steerPlaceholder: supportsSteering ? t("chat:composerSteerPlaceholder") : undefined,
+    steerPlaceholder: params.supportsSteering ? t("chat:composerSteerPlaceholder") : undefined,
     canQueueWhileStarting: params.canQueueWhileStarting,
   });
 
