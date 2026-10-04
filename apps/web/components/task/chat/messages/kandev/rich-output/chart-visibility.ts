@@ -8,7 +8,10 @@ function getScrollRoot(element: HTMLElement): Element | null {
   let ancestor = element.parentElement;
   while (ancestor) {
     const style = window.getComputedStyle(ancestor);
-    if ([style.overflowX, style.overflowY].some((value) => /^(auto|scroll|overlay)$/.test(value))) {
+    if (
+      /^(auto|scroll|overlay)$/.test(style.overflowY) &&
+      ancestor.scrollHeight > ancestor.clientHeight
+    ) {
       return ancestor;
     }
     ancestor = ancestor.parentElement;
@@ -56,11 +59,19 @@ export function useChartPlotVisibility() {
       { root, rootMargin: CHART_PREWARM_MARGIN },
     );
     observer.observe(plot);
-    if (isWithinPrewarmRange(plot, root)) {
+    const checkScrollRange = () => {
+      if (!isWithinPrewarmRange(plot, root)) return;
       setIsNearViewport(true);
       observer.disconnect();
-    }
-    return () => observer.disconnect();
+    };
+    document.addEventListener("scroll", checkScrollRange, true);
+    window.addEventListener("resize", checkScrollRange);
+    checkScrollRange();
+    return () => {
+      observer.disconnect();
+      document.removeEventListener("scroll", checkScrollRange, true);
+      window.removeEventListener("resize", checkScrollRange);
+    };
   }, [canObserveIntersection, shouldMountPlot]);
 
   useEffect(() => {
