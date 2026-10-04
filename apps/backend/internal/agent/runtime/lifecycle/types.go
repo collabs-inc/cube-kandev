@@ -656,7 +656,6 @@ func (e *RetainedPromptFailureError) Error() string {
 
 func (e *RetainedPromptFailureError) Unwrap() error {
 	return ErrAgentReported
-
 }
 
 func (e *AgentExecution) promptGenerationSnapshot() uint64 {

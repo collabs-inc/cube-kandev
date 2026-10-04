@@ -1458,7 +1458,6 @@ func (sm *SessionManager) waitForPromptDone(
 						Message:     signal.Error,
 						Disposition: signal.PromptFailureDisposition,
 					}
-
 				}
 				return nil, fmt.Errorf("%w: %s", ErrAgentReported, signal.Error)
 			}
