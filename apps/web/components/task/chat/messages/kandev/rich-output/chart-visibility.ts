@@ -3,6 +3,18 @@ import { useEffect, useRef, useState } from "react";
 // i18n-exempt: IntersectionObserver geometry, not user-facing copy.
 const CHART_PREWARM_MARGIN = "200px 0px";
 
+function getScrollRoot(element: HTMLElement): Element | null {
+  let ancestor = element.parentElement;
+  while (ancestor) {
+    const style = window.getComputedStyle(ancestor);
+    if ([style.overflowX, style.overflowY].some((value) => /^(auto|scroll|overlay)$/.test(value))) {
+      return ancestor;
+    }
+    ancestor = ancestor.parentElement;
+  }
+  return null;
+}
+
 export function useChartPlotVisibility() {
   const plotRef = useRef<HTMLDivElement | null>(null);
   const canObserveIntersection = typeof IntersectionObserver !== "undefined";
@@ -22,7 +34,7 @@ export function useChartPlotVisibility() {
         setIsNearViewport(true);
         observer.disconnect();
       },
-      { rootMargin: CHART_PREWARM_MARGIN },
+      { root: getScrollRoot(plot), rootMargin: CHART_PREWARM_MARGIN },
     );
     observer.observe(plot);
     return () => observer.disconnect();
@@ -33,6 +45,7 @@ export function useChartPlotVisibility() {
       setIsDocumentVisible(document.visibilityState !== "hidden");
     };
     document.addEventListener("visibilitychange", handleVisibilityChange);
+    handleVisibilityChange();
     return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, []);
 

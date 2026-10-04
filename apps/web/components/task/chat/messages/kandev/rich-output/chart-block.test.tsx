@@ -1,5 +1,6 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
+import { useLayoutEffect } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RichOutputChartBlock } from "./types";
 
@@ -114,6 +115,11 @@ function setDocumentVisibility(value: DocumentVisibilityState) {
   document.dispatchEvent(new Event("visibilitychange"));
 }
 
+function RevealDocumentBeforePassiveEffects({ children }: { children: ReactNode }) {
+  useLayoutEffect(() => setDocumentVisibility("visible"), []);
+  return children;
+}
+
 beforeEach(() => {
   observerRecords.length = 0;
   for (const values of Object.values(captured)) values.length = 0;
@@ -143,6 +149,16 @@ describe("ChartBlock plot scheduling", () => {
     expect(screen.getByTestId(MOCK_LINE_CHART)).not.toBeNull();
   });
 
+  it("observes the nearest scrollable transcript container", () => {
+    const { container } = render(
+      <div style={{ overflowY: "auto" }}>
+        <ChartBlock block={BLOCK} />
+      </div>,
+    );
+
+    expect(observerRecords[0].options?.root).toBe(container.firstElementChild);
+  });
+
   it("waits for a background tab to become visible after intersection", () => {
     setDocumentVisibility("hidden");
     render(<ChartBlock block={BLOCK} />);
@@ -151,6 +167,19 @@ describe("ChartBlock plot scheduling", () => {
     expect(screen.queryByTestId(MOCK_LINE_CHART)).toBeNull();
 
     act(() => setDocumentVisibility("visible"));
+    expect(screen.getByTestId(MOCK_LINE_CHART)).not.toBeNull();
+  });
+
+  it("syncs current visibility when the change precedes listener registration", () => {
+    setDocumentVisibility("hidden");
+    render(
+      <RevealDocumentBeforePassiveEffects>
+        <ChartBlock block={BLOCK} />
+      </RevealDocumentBeforePassiveEffects>,
+    );
+
+    intersect();
+
     expect(screen.getByTestId(MOCK_LINE_CHART)).not.toBeNull();
   });
 
