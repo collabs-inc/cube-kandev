@@ -367,6 +367,9 @@ type AgentExecution struct {
 	// promptLifecycleMu is held by workspace rebind waiting for readiness.
 	startupAttemptGeneration uint64
 	startupRecoveryStarted   bool
+	startupStopRequested     bool
+	startupCancelGeneration  uint64
+	startupCancel            context.CancelFunc
 	// startupAttemptIDs preserves the recovery identity for each startup
 	// generation. The execution ID can be reused by managed-runtime repair, so
 	// callbacks must use their captured generation identity instead of the
@@ -689,6 +692,56 @@ func (e *AgentExecution) beginStartupAttemptWithID(attemptID string) uint64 {
 	return e.startupAttemptGeneration
 }
 
+func (e *AgentExecution) registerStartupCancellation(generation uint64, cancel context.CancelFunc) bool {
+	if e == nil || cancel == nil {
+		return false
+	}
+	e.startupLifecycleMu.Lock()
+	defer e.startupLifecycleMu.Unlock()
+	if e.startupStopRequested || generation != e.startupAttemptGeneration {
+		return false
+	}
+	e.startupCancelGeneration = generation
+	e.startupCancel = cancel
+	return true
+}
+
+func (e *AgentExecution) clearStartupCancellation(generation uint64) {
+	if e == nil {
+		return
+	}
+	e.startupLifecycleMu.Lock()
+	defer e.startupLifecycleMu.Unlock()
+	if e.startupCancelGeneration == generation {
+		e.startupCancelGeneration = 0
+		e.startupCancel = nil
+	}
+}
+
+func (e *AgentExecution) cancelStartupForStop() {
+	if e == nil {
+		return
+	}
+	e.startupLifecycleMu.Lock()
+	e.startupStopRequested = true
+	cancel := e.startupCancel
+	e.startupCancel = nil
+	e.startupCancelGeneration = 0
+	e.startupLifecycleMu.Unlock()
+	if cancel != nil {
+		cancel()
+	}
+}
+
+func (e *AgentExecution) startupStopWasRequested() bool {
+	if e == nil {
+		return false
+	}
+	e.startupLifecycleMu.Lock()
+	defer e.startupLifecycleMu.Unlock()
+	return e.startupStopRequested
+}
+
 func (e *AgentExecution) setSessionSettingsStartupPolicy(policy SessionSettingsPolicy) {
 	if e == nil {
 		return
@@ -848,7 +901,7 @@ func (e *AgentExecution) startupGenerationForAttemptID(attemptID string) (uint64
 func (e *AgentExecution) acceptsStartupAttempt(generation uint64) bool {
 	e.startupLifecycleMu.Lock()
 	defer e.startupLifecycleMu.Unlock()
-	return e.startupAttemptGeneration == generation
+	return !e.startupStopRequested && e.startupAttemptGeneration == generation
 }
 
 // withStartupAttempt leases one callback's immutable startup identity through
@@ -862,7 +915,7 @@ func (e *AgentExecution) withStartupAttempt(generation uint64, callback func(att
 	e.startupCallbackMu.RLock()
 	defer e.startupCallbackMu.RUnlock()
 	e.startupLifecycleMu.Lock()
-	if e.startupAttemptGeneration != generation {
+	if e.startupStopRequested || e.startupAttemptGeneration != generation {
 		e.startupLifecycleMu.Unlock()
 		return false
 	}
@@ -904,7 +957,7 @@ func (e *AgentExecution) signalPromptCompletionForStartupGenerationLeased(
 	}
 	e.startupLifecycleMu.Lock()
 	defer e.startupLifecycleMu.Unlock()
-	if e.startupAttemptGeneration != startupGeneration {
+	if e.startupStopRequested || e.startupAttemptGeneration != startupGeneration {
 		return false
 	}
 	signal.StartupGeneration = startupGeneration

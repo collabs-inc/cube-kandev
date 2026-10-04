@@ -2855,12 +2855,20 @@ func (m *Manager) initializeAgentSession(ctx context.Context, execution *AgentEx
 
 	agentConfig, err := m.getAgentConfigForExecution(execution)
 	if err != nil {
+		if ctx.Err() != nil && execution.startupStopWasRequested() {
+			m.finalizeBootMessage(execution, bootMsg, bootStopCh, containerStateExited)
+			return err
+		}
 		m.finalizeBootMessage(execution, bootMsg, bootStopCh, "failed")
 		return fmt.Errorf("failed to get agent config: %w", err)
 	}
 
 	mcpServers, err := m.resolveMcpServers(ctx, execution, agentConfig)
 	if err != nil {
+		if ctx.Err() != nil && execution.startupStopWasRequested() {
+			m.finalizeBootMessage(execution, bootMsg, bootStopCh, containerStateExited)
+			return err
+		}
 		m.finalizeBootMessage(execution, bootMsg, bootStopCh, "failed")
 		m.updateExecutionError(execution.ID, "failed to resolve MCP config: "+err.Error())
 		return fmt.Errorf("failed to resolve MCP config: %w", err)
@@ -2868,6 +2876,10 @@ func (m *Manager) initializeAgentSession(ctx context.Context, execution *AgentEx
 
 	attachments := getAttachmentsFromMetadata(execution)
 	if err := m.initializeACPSession(ctx, execution, agentConfig, taskDescription, attachments, mcpServers); err != nil {
+		if ctx.Err() != nil && execution.startupStopWasRequested() {
+			m.finalizeBootMessage(execution, bootMsg, bootStopCh, containerStateExited)
+			return err
+		}
 		attempted, retryErr := m.retryManagedRuntimeStartupWithProgress(
 			ctx,
 			execution,
