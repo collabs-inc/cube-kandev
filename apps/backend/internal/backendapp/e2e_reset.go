@@ -367,6 +367,12 @@ func handleE2EReset(
 			})
 			return
 		}
+		tasks, err = orderE2EResetTasksChildFirst(tasks)
+		if err != nil {
+			log.Error("e2e reset: failed to order tasks for deletion", zap.Error(err))
+			c.JSON(http.StatusInternalServerError, gin.H{errKey: err.Error()})
+			return
+		}
 		var deletedTasks int64
 		deletedTaskIDs := append([]string(nil), taskIDsForCleanup...)
 		deletedTaskIDSet := make(map[string]struct{}, len(deletedTaskIDs))
@@ -433,6 +439,53 @@ func deleteTaskForE2EReset(
 		// disposable local changes left by the test that created the task.
 		DiscardWorktreeChanges: true,
 	})
+}
+
+func orderE2EResetTasksChildFirst(tasks []*taskmodels.Task) ([]*taskmodels.Task, error) {
+	taskByID := make(map[string]*taskmodels.Task, len(tasks))
+	remainingChildren := make(map[string]int, len(tasks))
+	for _, task := range tasks {
+		if task == nil || task.ID == "" {
+			return nil, fmt.Errorf("cannot order E2E reset tasks with an empty task")
+		}
+		if _, exists := taskByID[task.ID]; exists {
+			return nil, fmt.Errorf("cannot order E2E reset tasks with duplicate task %s", task.ID)
+		}
+		taskByID[task.ID] = task
+		remainingChildren[task.ID] = 0
+	}
+	for _, task := range tasks {
+		if _, exists := taskByID[task.ParentID]; exists && task.ParentID != "" {
+			remainingChildren[task.ParentID]++
+		}
+	}
+
+	ready := make([]*taskmodels.Task, 0, len(tasks))
+	for _, task := range tasks {
+		if remainingChildren[task.ID] == 0 {
+			ready = append(ready, task)
+		}
+	}
+
+	ordered := make([]*taskmodels.Task, 0, len(tasks))
+	for head := 0; head < len(ready); head++ {
+		task := ready[head]
+		ordered = append(ordered, task)
+		if task.ParentID == "" {
+			continue
+		}
+		if _, exists := taskByID[task.ParentID]; !exists {
+			continue
+		}
+		remainingChildren[task.ParentID]--
+		if remainingChildren[task.ParentID] == 0 {
+			ready = append(ready, taskByID[task.ParentID])
+		}
+	}
+	if len(ordered) != len(tasks) {
+		return nil, fmt.Errorf("cannot order E2E reset tasks with a cyclic hierarchy")
+	}
+	return ordered, nil
 }
 
 func waitForE2ETaskCleanup(ctx context.Context, database *sql.DB, taskIDs []string) error {

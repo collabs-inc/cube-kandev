@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http/httptest"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -55,6 +56,28 @@ func TestDeleteTaskForE2EResetDiscardsWorktreeChanges(t *testing.T) {
 	}
 	if !deleter.options.DiscardWorktreeChanges {
 		t.Fatal("E2E reset must discard disposable worktree changes")
+	}
+}
+
+func TestOrderE2EResetTasksChildFirst(t *testing.T) {
+	tasks := []*taskmodels.Task{
+		{ID: "parent"},
+		{ID: "child", ParentID: "parent"},
+		{ID: "grandchild", ParentID: "child"},
+		{ID: "independent"},
+	}
+
+	ordered, err := orderE2EResetTasksChildFirst(tasks)
+	if err != nil {
+		t.Fatalf("orderE2EResetTasksChildFirst: %v", err)
+	}
+	got := make([]string, 0, len(ordered))
+	for _, task := range ordered {
+		got = append(got, task.ID)
+	}
+	want := []string{"grandchild", "independent", "child", "parent"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("reset order = %v, want %v", got, want)
 	}
 }
 
