@@ -145,7 +145,7 @@ export type WsWatcher = {
    * arming* gets its reply, correlated by frame `id`. Rejects if the backend
    * answers with an `error` frame.
    */
-  waitForResponse(action: string, options?: { timeout?: number }): Promise<WsFrame>;
+  waitForResponse(action: string, options?: WaitForWsOptions): Promise<WsFrame>;
 };
 
 function decodeFrame(payload: string | Buffer | Uint8Array): WsFrame | null {
@@ -248,9 +248,9 @@ function waitForEvent(
 function waitForResponse(
   channels: Channels,
   action: string,
-  options: { timeout?: number },
+  options: WaitForWsOptions,
 ): Promise<WsFrame> {
-  const { timeout = DEFAULT_TIMEOUT } = options;
+  const { timeout = DEFAULT_TIMEOUT, where } = options;
   return new Promise<WsFrame>((resolve, reject) => {
     const requestIds = new Set<string>();
     const wait = armWsWait(
@@ -259,7 +259,9 @@ function waitForResponse(
       reject,
     );
     wait.listen(channels.sent, (frame) => {
-      if (frame.action === action && frame.id) requestIds.add(frame.id);
+      if (frame.action === action && frame.id && (!where || where(frame.payload))) {
+        requestIds.add(frame.id);
+      }
     });
     wait.listen(channels.received, (frame) => {
       if (!frame.id || !requestIds.has(frame.id)) return;

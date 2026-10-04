@@ -15,7 +15,7 @@ func TestMockInterruptionContinuationWireError(t *testing.T) {
 		enabled, attested, handled bool
 	}{
 		{"enabled mock", mockAgentID, true, true, true},
-		{"disabled mock", mockAgentID, false, false, true},
+		{"disabled mock", mockAgentID, false, false, false},
 		{"untrusted provider marker", "other-acp", true, false, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

@@ -217,7 +217,8 @@ func (a *Adapter) sendPrompt(
 		// asynchronously. Drain it before returning the error so a diagnostic
 		// agent_message_chunk cannot be overtaken by the terminal failure event.
 		notificationsDrained := a.syncNotifQueue()
-		if a.dialect.continuationError != nil && a.dialect.continuationError(err) {
+		if a.cfg.ProviderInterruptionContinuation &&
+			a.dialect.continuationError != nil && a.dialect.continuationError(err) {
 			snapshot := a.continuationSafetySnapshot(turn)
 			a.cancelAsyncTurnComplete(sessionID)
 			a.sendUpdate(AgentEvent{Type: streams.EventTypeError, SessionID: sessionID,
