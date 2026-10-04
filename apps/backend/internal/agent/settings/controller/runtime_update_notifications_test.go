@@ -13,12 +13,20 @@ import (
 type runtimeNoticeCapture struct {
 	mu      sync.Mutex
 	notices []agents.RuntimeUpdateNotice
+	batches [][]agents.RuntimeUpdateNotice
 }
 
 func (n *runtimeNoticeCapture) HandleAgentRuntimeUpdate(_ context.Context, notice agents.RuntimeUpdateNotice) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	n.notices = append(n.notices, notice)
+}
+
+func (n *runtimeNoticeCapture) HandleAgentRuntimeUpdates(_ context.Context, notices []agents.RuntimeUpdateNotice) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	n.batches = append(n.batches, append([]agents.RuntimeUpdateNotice(nil), notices...))
+	n.notices = append(n.notices, notices...)
 }
 
 // @covers AC-AGENTS-RUNTIME-NOTIFY-001.3, AC-AGENTS-RUNTIME-NOTIFY-002.6
@@ -32,10 +40,9 @@ func TestRuntimeBackgroundPassNamesManualRuntimeAndRetainedOutcome(t *testing.T)
 	if err := c.RunRuntimeUpdatePass(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if len(n.notices) != 1 || n.notices[0].AgentID != ag.ID() || n.notices[0].PreviousVersion != "1.0.0" || n.notices[0].Version != "2.0.0" || n.notices[0].URL != "/settings/agents#runtime-update-kimi-acp" {
-		t.Fatalf("manual notice: %+v", n.notices)
+	if len(n.notices) != 0 {
+		t.Fatalf("availability bypassed its collection window: %+v", n.notices)
 	}
-	n.notices = nil
 	c.publishRuntimeStatus(context.Background(), dto.AgentUpdateStatusDTO{AgentName: "gemini", DisplayName: "Gemini", RuntimeID: "npm:@google/gemini-cli", Available: true, Enabled: true, CheckState: dto.AgentUpdateCheckStateUnknown, LastOutcome: &managedruntime.UpdateOutcome{ID: "attempt", Status: "failed", PreviousVersion: "1.0.0", TargetVersion: "2.0.0"}})
 	if len(n.notices) != 1 || n.notices[0].Status != "failed" || n.notices[0].PreviousVersion != "1.0.0" {
 		t.Fatalf("retained failure: %+v", n.notices)
@@ -43,3 +50,9 @@ func TestRuntimeBackgroundPassNamesManualRuntimeAndRetainedOutcome(t *testing.T)
 }
 
 func (n *runtimeNoticeCapture) count() int { n.mu.Lock(); defer n.mu.Unlock(); return len(n.notices) }
+
+func (n *runtimeNoticeCapture) batchCount() int {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	return len(n.batches)
+}

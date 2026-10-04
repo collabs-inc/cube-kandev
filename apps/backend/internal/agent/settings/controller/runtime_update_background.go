@@ -7,11 +7,14 @@ import (
 )
 
 const runtimeUpdateBackgroundInterval = 15 * time.Minute
+const runtimeUpdateAvailabilityWindow = 30 * time.Second
 
 type runtimeUpdateBackground struct {
-	cancel context.CancelFunc
-	wg     sync.WaitGroup
-	once   sync.Once
+	cancel    context.CancelFunc
+	ctx       context.Context
+	collector *runtimeAvailabilityCollector
+	wg        sync.WaitGroup
+	once      sync.Once
 }
 
 // StartRuntimeUpdateBackground owns the single install-wide update sweep.
@@ -22,9 +25,17 @@ func (c *Controller) StartRuntimeUpdateBackground(parent context.Context, readin
 		return c.runtimeBackgroundStop(c.runtimeBackground)
 	}
 	ctx, cancel := context.WithCancel(parent)
-	worker := &runtimeUpdateBackground{cancel: cancel}
+	worker := &runtimeUpdateBackground{
+		cancel:    cancel,
+		ctx:       ctx,
+		collector: newRuntimeAvailabilityCollector(),
+	}
 	c.runtimeBackground = worker
-	worker.wg.Add(1)
+	worker.wg.Add(2)
+	go func() {
+		defer worker.wg.Done()
+		c.runRuntimeAvailabilityCollector(ctx, worker.collector)
+	}()
 	go func() {
 		defer worker.wg.Done()
 		if len(readiness) > 0 && readiness[0] != nil {
