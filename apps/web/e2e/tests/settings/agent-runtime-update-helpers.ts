@@ -53,11 +53,12 @@ function catalogue(
   models: Array<{ id: string; name: string }>,
   displayName = "Claude",
   runtimeVersion = "0.62.0",
+  agentName = AGENT_NAME,
 ) {
   return {
     agents: [
       {
-        name: AGENT_NAME,
+        name: agentName,
         display_name: displayName,
         description: "Claude ACP runtime",
         supports_mcp: true,
@@ -97,11 +98,11 @@ function catalogue(
   };
 }
 
-function discovery() {
+function discovery(agentName = AGENT_NAME) {
   return {
     agents: [
       {
-        name: AGENT_NAME,
+        name: agentName,
         supports_mcp: true,
         installation_paths: ["claude-agent-acp"],
         available: true,
@@ -204,6 +205,8 @@ async function handlePreviewRoute({
 }
 
 export type RuntimeUpdateFixtureOptions = {
+  agentName?: string;
+  broadcast?: (action: string, payload: unknown) => Promise<void>;
   retainedJobs?: UpdateJob[];
   postResponse?: UpdateJob;
   previewResponse?: UpdatePreview;
@@ -216,6 +219,7 @@ export async function installRuntimeUpdateFixture(
   page: Page,
   options: RuntimeUpdateFixtureOptions = {},
 ) {
+  const agentName = options.agentName ?? AGENT_NAME;
   let currentModels = [{ id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6" }];
   let persistedRuntimeVersion = "0.62.0";
   let retainedJobs = options.retainedJobs ?? [];
@@ -223,7 +227,7 @@ export async function installRuntimeUpdateFixture(
     options.postResponse ??
     ({
       job_id: "runtime-update-job-1",
-      agent_name: AGENT_NAME,
+      agent_name: agentName,
       status: "resolving",
       current_version: "0.62.0",
       started_at: NOW,
@@ -238,7 +242,7 @@ export async function installRuntimeUpdateFixture(
   const previewDelayMs = options.previewDelayMs ?? 0;
   let statusResponse = options.statusResponse ?? [
     {
-      agent_name: AGENT_NAME,
+      agent_name: agentName,
       package: "@agentclientprotocol/claude-agent-acp",
       default_version: "0.64.0",
       active_version: "0.62.0",
@@ -251,7 +255,7 @@ export async function installRuntimeUpdateFixture(
   let previewResponse: UpdatePreview =
     options.previewResponse ??
     ({
-      agent_name: AGENT_NAME,
+      agent_name: agentName,
       package: "@agentclientprotocol/claude-agent-acp",
       current_version: "0.62.0",
       target_version: "0.63.0",
@@ -286,14 +290,14 @@ export async function installRuntimeUpdateFixture(
     route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify(discovery()),
+      body: JSON.stringify(discovery(agentName)),
     }),
   );
   await page.route("**/api/v1/agents/available", (route) =>
     route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify(catalogue(currentModels, "Claude", persistedRuntimeVersion)),
+      body: JSON.stringify(catalogue(currentModels, "Claude", persistedRuntimeVersion, agentName)),
     }),
   );
   await page.route("**/api/v1/agents", (route) =>
@@ -306,10 +310,7 @@ export async function installRuntimeUpdateFixture(
   await page.route("**/api/v1/agent-update/**", async (route) => {
     const request = route.request();
     const url = new URL(request.url());
-    if (
-      request.method() === "GET" &&
-      url.pathname.endsWith(`/agent-update/${AGENT_NAME}/preview`)
-    ) {
+    if (request.method() === "GET" && url.pathname.endsWith(`/agent-update/${agentName}/preview`)) {
       previewCount += 1;
       const requestedTarget = url.searchParams.get("target_version");
       previewTargets.push(requestedTarget ?? "");
@@ -337,7 +338,7 @@ export async function installRuntimeUpdateFixture(
         body: JSON.stringify({ jobs: retainedJobs }),
       });
     }
-    if (request.method() === "POST" && url.pathname.endsWith(`/agent-update/${AGENT_NAME}`)) {
+    if (request.method() === "POST" && url.pathname.endsWith(`/agent-update/${agentName}`)) {
       postCount += 1;
       const body = request.postDataJSON() as {
         target_version?: string;
@@ -352,12 +353,12 @@ export async function installRuntimeUpdateFixture(
     }
     return route.fallback();
   });
-  await page.route(`**/api/v1/agent-models/${AGENT_NAME}**`, (route) =>
+  await page.route(`**/api/v1/agent-models/${agentName}**`, (route) =>
     route.fulfill({
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({
-        agent_name: AGENT_NAME,
+        agent_name: agentName,
         status: "ok",
         models: currentModels.map((model, index) => ({
           ...model,
@@ -383,7 +384,7 @@ export async function installRuntimeUpdateFixture(
   });
 
   return {
-    agentName: AGENT_NAME,
+    agentName,
     setRetainedJobs(jobs: UpdateJob[]) {
       retainedJobs = jobs;
     },
@@ -404,7 +405,7 @@ export async function installRuntimeUpdateFixture(
         operation: "up_to_date",
       };
       statusResponse = statusResponse.map((status) =>
-        status.agent_name === AGENT_NAME
+        status.agent_name === agentName
           ? {
               ...status,
               active_version: version,
@@ -434,11 +435,12 @@ export async function installRuntimeUpdateFixture(
           ? "agent.update.finished"
           : "agent.update.started";
       await this.emit(action, job);
+      await options.broadcast?.(action, job);
     },
     async emitOutput(chunk: string) {
       await this.emit("agent.update.output", {
         job_id: "runtime-update-job-1",
-        agent_name: AGENT_NAME,
+        agent_name: agentName,
         chunk,
       });
     },
@@ -446,7 +448,7 @@ export async function installRuntimeUpdateFixture(
       currentModels = models;
       await this.emit(
         "agent.available.updated",
-        catalogue(models, "Claude refreshed", persistedRuntimeVersion),
+        catalogue(models, "Claude refreshed", persistedRuntimeVersion, agentName),
       );
     },
   };

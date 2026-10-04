@@ -1,11 +1,183 @@
 import { test, expect } from "../../fixtures/test-base";
 import {
+  approveRuntimeUpdateInOtherTab,
   createProfileWithCatalog,
+  installProfileRuntimeObservationFixture,
   observeProfileDiscoveryRequests,
   readProfileProbeEvidence,
 } from "../../helpers/profile-capability-discovery";
 
 test.describe("Profile capability discovery", () => {
+  test("shows host runtime context and refreshes the open draft after an update in another tab", async ({
+    testPage,
+    apiClient,
+    backend,
+  }) => {
+    test.setTimeout(120_000);
+
+    const { agents } = await apiClient.listAgents();
+    const agent = agents.find((item) => item.name === "mock-agent");
+    if (!agent) throw new Error("mock-agent is required for profile discovery E2E");
+    const { profile } = await createProfileWithCatalog(
+      apiClient,
+      backend,
+      agent.id,
+      "Runtime observation",
+      "runtime-initial",
+    );
+    const profileRuntime = await installProfileRuntimeObservationFixture(testPage);
+    const requests = observeProfileDiscoveryRequests(testPage);
+    let updatePage: typeof testPage | undefined;
+
+    try {
+      await testPage.goto(`/settings/agents/${agent.name}/profiles/${profile.id}`);
+      const selector = testPage.getByRole("button", { name: "Profile start model settings" });
+      await expect(selector).toBeVisible({ timeout: 15_000 });
+      await expect(testPage.getByTestId("profile-capability-status")).toHaveAttribute(
+        "data-status",
+        "ready",
+        { timeout: 20_000 },
+      );
+      await expect(testPage.getByTestId("profile-runtime-component-bridge")).toContainText(
+        "Observed: 1.11.0",
+      );
+      await expect(testPage.getByTestId("profile-runtime-component-bridge")).toContainText(
+        "Configured: 1.10.0",
+      );
+      await expect(testPage.getByTestId("profile-runtime-update-status")).toHaveText(
+        "A managed runtime update is available.",
+      );
+      await expect(testPage.getByTestId("profile-runtime-component-provider")).toContainText(
+        "External",
+      );
+      await expect(testPage.getByRole("link", { name: "Provider guidance" })).toHaveAttribute(
+        "href",
+        "https://github.com/openai/codex",
+      );
+
+      const selectedBefore = await selector.textContent();
+      await testPage.getByTestId("env-var-row-0").locator("input").nth(1).fill("runtime-draft");
+      await expect(testPage.getByTestId("profile-capability-status")).toHaveAttribute(
+        "data-status",
+        "stale",
+      );
+
+      await testPage.getByRole("link", { name: "Manage bridge version" }).click();
+      const navigationGuard = testPage.getByRole("alertdialog", {
+        name: "Save changes before leaving?",
+      });
+      await expect(navigationGuard).toBeVisible();
+      await navigationGuard.getByRole("button", { name: "Continue editing" }).click();
+      await expect(testPage).toHaveURL(`/settings/agents/${agent.name}/profiles/${profile.id}`);
+
+      const updateTab = await approveRuntimeUpdateInOtherTab(testPage, profileRuntime);
+      updatePage = updateTab.page;
+      await expect(testPage.getByTestId("profile-capability-status")).toHaveAttribute(
+        "data-status",
+        "ready",
+        { timeout: 20_000 },
+      );
+      await expect(testPage.getByTestId("profile-runtime-component-bridge")).toContainText(
+        "Observed: 0.63.0",
+      );
+      await expect(selector).toHaveText(selectedBefore ?? "");
+      const savedProfile = await apiClient.getAgentProfile(profile.id);
+      expect(savedProfile.model).toBe("mock-fast");
+      expect(
+        savedProfile.envVars?.find((item) => item.key === "MOCK_AGENT_PROFILE_CATALOG")?.value,
+      ).toBe("runtime-initial");
+
+      const refreshedProbe = requests.find(
+        (request) => request.url.endsWith("/probe") && request.body.refresh === true,
+      );
+      expect(refreshedProbe?.body.profile_id).toBe(profile.id);
+      expect(refreshedProbe?.body.launch_settings).toMatchObject({
+        env_vars: expect.arrayContaining([
+          expect.objectContaining({ key: "MOCK_AGENT_PROFILE_CATALOG", value: "runtime-draft" }),
+        ]),
+      });
+      await selector.click();
+      await expect(
+        testPage.getByRole("option", { name: "Profile env after update" }),
+      ).toBeVisible();
+      await testPage.keyboard.press("Escape");
+      await expect(updateTab.runtime.postCount()).toBe(1);
+    } finally {
+      if (updatePage) await updatePage.close();
+      await apiClient.deleteAgentProfile(profile.id, true);
+    }
+  });
+
+  test("keeps the profile catalog and observation after a failed update in another tab", async ({
+    testPage,
+    apiClient,
+    backend,
+  }) => {
+    test.setTimeout(120_000);
+
+    const { agents } = await apiClient.listAgents();
+    const agent = agents.find((item) => item.name === "mock-agent");
+    if (!agent) throw new Error("mock-agent is required for profile discovery E2E");
+    const { profile } = await createProfileWithCatalog(
+      apiClient,
+      backend,
+      agent.id,
+      "Runtime observation failure",
+      "runtime-initial",
+    );
+    const profileRuntime = await installProfileRuntimeObservationFixture(testPage);
+    const requests = observeProfileDiscoveryRequests(testPage);
+    let updatePage: typeof testPage | undefined;
+
+    try {
+      await testPage.goto(`/settings/agents/${agent.name}/profiles/${profile.id}`);
+      const selector = testPage.getByRole("button", { name: "Profile start model settings" });
+      await expect(selector).toBeVisible({ timeout: 15_000 });
+      await expect(testPage.getByTestId("profile-capability-status")).toHaveAttribute(
+        "data-status",
+        "ready",
+        { timeout: 20_000 },
+      );
+      const selectedBefore = await selector.textContent();
+      await selector.click();
+      await expect(
+        testPage.getByRole("option", { name: "Profile env runtime-initial" }),
+      ).toBeVisible();
+      await testPage.keyboard.press("Escape");
+
+      const updateTab = await approveRuntimeUpdateInOtherTab(testPage, profileRuntime, "failed");
+      updatePage = updateTab.page;
+
+      await expect(testPage.getByTestId("profile-capability-status")).toHaveAttribute(
+        "data-status",
+        "ready",
+      );
+      await expect(testPage.getByTestId("profile-runtime-component-bridge")).toContainText(
+        "Observed: 1.11.0",
+      );
+      await expect(selector).toHaveText(selectedBefore ?? "");
+      await selector.click();
+      await expect(
+        testPage.getByRole("option", { name: "Profile env runtime-initial" }),
+      ).toBeVisible();
+      await expect(testPage.getByRole("option", { name: "Profile env after update" })).toHaveCount(
+        0,
+      );
+      await testPage.keyboard.press("Escape");
+      expect(requests.filter((request) => request.url.endsWith("/probe"))).toHaveLength(1);
+      expect(updateTab.runtime.postCount()).toBe(1);
+
+      const savedProfile = await apiClient.getAgentProfile(profile.id);
+      expect(savedProfile.model).toBe("mock-fast");
+      expect(
+        savedProfile.envVars?.find((item) => item.key === "MOCK_AGENT_PROFILE_CATALOG")?.value,
+      ).toBe("runtime-initial");
+    } finally {
+      if (updatePage) await updatePage.close();
+      await apiClient.deleteAgentProfile(profile.id, true);
+    }
+  });
+
   test("isolates saved catalogs and refreshes an unsaved launch draft before save", async ({
     testPage,
     apiClient,

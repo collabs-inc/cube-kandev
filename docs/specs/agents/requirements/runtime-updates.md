@@ -2,7 +2,7 @@
 status: active
 system: agents
 created: 2026-07-26
-updated: 2026-09-07
+updated: 2026-10-04
 owners:
   - Kandev
 ---
@@ -47,7 +47,33 @@ Operators need newly released agent models without waiting for a Kandev release.
 - **AC-AGENTS-RUNTIME-UPDATES-002.6:** If Kandev cannot complete default activation, startup shall stop before readiness and retry the activation during the next start.
 - **AC-AGENTS-RUNTIME-UPDATES-002.7:** On the first release with this behavior, Kandev shall treat an unmarked legacy selection as part of an earlier default generation.
 
+### REQ-AGENTS-RUNTIME-UPDATES-003: Runtime visibility beside model discovery
+
+**Intent:** Operators can identify the runtime behind a model list and reach its explicit update action.
+This extends runtime management into concrete-profile model settings. It does not change provider model availability.
+
+#### Acceptance criteria
+
+- **AC-AGENTS-RUNTIME-UPDATES-003.1:** Model settings shall show the observed bridge version and the effective managed package version as distinct values. Unknown observations shall remain explicit.
+- **AC-AGENTS-RUNTIME-UPDATES-003.2:** Model settings shall identify the underlying provider runtime as bundled, external, or unknown. Verified bundled dependency and external executable versions shall remain distinct from bridge versions and separately installed login or passthrough CLIs.
+- **AC-AGENTS-RUNTIME-UPDATES-003.3:** Runtime observations shall describe the same host launch context as the displayed model list. Draft edits, refresh, navigation, and runtime activation shall not mix observations from different contexts.
+- **AC-AGENTS-RUNTIME-UPDATES-003.4:** Model settings shall provide direct access to existing managed version selection or verified manual guidance. A bridge update shall not claim to update an external provider executable.
+- **AC-AGENTS-RUNTIME-UPDATES-003.5:** After a successful managed activation, an open affected profile shall refresh discovery with its current complete draft. Failed updates shall preserve the prior model list and runtime observation. Neither outcome shall change saved or draft model selections.
+- **AC-AGENTS-RUNTIME-UPDATES-003.6:** Discovery success shall mean that the provider returned a catalog. It shall not imply catalog completeness or account access to a missing model. Failed release checks shall remain unknown.
+- **AC-AGENTS-RUNTIME-UPDATES-003.7:** Desktop and phone users shall see the same runtime information and explicit recovery actions. Copy shall be localized, and phone actions shall have at least 44px touch targets.
+- **AC-AGENTS-RUNTIME-UPDATES-003.8:** Runtime inspection shall be bounded and read-only. It shall not install packages, activate versions, change profiles, expose raw launch settings, or alter running sessions.
+
+#### Exclusions
+
+Automatic updates, model availability inference, bundled dependency replacement, and remote executor inspection are outside this extension.
+Existing automatic update policies retain their separate contract.
+
+## Implementation plans
+
+- [Model discovery runtime visibility](../../../plans/model-discovery-runtime-visibility/plan.md)
+
 ## System design
 
 The migrated technical source is split into [part 1](../system-design/runtime-updates-01.md), [part 2](../system-design/runtime-updates-02.md).
 Upgrade-time default activation is defined in [runtime default activation](../system-design/runtime-default-activation.md).
+Model-setting observations and recovery are defined in [runtime model discovery](../system-design/runtime-model-discovery.md).

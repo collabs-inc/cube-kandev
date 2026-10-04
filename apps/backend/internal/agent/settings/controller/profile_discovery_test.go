@@ -2,19 +2,36 @@ package controller
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"reflect"
 	"testing"
 
+	"github.com/kandev/kandev/internal/agent/agents"
 	"github.com/kandev/kandev/internal/agent/hostutility"
+	runtimeenv "github.com/kandev/kandev/internal/agent/runtime/environment"
 	"github.com/kandev/kandev/internal/agent/settings/dto"
 	"github.com/kandev/kandev/internal/agent/settings/models"
 	"github.com/kandev/kandev/internal/secrets"
 )
 
 type recordingProfileDiscoveryUtility struct {
-	request hostutility.ProfileCapabilityRequest
-	called  bool
+	request     hostutility.ProfileCapabilityRequest
+	called      bool
+	runtimeInfo *agents.RuntimeInfo
+}
+
+func TestEmptyProfileCodexPathDoesNotMaskInheritedOverride(t *testing.T) {
+	definitions := profileProbeEnvironmentDefinitions(agents.NewCodexACP(), []dto.ProfileEnvVarDTO{{
+		Key: "CODEX_PATH", Value: "",
+	}})
+	env, _, err := runtimeenv.Resolve(context.Background(), definitions, nil)
+	if err != nil {
+		t.Fatalf("resolve empty profile environment: %v", err)
+	}
+	if _, exists := env["CODEX_PATH"]; exists {
+		t.Fatalf("empty profile CODEX_PATH generated an override: %#v", env)
+	}
 }
 
 func (f *recordingProfileDiscoveryUtility) Get(string) (hostutility.AgentCapabilities, bool) {
@@ -44,6 +61,7 @@ func (f *recordingProfileDiscoveryUtility) ProbeProfileCapabilities(
 		ContextRevision: "revision-1",
 		Capabilities: hostutility.AgentCapabilities{
 			Status:         hostutility.StatusOK,
+			RuntimeInfo:    f.runtimeInfo,
 			CurrentModelID: "model-a",
 			CurrentModeID:  "build",
 			Models:         []hostutility.Model{{ID: "model-a", Name: "Model A"}},
@@ -51,6 +69,58 @@ func (f *recordingProfileDiscoveryUtility) ProbeProfileCapabilities(
 			Commands:       []hostutility.Command{{Name: "init", Description: "Initialize"}},
 		},
 	}, nil
+}
+
+// @covers AC-AGENTS-RUNTIME-UPDATES-003.1
+func TestFetchProfileDynamicModelsPreservesRuntimeInfo(t *testing.T) {
+	ctrl, _, ctx, _, _ := newProviderTestController(t)
+	utility := &recordingProfileDiscoveryUtility{
+		runtimeInfo: &agents.RuntimeInfo{
+			Scope: "host",
+			Components: []agents.RuntimeComponent{{
+				Role: agents.RuntimeComponentBridge, Name: "Codex", ObservedVersion: "1.11.0",
+			}},
+		},
+	}
+	ctrl.hostUtility = utility
+	envVars := []dto.ProfileEnvVarDTO{}
+	cliFlags := []dto.CLIFlagDTO{}
+	commandPrefix := ""
+
+	response, err := ctrl.FetchProfileDynamicModels(ctx, "codex-acp", dto.ProfileCapabilityRequest{
+		AuthorizationScope: "user-runtime-info",
+		LaunchSettings: &dto.ProfileLaunchSettingsRequest{
+			EnvVars:       &envVars,
+			CLIFlags:      &cliFlags,
+			CommandPrefix: &commandPrefix,
+		},
+	})
+	if err != nil {
+		t.Fatalf("FetchProfileDynamicModels: %v", err)
+	}
+
+	payload, err := json.Marshal(response)
+	if err != nil {
+		t.Fatalf("marshal response: %v", err)
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(payload, &fields); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	var runtimeInfo struct {
+		Scope      string `json:"scope"`
+		Components []struct {
+			Role            string `json:"role"`
+			ObservedVersion string `json:"observed_version"`
+		} `json:"components"`
+	}
+	if err := json.Unmarshal(fields["runtime_info"], &runtimeInfo); err != nil {
+		t.Fatalf("decode runtime_info: %v", err)
+	}
+	if runtimeInfo.Scope != "host" || len(runtimeInfo.Components) == 0 ||
+		runtimeInfo.Components[0].Role != "bridge" || runtimeInfo.Components[0].ObservedVersion != "1.11.0" {
+		t.Fatalf("runtime_info = %s, want host bridge observation 1.11.0", fields["runtime_info"])
+	}
 }
 
 func TestFetchProfileDynamicModelsUsesSavedLaunchSettings(t *testing.T) {
