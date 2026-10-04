@@ -120,6 +120,31 @@ function RevealDocumentBeforePassiveEffects({ children }: { children: ReactNode 
   return children;
 }
 
+function PositionChartPlotBeforePassiveEffects({
+  top,
+  children,
+}: {
+  top: number;
+  children: ReactNode;
+}) {
+  useLayoutEffect(() => {
+    const plot = document.querySelector<HTMLElement>('[data-testid="rich-output-chart-plot"]');
+    if (!plot) return;
+    vi.spyOn(plot, "getBoundingClientRect").mockReturnValue({
+      x: 0,
+      y: top,
+      top,
+      right: 320,
+      bottom: top + 208,
+      left: 0,
+      width: 320,
+      height: 208,
+      toJSON: () => ({}),
+    });
+  }, [top]);
+  return children;
+}
+
 beforeEach(() => {
   observerRecords.length = 0;
   for (const values of Object.values(captured)) values.length = 0;
@@ -139,13 +164,27 @@ afterEach(() => {
 
 describe("ChartBlock plot scheduling", () => {
   it("defers the Recharts plot until the chart approaches the viewport", () => {
-    render(<ChartBlock block={BLOCK} />);
+    render(
+      <PositionChartPlotBeforePassiveEffects top={1000}>
+        <ChartBlock block={BLOCK} />
+      </PositionChartPlotBeforePassiveEffects>,
+    );
 
     expect(screen.queryByTestId(MOCK_LINE_CHART)).toBeNull();
     expect(screen.getByText(BLOCK.title)).not.toBeNull();
     expect(observerRecords[0].options?.rootMargin).toBe("200px 0px");
 
     intersect();
+    expect(screen.getByTestId(MOCK_LINE_CHART)).not.toBeNull();
+  });
+
+  it("mounts the plot when it is already in the scroll range before observing it", () => {
+    render(
+      <PositionChartPlotBeforePassiveEffects top={100}>
+        <ChartBlock block={BLOCK} />
+      </PositionChartPlotBeforePassiveEffects>,
+    );
+
     expect(screen.getByTestId(MOCK_LINE_CHART)).not.toBeNull();
   });
 
