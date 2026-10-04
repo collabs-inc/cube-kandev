@@ -4,6 +4,7 @@ import type { Locator, Page } from "@playwright/test";
 import type { ApiClient } from "../helpers/api-client";
 import { SessionPage } from "../pages/session-page";
 import { GitHelper, makeGitEnv } from "../helpers/git-helper";
+import { waitForFiniteAnimations } from "../helpers/animations";
 import { enableCanvasFeature, removeCanvas, seedTaskCanvas } from "./canvas/canvas-fixture";
 import {
   expectFileBrowserIconCentered,
@@ -243,6 +244,7 @@ test.describe("shared panel toolbars", () => {
     apiClient,
     backend,
     seedData,
+    prCapture,
   }) => {
     const session = await createToolbarTask(testPage, apiClient, seedData, "Narrow panel actions");
     const git = new GitHelper(seedData.repositoryPath, makeGitEnv(backend.tmpDir));
@@ -253,12 +255,39 @@ test.describe("shared panel toolbars", () => {
     await expect(session.changesFileRow("narrow-toolbar-actions.ts")).toBeVisible({
       timeout: 15_000,
     });
+    for (const width of [350, 420, 519, 520]) {
+      await constrainDockviewPanel(session.changes, width);
+      await expect(
+        session.changes.getByRole("button", { name: "Diff", exact: true }),
+      ).toBeVisible();
+      await expect(
+        session.changes.getByRole("button", { name: "Review", exact: true }),
+      ).toBeVisible();
+      await expect(session.changes.getByTestId("changes-request-walkthrough")).toBeVisible();
+      await expect(session.changes.getByTestId("panel-header-overflow")).toHaveCount(0);
+      await expectHeaderControlsContained(session.changes, `${width}px Changes`);
+    }
+    await prCapture.screenshot("changes-inline-actions", {
+      caption: "Desktop Changes shows each action once and omits the empty overflow menu.",
+    });
+    await constrainDockviewPanel(session.changes, 349);
+    await expect(session.changes.getByRole("button", { name: "Diff", exact: true })).toBeHidden();
+    await expect(session.changes.getByTestId("panel-header-overflow")).toBeVisible();
     await constrainDockviewPanel(session.changes, 240);
     await expect(session.changes.getByTestId("panel-header-overflow").first()).toBeVisible();
     await session.changes.getByTestId("panel-header-overflow").first().click();
     await expect(testPage.getByRole("menuitem", { name: "Diff", exact: true })).toBeVisible();
-    await expect(testPage.getByRole("menuitem", { name: "Review", exact: true })).toBeVisible();
+    await expect(testPage.getByRole("menuitem")).toHaveCount(1);
+    await expect(testPage.getByRole("menuitem", { name: "Review", exact: true })).toHaveCount(0);
+    await waitForFiniteAnimations(testPage.getByRole("menu"));
+    await prCapture.screenshot("changes-diff-overflow", {
+      caption: "Narrow desktop Changes offers only the hidden Diff action in its overflow menu.",
+    });
     await testPage.keyboard.press("Escape");
+    await expect(
+      session.changes.getByRole("button", { name: "Review", exact: true }),
+    ).toBeVisible();
+    await expect(session.changes.getByTestId("changes-request-walkthrough")).toBeVisible();
     await expectHeadersAtHeight(session.changes, 30, "narrow Changes");
 
     await session.addBrowserPanel();
@@ -349,10 +378,8 @@ test.describe("shared panel toolbars", () => {
     await session.waitForChatIdle({ timeout: 45_000 });
     await session.clickTab("Changes");
     await expect(session.changes).toBeVisible();
-    const changesOverflow = session.changes.getByTestId("panel-header-overflow").first();
-    await expect(changesOverflow).toBeVisible({ timeout: 20_000 });
-    await changesOverflow.click();
-    await testPage.getByRole("menuitem", { name: "Diff", exact: true }).click();
+    await constrainDockviewPanel(session.changes, 350);
+    await session.changes.getByRole("button", { name: "Diff", exact: true }).click();
 
     const selector = testPage.getByTestId("changes-review-pr-selector-trigger");
     await expect(selector).toBeVisible({ timeout: 20_000 });

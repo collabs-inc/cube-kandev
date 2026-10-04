@@ -544,55 +544,24 @@ function ChangesPanelWalkthroughButton({
 export type ChangesPanelHeaderActionProps = {
   showDiffReview?: boolean;
   onOpenDiffAll?: () => void;
-  onOpenReview?: () => void;
-  onRequestWalkthrough?: () => void;
-  requestWalkthroughDisabled?: boolean;
 };
 
 export function ChangesPanelHeaderOverflowActions({
   showDiffReview = true,
   onOpenDiffAll,
-  onOpenReview,
-  onRequestWalkthrough,
-  requestWalkthroughDisabled,
 }: ChangesPanelHeaderActionProps) {
   const { t } = useTranslation();
-  const walkthroughReason = requestWalkthroughDisabled
-    ? t("task:loadingChangedFiles")
-    : t(WALKTHROUGH_LABEL_KEY);
+  if (!showDiffReview) return null;
   return (
     <PanelHeaderOverflowMenu label={t("common:showMoreActions")}>
-      {showDiffReview && (
-        <>
-          <DropdownMenuItem
-            className={ACTION_MENU_ITEM_CLASS}
-            disabled={!onOpenDiffAll}
-            onSelect={() => onOpenDiffAll?.()}
-          >
-            <IconGitMerge className="size-4" />
-            {t("task:diff")}
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            className={ACTION_MENU_ITEM_CLASS}
-            disabled={!onOpenReview}
-            onSelect={() => onOpenReview?.()}
-          >
-            <IconEye className="size-4" />
-            {t(REVIEW_LABEL_KEY)}
-          </DropdownMenuItem>
-        </>
-      )}
-      {onRequestWalkthrough && (
-        <DropdownMenuItem
-          className={ACTION_MENU_ITEM_CLASS}
-          disabled={requestWalkthroughDisabled}
-          title={walkthroughReason}
-          onSelect={onRequestWalkthrough}
-        >
-          <IconRoute className="size-4" />
-          {t(WALKTHROUGH_LABEL_KEY)}
-        </DropdownMenuItem>
-      )}
+      <DropdownMenuItem
+        className={ACTION_MENU_ITEM_CLASS}
+        disabled={!onOpenDiffAll}
+        onSelect={() => onOpenDiffAll?.()}
+      >
+        <IconGitMerge className="size-4" />
+        {t("task:diff")}
+      </DropdownMenuItem>
     </PanelHeaderOverflowMenu>
   );
 }

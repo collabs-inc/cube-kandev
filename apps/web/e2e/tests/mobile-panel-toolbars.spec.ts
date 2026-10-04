@@ -3,6 +3,8 @@ import type { SeedData } from "../fixtures/test-base";
 import type { Page } from "@playwright/test";
 import type { ApiClient } from "../helpers/api-client";
 import { SessionPage } from "../pages/session-page";
+import { GitHelper, makeGitEnv } from "../helpers/git-helper";
+import { waitForFiniteAnimations } from "../helpers/animations";
 import {
   expectFileBrowserIconCentered,
   readTaskWorkspacePath,
@@ -122,6 +124,49 @@ async function expectTouchControls(page: Page, surface: string) {
 }
 
 test.describe("touch panel toolbars", () => {
+  test("shows only hidden Changes actions in the phone overflow menu", async ({
+    testPage,
+    apiClient,
+    seedData,
+    backend,
+    prCapture,
+  }) => {
+    await createToolbarTask(testPage, apiClient, seedData, "Phone Changes overflow");
+    const git = new GitHelper(seedData.repositoryPath, makeGitEnv(backend.tmpDir));
+    git.createFile("phone-toolbar-actions.ts", "export const phoneToolbarActions = true;\n");
+    await testPage
+      .getByRole("navigation")
+      .getByRole("button", { name: /Changes$/ })
+      .tap();
+    const changes = testPage.getByTestId("mobile-changes-panel");
+    const diff = changes.getByRole("button", { name: "Diff", exact: true });
+    const overflow = changes.getByTestId("panel-header-overflow");
+    await expect(diff).toBeVisible({ timeout: 15_000 });
+    await expect(overflow).toHaveCount(0);
+    await expect(changes.getByRole("button", { name: "Review", exact: true })).toBeVisible();
+    await expect(changes.getByTestId("changes-request-walkthrough")).toBeVisible();
+    await prCapture.screenshot("changes-inline-actions", {
+      caption: "Phone Changes keeps Diff, Review and Walkthrough visible without a duplicate menu.",
+    });
+
+    await testPage.setViewportSize({ width: 340, height: 844 });
+    await expect(diff).toBeHidden();
+    await expect(overflow).toBeVisible();
+    const box = await overflow.boundingBox();
+    expect(box?.width).toBeGreaterThanOrEqual(44);
+    expect(box?.height).toBeGreaterThanOrEqual(44);
+    await overflow.tap();
+    const menu = testPage.getByRole("menu");
+    await expect(menu.getByRole("menuitem")).toHaveCount(1);
+    await waitForFiniteAnimations(menu);
+    await prCapture.screenshot("changes-diff-overflow", {
+      caption: "A narrow phone keeps Diff reachable through a menu with no duplicate actions.",
+    });
+    await menu.getByRole("menuitem", { name: "Diff", exact: true }).tap();
+    await expect(testPage.getByRole("dialog")).toBeVisible();
+    await expectNoOverflow(testPage, "phone Changes overflow");
+  });
+
   test("centers Files copy path icons before and after copying", async ({
     testPage,
     apiClient,

@@ -166,18 +166,6 @@ export function ChangesPanelHeader(props: ChangesPanelHeaderProps) {
           hasPriorData={props.hasPriorData}
           failedRepositories={props.failedRepositories}
           showDiffReview={showDiffReview}
-          onOpenDiffAll={onOpenDiffAll}
-          onOpenReview={onOpenReview}
-          onRequestWalkthrough={onRequestWalkthrough}
-          requestWalkthroughDisabled={requestWalkthroughDisabled}
-        />
-      }
-      leftWhenOverflow={
-        <ChangesPanelHeaderLeft
-          refreshStatus={props.refreshStatus}
-          hasPriorData={props.hasPriorData}
-          failedRepositories={props.failedRepositories}
-          showDiffReview={showDiffReview}
           primaryOnly
           onOpenDiffAll={onOpenDiffAll}
           onOpenReview={onOpenReview}
@@ -187,16 +175,9 @@ export function ChangesPanelHeader(props: ChangesPanelHeaderProps) {
       }
       right={<ChangesPanelHeaderRight props={props} branchRows={branchRows} />}
       overflow={
-        <ChangesPanelHeaderOverflowActions
-          showDiffReview={showDiffReview}
-          onOpenDiffAll={onOpenDiffAll}
-          onOpenReview={onOpenReview}
-          onRequestWalkthrough={onRequestWalkthrough}
-          requestWalkthroughDisabled={requestWalkthroughDisabled}
-        />
+        showDiffReview ? <ChangesPanelHeaderOverflowActions onOpenDiffAll={onOpenDiffAll} /> : null
       }
-      overflowAt={520}
-      hideLeftWhenOverflow
+      overflowAt={350}
       hideRightWhenOverflow={false}
     />
   );
