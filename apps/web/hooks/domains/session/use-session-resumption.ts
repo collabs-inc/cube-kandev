@@ -468,6 +468,7 @@ async function checkAndResume({
 }
 
 interface UseSessionResumptionReturn {
+  requestIdentity: import("@/lib/session-recovery-presentation").SessionRecoveryOwner["requestIdentity"];
   resumptionState: ResumptionState;
   sessionStatus: SessionStatus | null;
   error: string | null;
@@ -488,6 +489,7 @@ interface UseSessionResumptionReturn {
  * and automatically resumes if needed.
  */
 type SessionResetAndCheckResult = {
+  committedRequest: SessionRequestIdentity;
   sessionStatus: SessionStatus | null;
   captureRequest: () => SessionRequestIdentity;
   buildGuardedSettersFor: (capturedRequest: SessionRequestIdentity) => ResumeStateSetter;
@@ -501,6 +503,7 @@ type ResetAndCheckParams = {
   session: SessionLike;
   setters: ResumeStateSetter;
   preventAutoStart: boolean;
+  preventAutoResume?: boolean;
   taskArchiveState: TaskArchiveState;
 };
 
@@ -519,6 +522,7 @@ function useSessionResetAndCheck({
   session,
   setters,
   preventAutoStart,
+  preventAutoResume,
   taskArchiveState,
 }: ResetAndCheckParams): SessionResetAndCheckResult {
   const requestKey = getSessionRequestKey(taskId, sessionId, taskArchiveState);
@@ -534,7 +538,11 @@ function useSessionResetAndCheck({
   const startupRecoveryInFlightRef = useRef(new Map<string, Promise<void>>());
   const focusRequestInFlightRef = useRef(false);
   const lastFocusRequestAtRef = useRef(0);
-  const activeRequestRef = useRef<SessionRequestIdentity>({ key: requestKey, generation: 0 });
+  const [committedRequest, setCommittedRequest] = useState<SessionRequestIdentity>({
+    key: requestKey,
+    generation: 0,
+  });
+  const activeRequestRef = useRef<SessionRequestIdentity>(committedRequest);
 
   // Publish the new identity during commit so callbacks from the previous
   // request are rejected before passive effects or queued promise handlers run.
@@ -544,7 +552,8 @@ function useSessionResetAndCheck({
       key: requestKey,
       generation: requestGenerationRef.current,
     };
-  }, [requestKey]);
+    setCommittedRequest(activeRequestRef.current);
+  }, [requestKey, preventAutoResume]);
 
   // Reset all local state when session or task changes to prevent stale data
   // from a previous session leaking into the new one (e.g. topbar branch).
@@ -557,7 +566,7 @@ function useSessionResetAndCheck({
     setters.setRecoveryFailure?.(null);
     setters.setWorktreePath(null);
     setters.setWorktreeBranch(null);
-  }, [sessionId, taskId, taskArchiveState]); // eslint-disable-line react-hooks/exhaustive-deps -- intentional reset on dep change
+  }, [sessionId, taskId, taskArchiveState, preventAutoResume]); // eslint-disable-line react-hooks/exhaustive-deps -- intentional reset on dep change
 
   // Check session status and auto-resume if needed
   useEffect(() => {
@@ -566,6 +575,7 @@ function useSessionResetAndCheck({
       !sessionId ||
       connectionStatus !== "connected" ||
       taskArchiveState !== false ||
+      preventAutoResume ||
       hasAttemptedResume.current
     )
       return;
@@ -595,10 +605,24 @@ function useSessionResetAndCheck({
       }
     };
     void promise.then(clearIfCurrent, clearIfCurrent);
-  }, [taskId, sessionId, connectionStatus, session, preventAutoStart, taskArchiveState]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [
+    taskId,
+    sessionId,
+    connectionStatus,
+    session,
+    preventAutoStart,
+    preventAutoResume,
+    taskArchiveState,
+  ]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (!taskId || !sessionId || connectionStatus !== "connected" || taskArchiveState !== false) {
+    if (
+      !taskId ||
+      !sessionId ||
+      connectionStatus !== "connected" ||
+      taskArchiveState !== false ||
+      preventAutoResume
+    ) {
       return;
     }
     const capturedRequest = activeRequestRef.current;
@@ -664,7 +688,16 @@ function useSessionResetAndCheck({
       window.removeEventListener("focus", onWindowFocus);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, [connectionStatus, preventAutoStart, session, sessionId, setters, taskArchiveState, taskId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [
+    connectionStatus,
+    preventAutoStart,
+    preventAutoResume,
+    session,
+    sessionId,
+    setters,
+    taskArchiveState,
+    taskId,
+  ]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Freshly created remote sessions may return status before runtime metadata is available.
   // Retry a few times so topbar/tooltips can show remote details without manual refresh.
@@ -738,6 +771,7 @@ function useSessionResetAndCheck({
 
   return {
     sessionStatus,
+    committedRequest,
     captureRequest: () => activeRequestRef.current,
     buildGuardedSettersFor: (capturedRequest) =>
       buildGuardedSetters(activeRequestRef, capturedRequest, setters),
@@ -878,6 +912,7 @@ function useManualResumeSession({
 
 export type SessionResumptionOptions = {
   onTaskArchiveConflict?: () => void;
+  preventAutoResume?: boolean;
 };
 
 export function useSessionResumption(
@@ -937,7 +972,7 @@ export function useSessionResumption(
 
   useSessionRecoveryFeedback(sessionId, session?.state, error, notice, setters);
 
-  const { sessionStatus, captureRequest, buildGuardedSettersFor, retryStatus } =
+  const { sessionStatus, committedRequest, captureRequest, buildGuardedSettersFor, retryStatus } =
     useSessionResetAndCheck({
       taskId,
       sessionId,
@@ -945,6 +980,7 @@ export function useSessionResumption(
       session,
       setters,
       preventAutoStart: preventAutoStartAgentOnOpen,
+      preventAutoResume: options.preventAutoResume,
       taskArchiveState,
     });
 
@@ -957,7 +993,18 @@ export function useSessionResumption(
     buildGuardedSettersFor,
   });
 
+  const request = committedRequest;
+  const ownsFeedback = request.key === getSessionRequestKey(taskId, sessionId, taskArchiveState);
   return {
+    requestIdentity:
+      ownsFeedback && taskId && sessionId
+        ? {
+            taskId,
+            sessionId,
+            generation: request.generation,
+            attemptId: recoveryAttemptIdRef.current,
+          }
+        : null,
     resumptionState,
     sessionStatus,
     error,

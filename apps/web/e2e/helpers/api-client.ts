@@ -15,6 +15,7 @@ import type {
   TaskPriority,
   SidebarTaskColorPatchApi,
   WorkflowAgentOverrides,
+  Repository,
 } from "../../lib/types/http";
 import type { Agent, AgentProfile, AvailableAgent } from "../../lib/types/http-agents";
 import type { SidebarTaskColorAutomation } from "../../lib/task-color-automation-settings";
@@ -137,6 +138,10 @@ export type MockReview = {
 };
 
 export type MockCheckRun = {
+  id?: number;
+  app_id?: number;
+  app_slug?: string;
+  check_suite_id?: number;
   name: string;
   source?: string;
   status: string;
@@ -1182,6 +1187,19 @@ export class ApiClient {
     await this.request("PATCH", `/api/v1/repositories/${repositoryId}`, updates);
   }
 
+  async getRepository(repositoryId: string): Promise<Repository> {
+    return this.request("GET", `/api/v1/repositories/${repositoryId}`);
+  }
+
+  async deleteRepository(repositoryId: string): Promise<void> {
+    const response = await this.rawRequest("DELETE", `/api/v1/repositories/${repositoryId}`);
+    if (!response.ok) {
+      throw new Error(
+        `API DELETE /api/v1/repositories/${repositoryId} failed (${response.status}): ${await response.text()}`,
+      );
+    }
+  }
+
   async createRepositoryScript(
     repositoryId: string,
     name: string,
@@ -2010,6 +2028,18 @@ export class ApiClient {
     merge_queue_last_removal_reason?: string;
     merge_queue_last_removal_before_sha?: string;
     checks?: Array<{
+      id?: number;
+      app_id?: number;
+      app_slug?: string;
+      check_suite_id?: number;
+      workflow_id?: number;
+      workflow_name?: string;
+      workflow_run_id?: number;
+      workflow_event?: string;
+      head_repo_id?: number;
+      head_repo_owner?: string;
+      head_repo_name?: string;
+      head_branch?: string;
       name: string;
       source?: string;
       status?: string;
@@ -2316,6 +2346,10 @@ export class ApiClient {
     repo: string;
     pr_number: number;
     checks?: Array<{
+      id?: number;
+      app_id?: number;
+      app_slug?: string;
+      check_suite_id?: number;
       name: string;
       source?: string;
       status?: string;
@@ -2350,6 +2384,7 @@ export class ApiClient {
     }>;
     workflow_runs?: Array<{
       id: number;
+      check_suite_id?: number;
       run_attempt?: number;
       workflow_id?: number;
       name: string;
@@ -2718,7 +2753,12 @@ export class ApiClient {
   }
 
   async listSessionTurns(sessionId: string): Promise<{
-    turns: Array<{ id: string; completed_at?: string | null }>;
+    turns: Array<{
+      id: string;
+      started_at?: string;
+      completed_at?: string | null;
+      metadata?: Record<string, unknown>;
+    }>;
   }> {
     return this.request("GET", `/api/v1/task-sessions/${sessionId}/turns`);
   }
@@ -2728,7 +2768,7 @@ export class ApiClient {
       from_step_id?: string | null;
       to_step_id: string;
       trigger: string;
-    }>;
+    }> | null;
   }> {
     return this.request("GET", `/api/v1/sessions/${sessionId}/workflow/history`);
   }

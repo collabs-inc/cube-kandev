@@ -254,6 +254,8 @@ function DesktopFileRowContent({
 }
 
 function FileRowStats({ file, readOnly }: { file: ChangedFile; readOnly?: boolean }) {
+  const { t } = useTranslation();
+  const detailStateLabel = file.diffState === "unavailable" ? t("task:gitDiffUnavailable") : null;
   return (
     <div
       className={cn(
@@ -261,7 +263,12 @@ function FileRowStats({ file, readOnly }: { file: ChangedFile; readOnly?: boolea
         !readOnly && "transition-opacity group-hover:opacity-0 group-focus-within:opacity-0",
       )}
     >
-      <LineStat added={file.plus} removed={file.minus} />
+      {file.diffState !== "pending" &&
+        (detailStateLabel ? (
+          <span className="text-[10px] text-muted-foreground">{detailStateLabel}</span>
+        ) : (
+          <LineStat added={file.plus} removed={file.minus} />
+        ))}
       <FileStatusIcon status={file.status} oldPath={file.oldPath} />
     </div>
   );

@@ -1,6 +1,7 @@
 import type { ConnectionIssueSeverity, ConnectionStatus } from "@/lib/types/connection";
 import type { HealthCheckSummary, HealthIssue, SystemHealthResponse } from "@/lib/types/health";
 import type { SettingsMenuMode } from "@/lib/settings/settings-menu-mode";
+import type { MessageAttachment } from "@/lib/services/session-launch-service";
 import type {
   FilterClause,
   GroupKey,
@@ -61,14 +62,7 @@ export type MobileKanbanState = {
 /** Core, host-defined mobile panels. Kept as a named union (rather than
  *  inlined into MobileSessionPanel) so existing `=== "chat"`-style narrowing
  *  still works unchanged after MobileSessionPanel grew a plugin variant. */
-export type MobileSessionCorePanel =
-  | "chat"
-  | "plan"
-  | "changes"
-  | "files"
-  | "terminal"
-  | "review"
-  | "prompt-history";
+export type MobileSessionCorePanel = "chat" | "plan" | "changes" | "files" | "terminal" | "review";
 
 /** A plugin task panel id on mobile, `plugin:<pluginId>:<panelKey>` — see
  *  lib/state/layout-manager/plugin-panels.ts's pluginPanelId. */
@@ -118,6 +112,14 @@ export type SystemHealthState = {
 
 export type QuickChatSessionKind = "chat" | "config";
 
+export type QuickChatOpeningPayload = {
+  message: string;
+  clientMessageId?: string;
+  attachments?: MessageAttachment[];
+};
+
+export type QuickChatInitialPrompt = string | QuickChatOpeningPayload;
+
 export type QuickChatSelection = Partial<Record<QuickChatSessionKind, string>>;
 
 export type QuickChatSelectionByWorkspace = Record<string, QuickChatSelection>;
@@ -160,7 +162,7 @@ export type QuickChatSession = {
   taskId?: string;
   name?: string;
   agentProfileId?: string;
-  initialPrompt?: string;
+  initialPrompt?: QuickChatInitialPrompt;
 };
 
 export type QuickChatActiveKind = "conversation" | "terminal";
@@ -175,6 +177,13 @@ export type QuickChatSessionTombstone = {
   tombstonedAt: string;
 };
 
+export type ConfigChatRestartState = {
+  sessionId: string;
+  status: "restarting" | "uncertain";
+  source: "local" | "server";
+  error?: string;
+};
+
 export type QuickChatState = {
   isOpen: boolean;
   sessions: QuickChatSession[];
@@ -187,6 +196,7 @@ export type QuickChatState = {
   lastSettledAtBySession: Record<string, string>;
   sessionOwnership: Record<string, QuickChatSessionOwnership>;
   syncRevisionByWorkspace: Record<string, number>;
+  configChatRestarts: Record<string, ConfigChatRestartState>;
   tombstonedSessions: Record<string, QuickChatSessionTombstone>;
   /** Optimistic mixed-tab order keyed by workspace until the save settles. */
   tabOrderByWorkspace: Record<string, string[]>;
@@ -223,6 +233,11 @@ export type TaskDeletedNotification = {
 };
 
 export type UpdateAvailableNotification = {
+  agent_name?: string;
+  runtime_id?: string;
+  display_name?: string;
+  previous_version?: string;
+  runtime_update_status?: "available" | "succeeded" | "failed" | "interrupted";
   version: string;
   url?: string;
   title: string;
@@ -323,6 +338,7 @@ export type UISliceState = {
   taskDeletedNotification: TaskDeletedNotification | null;
   /** Set when the background updates poller reports a newly detected release. */
   updateAvailableNotification: UpdateAvailableNotification | null;
+  updateAvailableNotificationQueue: UpdateAvailableNotification[];
   bottomTerminal: BottomTerminalState;
   sidebarViews: SidebarSliceState;
   sidebarViewsByWorkspace: Record<string, SidebarSliceState>;
@@ -427,7 +443,14 @@ export type UISliceActions = {
     workspaceId: string,
     state: { pending: boolean; error: string | null },
   ) => void;
-  setQuickChatInitialPrompt: (sessionId: string, prompt?: string) => void;
+  setQuickChatInitialPrompt: (sessionId: string, prompt?: QuickChatInitialPrompt) => void;
+  setConfigChatRestart: (workspaceId: string, restart: ConfigChatRestartState | null) => void;
+  syncConfigChatRestart: (workspaceId: string, pending: boolean, sessionId?: string) => void;
+  replaceConfigChatSession: (
+    workspaceId: string,
+    oldSessionId: string,
+    replacement: QuickChatSession,
+  ) => void;
   /** Opens Quick Chat after the requested workspace list becomes authoritative. */
   requestQuickChatOpen: (
     workspaceId: string,

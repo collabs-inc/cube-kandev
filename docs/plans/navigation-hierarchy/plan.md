@@ -640,3 +640,29 @@ managed production build passed nine desktop browser scenarios without retries.
 Its unchanged artifacts passed four phone scenarios without retries, including
 changelist spacing, tree touch controls, status groups in both themes, and
 workflow hierarchy. Fresh exact-head CI will run after the merge is published.
+
+
+## Conflict reconciliation (2026-10-05)
+
+- Integrated main `def028f60c73bb8dfd43bed84c5aef066dc24382` into the reviewed
+  navigation branch. The relocated lifecycle deadline regression keeps one
+  deterministic-clock test, main's 10-second transfer and 1-second launch
+  deadlines, and the cancellation/progress/fresh-retry assertions.
+- Preserved incoming pending-removal guards, the Quick Chat opening composer,
+  mobile terminal controls, PR approval badges, and exported plugin SDK types
+  alongside the approved navigation hierarchy, plain task rows, utility order,
+  and footer placement. No production interaction contract changed in resolution.
+- Added `sidebar:filtersActive` to the newly landed Korean catalog. Full i18n
+  validation passes with all real locales and pseudo synchronized.
+- Focused frontend validation: 227 tests in 19 files, typecheck, and full lint
+  passed. Targeted lifecycle race tests, documentation/spec lint, harness
+  validation and its tests, and JSON syntax/duplicate-key validation passed.
+- Fresh managed desktop browser validation: 13 tests passed with retries disabled,
+  covering launch/focus, navigation, task groups, PR summaries/approval badges,
+  tablet sizing, and terminal reuse. The unchanged fresh build also passed 11
+  phone tests with retries disabled, including prompt delivery, draft continuity,
+  nested navigation, PR drawers, touch targets, and terminal keyboard behavior.
+  Final delivery evidence is recorded in the current Kandev task plan.
+- Resolution changes test composition and the Korean filter label only. The
+  existing English navigation screenshots remain representative; no affected
+  screenshot viewport requires replacement.

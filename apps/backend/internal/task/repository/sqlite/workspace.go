@@ -224,11 +224,14 @@ func (r *Repository) deleteWorkspaceCascade(
 	expectedName *string,
 	cleanup func(context.Context, *sqlx.Tx) error,
 ) ([]*models.Task, []*models.Workflow, error) {
-	tx, err := r.db.BeginTxx(ctx, nil)
+	tx, err := r.db.BeginTxx(ctx, r.hierarchyTxOptions())
 	if err != nil {
 		return nil, nil, err
 	}
 	defer func() { _ = tx.Rollback() }()
+	if err := r.lockTaskHierarchy(ctx, tx, []string{id}, nil); err != nil {
+		return nil, nil, err
+	}
 
 	// Lock the workspace row BEFORE inventorying its tasks: task creation
 	// takes the same lock, so a task created after this point either commits
@@ -337,6 +340,9 @@ func (r *Repository) purgeWorkspaceTaskQueuesInTx(ctx context.Context, tx *sqlx.
 		sessions, err := r.taskQueueSessionsInTx(ctx, tx, task.ID)
 		if err != nil {
 			return fmt.Errorf("task queue sessions for cascade task %s: %w", task.ID, err)
+		}
+		if err := r.purgeTaskPromptSequenceTx(ctx, tx, task.ID, sessions); err != nil {
+			return err
 		}
 		if err := r.purgeTaskQueueInTx(ctx, tx, task.ID, sessions, true); err != nil {
 			return fmt.Errorf("purge task queue for workspace cascade task %s: %w", task.ID, err)

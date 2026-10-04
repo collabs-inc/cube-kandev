@@ -141,6 +141,23 @@ describe("resumeWithSilentFallback", () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
   });
 
+  it("publishes committed request identity when idle inputs change without a status request", () => {
+    mockConnectionStatus = "disconnected";
+    const { result, rerender } = renderHook(
+      ({ taskId, sessionId, archived }) => useSessionResumption(taskId, sessionId, archived),
+      { initialProps: { taskId: TASK_ID, sessionId: SESSION_ID, archived: false } },
+    );
+    const initialGeneration = result.current.requestIdentity!.generation;
+    rerender({ taskId: "t2", sessionId: "s2", archived: false });
+    expect(result.current.requestIdentity).toMatchObject({ taskId: "t2", sessionId: "s2" });
+    expect(result.current.requestIdentity!.generation).toBeGreaterThan(initialGeneration);
+    const switchedGeneration = result.current.requestIdentity!.generation;
+    rerender({ taskId: "t2", sessionId: "s2", archived: true });
+    expect(result.current.requestIdentity!.generation).toBeGreaterThan(switchedGeneration);
+    expect(result.current.resumptionState).toBe("idle");
+    expect(mockRequest).not.toHaveBeenCalled();
+  });
+
   it("uses resume on first try when it succeeds, never calling restore_workspace", async () => {
     mockRequest.mockResolvedValueOnce({
       success: true,
@@ -602,6 +619,11 @@ describe("useSessionResumption", () => {
       statusError: "WebSocket request timed out: task.session.status",
     });
     expect(result.current.recoveryAttemptId).toBe(1);
+    expect(result.current.requestIdentity).toMatchObject({
+      taskId: TASK_ID,
+      sessionId: SESSION_ID,
+      attemptId: 1,
+    });
     expect(mockRequest).toHaveBeenCalledTimes(2);
 
     mockRequest.mockResolvedValueOnce({
@@ -625,6 +647,11 @@ describe("useSessionResumption", () => {
     expect(result.current.recoveryFailure).toBeNull();
     expect(result.current.resumptionState).toBe("running");
     expect(result.current.recoveryAttemptId).toBe(2);
+    expect(result.current.requestIdentity).toMatchObject({
+      taskId: TASK_ID,
+      sessionId: SESSION_ID,
+      attemptId: 2,
+    });
   });
 
   it("keeps a workspace restore failure as launch feedback with a launch retry", async () => {
@@ -1115,6 +1142,64 @@ describe("idle-suspended session focus recovery", () => {
         state: "WAITING_FOR_INPUT",
       },
     };
+  });
+
+  it("does not recover on focus while automatic recovery is blocked", async () => {
+    const visibility = vi.spyOn(document, "visibilityState", "get").mockReturnValue("visible");
+    mockRequest.mockResolvedValue({
+      session_id: SESSION_ID,
+      task_id: TASK_ID,
+      state: "WAITING_FOR_INPUT",
+      is_agent_running: false,
+      is_resumable: true,
+      needs_resume: true,
+      is_idle_suspended: true,
+      auto_resume_allowed: true,
+      resume_reason: "idle_suspension",
+    });
+    try {
+      renderHook(() =>
+        useSessionResumption(TASK_ID, SESSION_ID, false, { preventAutoResume: true }),
+      );
+      await act(async () => {
+        window.dispatchEvent(new Event("focus"));
+      });
+      expect(mockRequest).not.toHaveBeenCalled();
+    } finally {
+      visibility.mockRestore();
+    }
+  });
+
+  it("invalidates pending startup recovery when an error arrives", async () => {
+    const status = Promise.withResolvers<unknown>();
+    mockRequest.mockReturnValueOnce(status.promise);
+    const { rerender } = renderHook(
+      ({ blocked }) =>
+        useSessionResumption(TASK_ID, SESSION_ID, false, { preventAutoResume: blocked }),
+      { initialProps: { blocked: false } },
+    );
+    await waitFor(() =>
+      expect(mockRequest).toHaveBeenCalledWith(
+        STATUS_ACTION,
+        expect.anything(),
+        expect.any(Number),
+      ),
+    );
+    rerender({ blocked: true });
+    await act(async () => {
+      status.resolve({
+        session_id: SESSION_ID,
+        task_id: TASK_ID,
+        state: "WAITING_FOR_INPUT",
+        is_agent_running: false,
+        is_resumable: true,
+        needs_resume: true,
+        is_idle_suspended: true,
+        auto_resume_allowed: true,
+        resume_reason: "idle_suspension",
+      });
+    });
+    expect(mockRequest.mock.calls.some(([action]) => action === LAUNCH_ACTION)).toBe(false);
   });
 
   it("resumes the selected session without a prompt despite the preference", async () => {

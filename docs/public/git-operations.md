@@ -27,8 +27,11 @@ The state transitions are separate operations. Inspect the diff before staging, 
 ### When task and PR histories differ
 
 For an associated pull request, Kandev keeps the task checkout and the published PR history
-separate when their commit histories differ. It may identify a completed local rebase when the
-current repository evidence supports that explanation. If the evidence is missing or incomplete,
+separate when current evidence confirms that both histories contain commits absent from the other.
+Different head commits alone can also mean that one version is simply ahead. When cached upstream
+data cannot establish the relationship to the current PR head, Kandev keeps a unified history and
+withholds remote mutation actions until it has enough evidence. It may identify a completed local
+rebase when the current repository evidence supports that explanation. If the evidence is missing or incomplete,
 Kandev uses neutral wording instead of guessing which history changed.
 
 Choose **Compare versions** first. Kandev opens **Changes** with the task and PR histories visible;
@@ -39,6 +42,25 @@ branch, pull request, and both displayed heads before choosing a replacement act
 confirmation. **Restore published PR version...** replaces the task checkout history, creates a
 recovery branch at the current task head first, and requires a clean working tree. If the provider
 head changes before confirmation, Kandev leaves both versions unchanged and asks for a fresh review.
+
+## Seed ignored files into worktrees
+
+Repository copy-file settings seed files before a new worktree's setup script
+runs. Enter repository-relative paths or glob patterns separated by commas,
+for example `.env.local, config/{local,dev}.env`.
+
+Commas inside character classes and brace alternation belong to the pattern.
+`config/[a,b].env` matches `a.env`, `b.env`, or `,.env` in `config`.
+Braces inside classes are literal: `config/[{].env, .env.local` selects
+`config/{.env` and `.env.local`. On POSIX hosts, backslashes escape the next
+character, including commas and braces. On Windows, backslashes are path
+separators; use character classes for literal glob characters.
+
+Append `:symlink` to share a source file through a relative host-worktree link,
+for example `.env.local:symlink`. Remote executors copy its bytes instead.
+Windows link creation can require extra privileges. The first entry wins when
+patterns overlap, and existing destinations are skipped. Other colons remain
+literal; use `::symlink` for a filename ending in `:symlink`.
 
 ## Prerequisites and trust boundary
 
@@ -108,9 +130,11 @@ By default, managed worktrees live under the configured task-data directory, com
 
 Additional branches are siblings of the primary repository worktree, not directories nested inside it. Multi-repository tasks have one worktree per repository. Kandev reuses a valid session/repository worktree; if its directory is missing, it attempts to recreate it from the recorded local or remote branch.
 
-Managed worktrees can remain registered to an older repository clone after the repository path changes. For supported GitHub and GitLab repositories, Kandev checks the provider origin, linked-worktree registration, branch, and commit. When the worktree is clean, Kandev moves it to the current workspace clone before it starts an agent. Kandev keeps the old checkout.
+Managed worktrees can remain registered to an older repository clone after the repository path changes. For supported GitHub and GitLab repositories, Kandev checks the provider origin, linked-worktree registration, branch, and commit. When the worktree is clean, Kandev moves it to the current workspace clone before it starts an agent and retains a recovery snapshot of the old checkout.
 
-If the worktree contains local changes, Kandev stops and offers **Move files and resume**. Before you confirm, note that Kandev keeps the original checkout and a file snapshot. Git staging state does not transfer. Review the moved changes before you commit. Kandev blocks worktrees with unsupported filters, sparse checkout, or submodules.
+If a worktree contains local changes, Resume or **Restore workspace** stops before agent startup and offers **Move files and resume**. Kandev leaves the original worktree untouched until you confirm. It then preserves a recovery snapshot and copies tracked, untracked, and ignored file content, deletions, file modes, and symbolic links to the replacement worktree. Git's index and staging choices do not transfer, so stage the files again before committing. Review the changes after recovery. Kandev blocks worktrees with unsupported filters, sparse checkout, or submodules.
+
+If an older task still shows a generic recovery error, use Resume or **Restore workspace** once to check the current workspace and reveal the relocation action. A busy inspection leaves every checkout unchanged. Wait for it to finish, then retry manually.
 
 For a new task branch, the repository default template is:
 
@@ -152,6 +176,12 @@ If the selected PR or branch cannot be fetched, preparation fails instead of sta
 Resuming an existing workspace preserves its branch, local commits, and uncommitted changes.
 A newly recreated workspace fetches the selected PR again.
 Existing workspaces that previously started on the wrong branch are not reset automatically.
+
+In the Review dialog, choose **Preview markdown** for a changed Markdown file to
+render its changed content in place. **Show diff** returns to the textual diff.
+The selected view stays in place if the file list briefly refreshes while Review
+remains open.
+
 ### Files remain, but Git metadata is missing
 
 A linked worktree stores its files separately from its Git administrative
@@ -187,6 +217,11 @@ A main repository can also be the selected host **Worktree** checkout. Its `.git
 directory does not require linked-worktree recovery. When Git metadata is valid,
 Kandev keeps using the same checkout and does not create recovery artifacts. A
 successful relaunch clears the matching task-level launch error.
+
+A healthy checkout can keep using an older managed clone while that clone remains
+the repository's registered source. Resuming does not require a newer workspace
+clone to exist or move your files. If the registered source changes, Kandev
+validates the old and new clone identities before offering or performing relocation.
 
 For missing linked-worktree metadata, Kandev checks every selected repository
 slot before it changes any slot. It keeps the original checkout and creates a
@@ -313,6 +348,11 @@ Open **Settings → Workspaces → _workspace_ → Repositories**, edit a reposi
 Policies belong to that repository. Create, edit, and delete actions take effect immediately.
 The branch controls list local and remote branches. You can search the list or refresh it from Git.
 
+Partial policy updates preserve fields they omit, including the saved pull-request target when
+only the base changes. Independent edits to different fields both survive. Supplying an empty or
+whitespace-only target resets it to the policy's effective base branch at the time of the update.
+An omitted target on creation defaults to the base branch.
+
 The base branch is the starting point for the new task branch. The pull-request target is its merge
 destination. These values are usually the same. A Gitflow Release policy can start from `develop`
 and target `main`.
@@ -324,7 +364,10 @@ line in the picker. Point to or focus its information icon to see the saved valu
 tap the icon.
 
 The **Gitflow starter** can create Feature, Bugfix, Hotfix, and Release policies in one operation.
-It requires two different existing branches and does not change Git branches. A task stores the
+It requires two different existing branches and an empty policy list. Concurrent starters admit
+one complete set; the other receives an already-seeded conflict. An ordinary policy added before
+the starter's admission also makes it reject. You can add custom policies after initialization.
+The starter does not change Git branches. A task stores the
 selected policy values when it is created. Later policy edits or deletion do not change that task's
 branch or pull-request target. Kandev's pull-request dialog uses the saved target by default. You can
 select a different target before creation.
@@ -374,8 +417,8 @@ All operations below run in the selected repository workspace.
 | Rebase | If `origin` exists, fetches `origin BASE` and rebases onto `origin/BASE`. Without `origin`, rebases onto the local `refs/heads/BASE`. | Rewrites local commits. If conflict files are detected from Git output, Kandev attempts `git rebase --abort` automatically and returns the file list. |
 | Merge | If `origin` exists, fetches `origin BASE` and merges `origin/BASE`. Without `origin`, merges the local `refs/heads/BASE`. | Conflicts are deliberately left in the worktree. Resolve and commit them, or use Abort Merge. |
 | Abort | Runs `git merge --abort` or `git rebase --abort`. | Fails when that operation is not in progress or the repository cannot be restored. |
-| Stage | With paths, `git add -- PATHS`; with an empty path list, `git add -A`. | Empty means all changes, including deletions. |
-| Unstage | With paths, `git reset HEAD -- PATHS`; with an empty path list, `git reset HEAD`. | Keeps working-tree content. |
+| Stage | With paths, `git add --` with each path selected literally; with an empty path list, `git add -A`. | Named files select only those files. Actual directories select their subtrees. Empty means all changes, including deletions. |
+| Unstage | With paths, `git reset HEAD --` with each path selected literally; with an empty path list, `git reset HEAD`. | Keeps working-tree content. Named files and actual directory subtrees use the same literal selection as Stage. |
 | Commit | Optionally runs `git add -A`, then `git commit -m MESSAGE`; Amend adds `--amend`. | The normal UI defaults to staging all when it invokes this helper. Amend rewrites `HEAD`. |
 | Discard | Restores tracked paths from `HEAD`; added and untracked files are unstaged and deleted. | Removes both staged and unstaged work. Explicit paths are required, but deletion is not recoverable through Kandev. |
 | Edit branch | `git branch -m NEW_NAME` for the current local branch. | Does not rename/delete the old remote branch or automatically repair every external reference. Push the new branch explicitly. |
@@ -400,6 +443,12 @@ A fan-out can partially succeed. The UI continues after a failure and reports pe
 ## Commit history and reset behavior
 
 The Changes panel's session history is calculated relative to the session's recorded base commit or current merge base, so it focuses on commits created on the task branch. Kandev refreshes status and emits session Git updates after mutations, but the underlying Git repository remains authoritative.
+
+The Changes toolbar shows a spinner while Git status or inline commit details load.
+If a read fails, it shows a warning and retries automatically with increasing
+delays. The panel keeps the last available file and history data visible while
+it retries. Diff viewers continue to show their own loading state until their
+details arrive.
 
 Two similarly named actions have very different semantics:
 
@@ -449,8 +498,8 @@ These are the registered Kandev WebSocket actions. Every payload requires `sessi
 | `worktree.merge` | required `base_branch` |
 | `worktree.abort` | `operation`: exactly `merge` or `rebase` |
 | `worktree.commit` | required non-empty `message`; `stage_all`; `amend` |
-| `worktree.stage` | `paths` list; empty means all |
-| `worktree.unstage` | `paths` list; empty means all |
+| `worktree.stage` | `paths` list of literal repository-relative files or directories; empty means all |
+| `worktree.unstage` | `paths` list of literal repository-relative files or directories; empty means all |
 | `worktree.discard` | required non-empty `paths` list |
 | `worktree.create_pr` | required `title`; `body`; `base_branch`; `draft`; response can include `pr_url` and `provider` (`github`, `gitlab`, or `azure_repos`) |
 | `worktree.revert_commit` | required `commit_sha`, which must be exact `HEAD` |
@@ -493,6 +542,8 @@ Example request and normal operation result:
 ```
 
 Read-only Git actions used by the Changes panel include `session.commit_diff`, `session.git.commits`, `session.cumulative_diff`, and `session.git.snapshots`. See [WebSocket API](websocket-api.md) for transport and subscription behavior.
+
+Commit details and cumulative Review take each file's added, deleted, renamed, or modified status from Git change metadata; matching words in a filename or patch content do not change its status.
 
 `agentctl` also implements `/api/v1/git/*` HTTP routes inside the execution runtime. Those routes are an internal backend-to-runtime control surface, not the public Kandev backend API. External clients should not discover or expose executor-local agentctl ports; use the registered Kandev WebSocket actions.
 
