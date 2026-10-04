@@ -206,6 +206,10 @@ test.describe("PR switcher changes panel", () => {
       where: (payload) =>
         payload.owner === "testorg" && payload.repo === "testrepo" && payload.number === 101,
     });
+    const taskAFilesLoaded = gateway.waitForResponse("github.pr_files.get", {
+      where: (payload) =>
+        payload.owner === "testorg" && payload.repo === "testrepo" && payload.number === 101,
+    });
     await kanban.taskCardInColumn("Auth Fix Task", doneStep.id).click();
     await expect(testPage).toHaveURL(/\/t\//, { timeout: 15_000 });
 
@@ -214,6 +218,7 @@ test.describe("PR switcher changes panel", () => {
 
     // --- Switch to the Changes tab (Files tab is active by default) ---
     await session.clickTab("Changes");
+    await taskAFilesLoaded;
     await taskACommitsLoaded;
 
     // --- Verify Task A PR data ---
@@ -239,11 +244,16 @@ test.describe("PR switcher changes panel", () => {
       where: (payload) =>
         payload.owner === "testorg" && payload.repo === "testrepo" && payload.number === 202,
     });
+    const taskBFilesLoaded = gateway.waitForResponse("github.pr_files.get", {
+      where: (payload) =>
+        payload.owner === "testorg" && payload.repo === "testrepo" && payload.number === 202,
+    });
     await session.taskInSidebar("Dashboard Task").click();
     await expect(testPage).toHaveURL((url) => url.pathname.includes(taskB.id), {
       timeout: 15_000,
     });
     await session.clickTab("Changes");
+    await taskBFilesLoaded;
     await taskBCommitsLoaded;
 
     // Wait for PR data to load for Task B
