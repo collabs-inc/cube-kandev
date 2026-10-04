@@ -598,6 +598,7 @@ func (e *ACPInferenceExecutor) Probe(ctx context.Context, req *ProbeRequest) (*P
 		cfg.CommandPrefix,
 		args,
 		cmd.Env,
+		cmd.Path,
 		cmd.Dir,
 		resp.AgentVersion,
 	)

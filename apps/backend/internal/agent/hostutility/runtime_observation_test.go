@@ -73,3 +73,18 @@ func TestBuildProbeRequestAttributesOpenCodeFromResolvedCommand(t *testing.T) {
 		t.Fatalf("custom OpenCode command was attributed: %#v", custom)
 	}
 }
+
+func TestStampConfiguredRuntimeVersionForUnknownBridgeWithTrustedManagedTarget(t *testing.T) {
+	agent := agents.NewCodexACP()
+	caps := AgentCapabilities{RuntimeInfo: &agents.RuntimeInfo{
+		Components: []agents.RuntimeComponent{{
+			Role: agents.RuntimeComponentBridge, Source: agents.RuntimeComponentUnknown,
+			Owner: agents.RuntimeComponentOwnerKandev, Package: "@agentclientprotocol/codex-acp",
+		}},
+	}}
+	stampConfiguredRuntimeVersion(&caps, agent, agent.ManagedNPMRuntime().ACPCommand("1.2.3"))
+	bridge := caps.RuntimeInfo.Components[0]
+	if bridge.EffectiveVersion != "1.2.3" {
+		t.Fatalf("effective version = %q, want configured version for trusted managed target", bridge.EffectiveVersion)
+	}
+}

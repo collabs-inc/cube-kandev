@@ -77,6 +77,7 @@ func (e *ACPInferenceExecutor) collectRuntimeObservation(
 	commandPrefix []string,
 	preparedArgs []string,
 	env []string,
+	launchedExecutable string,
 	workDir string,
 	agentVersion string,
 ) *agents.RuntimeInfo {
@@ -95,12 +96,12 @@ func (e *ACPInferenceExecutor) collectRuntimeObservation(
 	bridge := componentFromDescriptor(agents.RuntimeComponentBridge, descriptor.Bridge)
 	if len(commandPrefix) > 0 {
 		bridge.Source = agents.RuntimeComponentUnknown
-		bridge.Owner = agents.RuntimeComponentOwnerUnknown
-		bridge.Package = ""
-		bridge.GuidanceURL = ""
+		bridge.ObservedVersion = ""
 	}
 	packageSpec, managedBridge := exactRuntimePackage(command, descriptor.Bridge.Package)
-	bridge.ObservedVersion = normalizedStableVersion(agentVersion)
+	if len(commandPrefix) == 0 {
+		bridge.ObservedVersion = normalizedStableVersion(agentVersion)
+	}
 	info.Components = append(info.Components, bridge)
 
 	if descriptor.Provider == nil {
@@ -127,7 +128,9 @@ func (e *ACPInferenceExecutor) collectRuntimeObservation(
 	provider.Source = validComponentSource(provider.Source)
 	provider.Owner = validComponentOwner(provider.Owner)
 	if provider.Source == agents.RuntimeComponentBundled && managedBridge {
-		cacheRoot, err := resolveNPMCacheRoot(inspectCtx, preparedArgs, env, workDir, e.logger)
+		cacheRoot, err := resolveNPMCacheRoot(
+			inspectCtx, launchedExecutable, preparedArgs, env, workDir, e.logger,
+		)
 		if err == nil {
 			provider.ObservedVersion = inspectBundledDependencyVersion(
 				cacheRoot, packageSpec, descriptor.Bridge.Package, provider.Package,
@@ -290,14 +293,15 @@ func environmentValue(env []string, key string) string {
 
 func resolveNPMCacheRoot(
 	ctx context.Context,
+	launchedExecutable string,
 	preparedArgs []string,
 	env []string,
 	workDir string,
 	logger *zap.Logger,
 ) (string, error) {
-	npm, ok := resolveExecutableInEnvironment("npm", env, workDir)
+	npm, ok := resolveSiblingNPMExecutable(launchedExecutable, env, workDir)
 	if !ok {
-		return "", errors.New("npm executable unavailable")
+		return "", errors.New("npm executable beside launched npx is unavailable")
 	}
 	args := []string{}
 	if prefix := managedNPMProjectPrefix(preparedArgs); prefix != "" {
@@ -308,15 +312,42 @@ func resolveNPMCacheRoot(
 	if err != nil {
 		return "", err
 	}
-	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
-	if len(lines) != 1 {
-		return "", errors.New("npm cache root output invalid")
+	cacheRoot := ""
+	for _, line := range strings.Split(string(output), "\n") {
+		line = strings.TrimSpace(strings.TrimSuffix(line, "\r"))
+		if line != "" {
+			cacheRoot = line
+		}
 	}
-	cacheRoot := strings.TrimSpace(strings.TrimSuffix(lines[0], "\r"))
 	if cacheRoot == "" || !filepath.IsAbs(cacheRoot) {
 		return "", errors.New("npm cache root is not absolute")
 	}
 	return filepath.Clean(cacheRoot), nil
+}
+
+func resolveSiblingNPMExecutable(launchedExecutable string, env []string, workDir string) (string, bool) {
+	if strings.TrimSpace(launchedExecutable) == "" || strings.ContainsAny(launchedExecutable, "\x00\r\n") {
+		return "", false
+	}
+	if !filepath.IsAbs(launchedExecutable) {
+		launchedExecutable = filepath.Join(workDir, launchedExecutable)
+	}
+	launchedExecutable, err := filepath.Abs(launchedExecutable)
+	if err != nil {
+		return "", false
+	}
+	extension := filepath.Ext(launchedExecutable)
+	npm := filepath.Join(filepath.Dir(launchedExecutable), "npm"+extension)
+	candidates := []string{npm}
+	if extension == "" {
+		candidates = executableCandidates(npm, env)
+	}
+	for _, candidate := range candidates {
+		if path, ok := executableFile(candidate); ok {
+			return path, true
+		}
+	}
+	return "", false
 }
 
 func managedNPMProjectPrefix(args []string) string {

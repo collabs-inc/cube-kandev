@@ -9,6 +9,8 @@ import { ProfileRuntimeInfo } from "./profile-runtime-info";
 const { listStatusesMock } = vi.hoisted(() => ({ listStatusesMock: vi.fn() }));
 const CLAUDE_AGENT = "claude-acp";
 const CLAUDE_PACKAGE = "@agentclientprotocol/claude-agent-acp";
+const MANAGE_BRIDGE_VERSION_LABEL = "Manage bridge version";
+const OPENCODE_GUIDANCE_URL = "https://opencode.ai/docs/cli/";
 const RUNTIME_STATUS_TEST_ID = "profile-runtime-update-status";
 
 vi.mock("@/lib/api/domains/agent-update-api", async (importOriginal) => ({
@@ -128,7 +130,7 @@ it("shows observed and configured versions with managed and provider recovery", 
   expect(screen.getByText("Latest runtime version is unavailable.")).toBeTruthy();
   expect(screen.queryByText("Version unknown")).toBeNull();
 
-  const manage = screen.getByRole("link", { name: "Manage bridge version" });
+  const manage = screen.getByRole("link", { name: MANAGE_BRIDGE_VERSION_LABEL });
   expect(manage.getAttribute("href")).toBe(`/settings/agents#installed-agent-${CLAUDE_AGENT}`);
   const guidance = screen.getByRole("link", { name: "Provider guidance" });
   expect(guidance.getAttribute("href")).toBe("https://github.com/openai/codex");
@@ -164,7 +166,7 @@ it("shows trusted manual recovery for native OpenCode without managed-release wo
         source: "external",
         owner: "external",
         observed_version: "1.1.0",
-        guidance_url: "https://opencode.ai/docs/cli/",
+        guidance_url: OPENCODE_GUIDANCE_URL,
       },
     ],
   };
@@ -176,9 +178,84 @@ it("shows trusted manual recovery for native OpenCode without managed-release wo
 
   expect(screen.getByText("External")).toBeTruthy();
   expect(screen.getByText("Managed externally")).toBeTruthy();
-  expect(screen.queryByRole("link", { name: "Manage bridge version" })).toBeNull();
+  expect(screen.queryByRole("link", { name: MANAGE_BRIDGE_VERSION_LABEL })).toBeNull();
   expect(screen.getByRole("link", { name: "Manual update guidance" }).getAttribute("href")).toBe(
-    "https://opencode.ai/docs/cli/",
+    OPENCODE_GUIDANCE_URL,
+  );
+  expect(screen.queryByTestId(RUNTIME_STATUS_TEST_ID)).toBeNull();
+});
+
+it("keeps trusted manual guidance for an external runtime behind an unverified prefix", () => {
+  const prefixedNativeRuntime: RuntimeInfo = {
+    scope: "host",
+    observed_at: runtimeInfo.observed_at,
+    components: [
+      {
+        role: "bridge",
+        name: "OpenCode",
+        source: "unknown",
+        owner: "external",
+        guidance_url: OPENCODE_GUIDANCE_URL,
+      },
+    ],
+  };
+  renderProfileRuntimeInfo({
+    agentName: "opencode-acp",
+    discoveryState: "ready",
+    runtimeInfo: prefixedNativeRuntime,
+  });
+
+  expect(screen.getByRole("link", { name: "Manual update guidance" }).getAttribute("href")).toBe(
+    OPENCODE_GUIDANCE_URL,
+  );
+  expect(screen.queryByRole("link", { name: MANAGE_BRIDGE_VERSION_LABEL })).toBeNull();
+  expect(screen.queryByTestId(RUNTIME_STATUS_TEST_ID)).toBeNull();
+});
+
+it("keeps the trusted managed fallback action for an unknown prefixed launch", () => {
+  const prefixedRuntime: RuntimeInfo = {
+    scope: "host",
+    observed_at: runtimeInfo.observed_at,
+    components: [
+      {
+        role: "bridge",
+        name: "Codex",
+        source: "unknown",
+        owner: "kandev",
+        package: "@agentclientprotocol/codex-acp",
+        effective_version: "1.1.0",
+      },
+    ],
+  };
+  renderProfileRuntimeInfo(
+    {
+      agentName: "codex-acp",
+      discoveryState: "ready",
+      runtimeInfo: prefixedRuntime,
+    },
+    {
+      "codex-acp": {
+        agent_name: "codex-acp",
+        display_name: "Codex",
+        runtime_id: "managed:codex-acp",
+        owner: "kandev",
+        mechanism: "npm",
+        management: "managed",
+        available: true,
+        enabled: true,
+        auto_update_supported: false,
+        auto_update: false,
+        package: "@agentclientprotocol/codex-acp",
+        default_version: "1.2.0",
+        effective_version: "1.1.0",
+        check_state: "update_available",
+      },
+    } satisfies Record<string, AgentUpdateStatus>,
+  );
+
+  expect(screen.getByText("Configured: 1.1.0")).toBeTruthy();
+  expect(screen.getByRole("link", { name: MANAGE_BRIDGE_VERSION_LABEL }).getAttribute("href")).toBe(
+    "/settings/agents#installed-agent-codex-acp",
   );
   expect(screen.queryByTestId(RUNTIME_STATUS_TEST_ID)).toBeNull();
 });
@@ -305,7 +382,7 @@ it("labels the retained runtime observation as stale while keeping recovery avai
 
   expect(screen.getByText("Refresh profile discovery to inspect runtime details.")).toBeTruthy();
   expect(screen.getByText("Observed: 1.11.0")).toBeTruthy();
-  expect(screen.getByRole("link", { name: "Manage bridge version" })).toBeTruthy();
+  expect(screen.getByRole("link", { name: MANAGE_BRIDGE_VERSION_LABEL })).toBeTruthy();
 });
 
 it("does not render untrusted guidance URLs", () => {

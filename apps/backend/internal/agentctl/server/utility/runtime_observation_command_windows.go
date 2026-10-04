@@ -17,7 +17,8 @@ func configureRuntimeObservationCommand(
 	args []string,
 	_ []string,
 ) error {
-	if !strings.EqualFold(filepath.Ext(executable), ".cmd") {
+	extension := filepath.Ext(executable)
+	if !strings.EqualFold(extension, ".cmd") && !strings.EqualFold(extension, ".bat") {
 		return nil
 	}
 	if !runtimeObservationCmdTextSafe(executable) {

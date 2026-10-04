@@ -9,6 +9,7 @@ import {
 } from "@playwright/test";
 import type { AgentProfile } from "../../lib/types/http";
 import type { DynamicModelsResponse } from "../../lib/types/http";
+import type { ProfileRuntimeComponent } from "../../lib/types/http-agents";
 import type { ApiClient } from "./api-client";
 import type { BackendContext } from "../fixtures/backend";
 import {
@@ -70,13 +71,45 @@ async function expectRuntimeUpdateOutcome(
 
 export async function installProfileRuntimeObservationFixture(
   page: Page,
-  options: { nativeBridge?: boolean } = {},
+  options: { nativeBridge?: boolean; unknownManagedFallback?: boolean } = {},
 ) {
   let observedVersion = "1.11.0";
   let configuredVersion = "1.10.0";
   let activationModel: { id: string; name: string } | null = null;
   let socket: WebSocketRoute | undefined;
   let clientReady = false;
+
+  function bridgeRuntimeComponent(): ProfileRuntimeComponent {
+    if (options.nativeBridge) {
+      return {
+        role: "bridge",
+        name: "OpenCode",
+        source: "external",
+        owner: "external",
+        observed_version: observedVersion,
+        guidance_url: "https://opencode.ai/docs/cli/",
+      };
+    }
+    if (options.unknownManagedFallback) {
+      return {
+        role: "bridge",
+        name: "Mock ACP bridge",
+        package: "@agentclientprotocol/mock-agent-acp",
+        source: "unknown",
+        owner: "kandev",
+        effective_version: configuredVersion,
+      };
+    }
+    return {
+      role: "bridge",
+      name: "Mock ACP bridge",
+      package: "@agentclientprotocol/mock-agent-acp",
+      source: "managed",
+      owner: "kandev",
+      effective_version: configuredVersion,
+      observed_version: observedVersion,
+    };
+  }
 
   await page.route("**/api/v1/agent-models/mock-agent/probe", async (route) => {
     const models: DynamicModelsResponse["models"] = [
@@ -101,24 +134,7 @@ export async function installProfileRuntimeObservationFixture(
           scope: "host",
           observed_at: "2026-10-04T12:00:00.000Z",
           components: [
-            options.nativeBridge
-              ? {
-                  role: "bridge",
-                  name: "OpenCode",
-                  source: "external",
-                  owner: "external",
-                  observed_version: observedVersion,
-                  guidance_url: "https://opencode.ai/docs/cli/",
-                }
-              : {
-                  role: "bridge",
-                  name: "Mock ACP bridge",
-                  package: "@agentclientprotocol/mock-agent-acp",
-                  source: "managed",
-                  owner: "kandev",
-                  effective_version: configuredVersion,
-                  observed_version: observedVersion,
-                },
+            bridgeRuntimeComponent(),
             {
               role: "provider",
               name: "Codex CLI",

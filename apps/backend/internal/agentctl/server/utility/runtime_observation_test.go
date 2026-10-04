@@ -55,7 +55,7 @@ func TestRuntimeObservationPreservesExternalPrimaryRuntimeOwnership(t *testing.T
 	}
 	info := NewACPInferenceExecutor(zap.NewNop()).collectRuntimeObservation(
 		context.Background(), descriptor, []string{"opencode", "acp"}, nil,
-		[]string{"opencode", "acp"}, nil, t.TempDir(), "1.2.3",
+		[]string{"opencode", "acp"}, nil, "", t.TempDir(), "1.2.3",
 	)
 	bridge := runtimeComponentByRole(t, info, agents.RuntimeComponentBridge)
 	if bridge.Source != agents.RuntimeComponentExternal || bridge.Owner != agents.RuntimeComponentOwnerExternal ||
@@ -148,15 +148,16 @@ func TestRuntimeObservationMarksExternalProviderUnknownUnderPrefix(t *testing.T)
 	descriptor := codexRuntimeDescriptor()
 	info := NewACPInferenceExecutor(zap.NewNop()).collectRuntimeObservation(
 		context.Background(), descriptor, codexManagedCommand(), []string{"sandbox", "--"},
-		codexManagedCommand(), []string{"CODEX_PATH=" + binary}, t.TempDir(), "1.2.3",
+		codexManagedCommand(), []string{"CODEX_PATH=" + binary}, "", t.TempDir(), "1.2.3",
 	)
 	provider := runtimeComponentByRole(t, info, agents.RuntimeComponentProvider)
 	if provider.Source != agents.RuntimeComponentUnknown || provider.Owner != agents.RuntimeComponentOwnerUnknown || provider.ObservedVersion != "" {
 		t.Fatalf("wrapped provider was attributed: %#v", provider)
 	}
 	bridge := runtimeComponentByRole(t, info, agents.RuntimeComponentBridge)
-	if bridge.Source != agents.RuntimeComponentUnknown || bridge.Owner != agents.RuntimeComponentOwnerUnknown || bridge.Package != "" || bridge.GuidanceURL != "" {
-		t.Fatalf("wrapped primary runtime retained trusted identity: %#v", bridge)
+	if bridge.Source != agents.RuntimeComponentUnknown || bridge.Owner != agents.RuntimeComponentOwnerKandev ||
+		bridge.Package != "@agentclientprotocol/codex-acp" || bridge.ObservedVersion != "" || bridge.GuidanceURL != "" {
+		t.Fatalf("wrapped primary runtime did not retain only trusted configured identity: %#v", bridge)
 	}
 	if provider.Package != "" || provider.GuidanceURL != "" {
 		t.Fatalf("wrapped provider retained trusted identity: %#v", provider)
@@ -178,7 +179,7 @@ func TestRuntimeObservationUsesCapturedExternalCodexAndSanitizesOutput(t *testin
 	writeRuntimeObservationExecutable(t, binary, "#!/bin/sh\nprintf 'codex-cli 0.177.3\\nOPENAI_API_KEY=private-secret\\n'\nprintf 'ANTHROPIC_API_KEY=private-secret\\n' >&2\n")
 	info := NewACPInferenceExecutor(zap.NewNop()).collectRuntimeObservation(
 		context.Background(), codexRuntimeDescriptor(), codexManagedCommand(), nil,
-		codexManagedCommand(), []string{"CODEX_PATH=codex", "PATH=" + dir}, t.TempDir(), "1.2.3",
+		codexManagedCommand(), []string{"CODEX_PATH=codex", "PATH=" + dir}, "", t.TempDir(), "1.2.3",
 	)
 	if info == nil || info.Scope != "host" {
 		t.Fatalf("runtime info = %#v", info)
@@ -255,7 +256,7 @@ func TestRuntimeObservationResolvesRelativeExecutableInputsAgainstCapturedWorkDi
 		t.Run(tt.name, func(t *testing.T) {
 			info := NewACPInferenceExecutor(zap.NewNop()).collectRuntimeObservation(
 				context.Background(), codexRuntimeDescriptor(), codexManagedCommand(), nil,
-				codexManagedCommand(), []string{"CODEX_PATH=" + tt.codex, "PATH=" + tt.path}, workDir, "1.2.3",
+				codexManagedCommand(), []string{"CODEX_PATH=" + tt.codex, "PATH=" + tt.path}, "", workDir, "1.2.3",
 			)
 			provider := runtimeComponentByRole(t, info, agents.RuntimeComponentProvider)
 			if provider.Source != agents.RuntimeComponentExternal || provider.ObservedVersion != "0.177.3" {
@@ -274,7 +275,7 @@ func TestRuntimeObservationRefreshReadsReplacementAtSameExternalPath(t *testing.
 	observe := func() string {
 		info := NewACPInferenceExecutor(zap.NewNop()).collectRuntimeObservation(
 			context.Background(), codexRuntimeDescriptor(), codexManagedCommand(), nil,
-			codexManagedCommand(), []string{"CODEX_PATH=" + binary}, t.TempDir(), "1.2.3",
+			codexManagedCommand(), []string{"CODEX_PATH=" + binary}, "", t.TempDir(), "1.2.3",
 		)
 		return runtimeComponentByRole(t, info, agents.RuntimeComponentProvider).ObservedVersion
 	}
@@ -300,7 +301,7 @@ func TestRuntimeObservationUsesInheritedCodexPathWhenProfileHasNoOverride(t *tes
 	}
 	info := NewACPInferenceExecutor(zap.NewNop()).collectRuntimeObservation(
 		context.Background(), codexRuntimeDescriptor(), codexManagedCommand(), nil,
-		codexManagedCommand(), childEnv, t.TempDir(), "1.2.3",
+		codexManagedCommand(), childEnv, "", t.TempDir(), "1.2.3",
 	)
 	provider := runtimeComponentByRole(t, info, agents.RuntimeComponentProvider)
 	if provider.Source != agents.RuntimeComponentExternal || provider.ObservedVersion != "0.177.3" {
@@ -323,14 +324,32 @@ func TestRuntimeObservationUsesBundledClaudeSDKManifest(t *testing.T) {
 		filepath.Join(npxRoot, "node_modules", "@anthropic-ai", "claude-agent-sdk", "package.json"),
 		"@anthropic-ai/claude-agent-sdk", "0.16.1",
 	)
-	binDir := filepath.Join(t.TempDir(), "npm tools")
-	if err := os.MkdirAll(binDir, 0o700); err != nil {
-		t.Fatalf("create npm bin: %v", err)
+	decoyCacheRoot := t.TempDir()
+	decoyNpxRoot := npxTreeRoot(decoyCacheRoot, bridgeSpec)
+	writePackageManifest(t,
+		filepath.Join(decoyNpxRoot, "node_modules", "@agentclientprotocol", "claude-agent-acp", "package.json"),
+		"@agentclientprotocol/claude-agent-acp", "1.2.3",
+	)
+	writePackageManifest(t,
+		filepath.Join(decoyNpxRoot, "node_modules", "@anthropic-ai", "claude-agent-sdk", "package.json"),
+		"@anthropic-ai/claude-agent-sdk", "9.9.9",
+	)
+	npxBinDir := filepath.Join(t.TempDir(), "launched npx")
+	if err := os.MkdirAll(npxBinDir, 0o700); err != nil {
+		t.Fatalf("create launched npx bin: %v", err)
+	}
+	childPathDir := filepath.Join(t.TempDir(), "child PATH")
+	if err := os.MkdirAll(childPathDir, 0o700); err != nil {
+		t.Fatalf("create child PATH bin: %v", err)
 	}
 	argsFile := filepath.Join(t.TempDir(), "npm args")
-	writeRuntimeObservationExecutable(t, filepath.Join(binDir, "npm"), "#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$NPM_ARGS_FILE\"\nprintf '%s\\n' \"$NPM_CACHE_ROOT\"\n")
+	npxExecutable := filepath.Join(npxBinDir, "npx")
+	writeRuntimeObservationExecutable(t, npxExecutable, "#!/bin/sh\nexit 0\n")
+	writeRuntimeObservationExecutable(t, filepath.Join(npxBinDir, "npm"), "#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$NPM_ARGS_FILE\"\nprintf 'npm warn using a legacy cache setting\\n%s\\n' \"$NPM_CACHE_ROOT\"\n")
+	decoyNPMMarker := filepath.Join(t.TempDir(), "decoy npm used")
+	writeRuntimeObservationExecutable(t, filepath.Join(childPathDir, "npm"), "#!/bin/sh\nprintf x > \""+decoyNPMMarker+"\"\nprintf '%s\\n' \"$DECOY_NPM_CACHE_ROOT\"\n")
 	globalClaudeMarker := filepath.Join(t.TempDir(), "global-claude-used")
-	writeRuntimeObservationExecutable(t, filepath.Join(binDir, "claude"), "#!/bin/sh\nprintf x > \""+globalClaudeMarker+"\"\nprintf 'Claude Code 99.9.9\\n'\n")
+	writeRuntimeObservationExecutable(t, filepath.Join(childPathDir, "claude"), "#!/bin/sh\nprintf x > \""+globalClaudeMarker+"\"\nprintf 'Claude Code 99.9.9\\n'\n")
 	preparedPrefix := filepath.Join(t.TempDir(), "managed npm prefix")
 	preparedCommand := []string{"npx", "--yes", "--prefer-offline", "--prefix", preparedPrefix, bridgeSpec}
 	command := []string{"npx", "--yes", "--prefer-offline", "--prefix", managedruntime.NPMProjectPrefix, bridgeSpec}
@@ -347,7 +366,9 @@ func TestRuntimeObservationUsesBundledClaudeSDKManifest(t *testing.T) {
 	}
 	info := NewACPInferenceExecutor(zap.NewNop()).collectRuntimeObservation(
 		context.Background(), descriptor, command, nil, preparedCommand,
-		[]string{"PATH=" + binDir, "NPM_CACHE_ROOT=" + cacheRoot, "NPM_ARGS_FILE=" + argsFile},
+		[]string{"PATH=" + childPathDir, "NPM_CACHE_ROOT=" + cacheRoot,
+			"DECOY_NPM_CACHE_ROOT=" + decoyCacheRoot, "NPM_ARGS_FILE=" + argsFile},
+		npxExecutable,
 		t.TempDir(), "1.2.3",
 	)
 	observed := runtimeComponentByRole(t, info, agents.RuntimeComponentProvider)
@@ -356,6 +377,9 @@ func TestRuntimeObservationUsesBundledClaudeSDKManifest(t *testing.T) {
 	}
 	if _, err := os.Stat(globalClaudeMarker); !os.IsNotExist(err) {
 		t.Fatalf("global Claude CLI was inspected: %v", err)
+	}
+	if _, err := os.Stat(decoyNPMMarker); !os.IsNotExist(err) {
+		t.Fatalf("npm from child PATH was inspected instead of the launched npx sibling: %v", err)
 	}
 	args, err := os.ReadFile(argsFile)
 	if err != nil {
@@ -375,7 +399,7 @@ func TestRuntimeObservationKeepsExternalIdentityAfterVersionFailure(t *testing.T
 	writeRuntimeObservationExecutable(t, binary, "#!/bin/sh\nprintf 'token=secret\\n' >&2\nexit 2\n")
 	info := NewACPInferenceExecutor(zap.NewNop()).collectRuntimeObservation(
 		context.Background(), codexRuntimeDescriptor(), codexManagedCommand(), nil,
-		codexManagedCommand(), []string{"CODEX_PATH=" + binary}, t.TempDir(), "1.2.3",
+		codexManagedCommand(), []string{"CODEX_PATH=" + binary}, "", t.TempDir(), "1.2.3",
 	)
 	provider := runtimeComponentByRole(t, info, agents.RuntimeComponentProvider)
 	if provider.Source != agents.RuntimeComponentExternal || provider.ObservedVersion != "" {
@@ -391,7 +415,7 @@ func TestRuntimeObservationRejectsOversizedVersionOutput(t *testing.T) {
 	writeRuntimeObservationExecutable(t, binary, "#!/bin/sh\nprintf 'codex-cli 0.177.3\\n'; head -c 8192 /dev/zero | tr '\\000' x; printf 'credential=secret\\n' >&2\n")
 	info := NewACPInferenceExecutor(zap.NewNop()).collectRuntimeObservation(
 		context.Background(), codexRuntimeDescriptor(), codexManagedCommand(), nil,
-		codexManagedCommand(), []string{"CODEX_PATH=" + binary}, t.TempDir(), "1.2.3",
+		codexManagedCommand(), []string{"CODEX_PATH=" + binary}, "", t.TempDir(), "1.2.3",
 	)
 	provider := runtimeComponentByRole(t, info, agents.RuntimeComponentProvider)
 	if provider.Source != agents.RuntimeComponentExternal || provider.ObservedVersion != "" {

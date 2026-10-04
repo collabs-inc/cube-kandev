@@ -148,9 +148,12 @@ function ProfileRuntimeActions({
 }) {
   const bridge = components.find((component) => component.role === "bridge");
   const bridgeManaged = bridge?.source === "managed" && bridge.owner === "kandev";
+  const bridgeHasManagedTarget =
+    bridgeManaged ||
+    (bridge?.source === "unknown" && bridge.owner === "kandev" && Boolean(bridge.package));
   return (
     <div className="flex flex-col gap-2 md:flex-row md:flex-wrap">
-      {bridgeManaged && (
+      {bridgeHasManagedTarget && (
         <Button
           asChild
           variant="outline"
@@ -164,7 +167,7 @@ function ProfileRuntimeActions({
       {components.map((component) => {
         const manualRuntime =
           component.role === "bridge" &&
-          component.source === "external" &&
+          (component.source === "external" || component.source === "unknown") &&
           component.owner === "external";
         const guidanceUrl =
           component.role === "provider" || manualRuntime

@@ -180,6 +180,53 @@ test.describe("Mobile profile capability discovery", () => {
     }
   });
 
+  test("keeps configured managed fallback recovery available for an unknown prefixed launch", async ({
+    testPage,
+    apiClient,
+    backend,
+  }) => {
+    const { agents } = await apiClient.listAgents();
+    const agent = agents.find((item) => item.name === "mock-agent");
+    if (!agent) throw new Error("mock-agent is required for profile discovery E2E");
+    const { profile } = await createProfileWithCatalog(
+      apiClient,
+      backend,
+      agent.id,
+      "Mobile prefixed runtime recovery",
+      "mobile-prefixed-runtime",
+    );
+    await installProfileRuntimeObservationFixture(testPage, { unknownManagedFallback: true });
+
+    try {
+      await testPage.goto(`/settings/agents/${agent.name}/profiles/${profile.id}`);
+      await expect(testPage.getByTestId("profile-capability-status")).toHaveAttribute(
+        "data-status",
+        "ready",
+        { timeout: 20_000 },
+      );
+
+      const runtimeDetails = testPage.getByTestId("profile-runtime-info");
+      const bridge = runtimeDetails.getByTestId("profile-runtime-component-bridge");
+      await expect(bridge).toContainText("Source unknown");
+      await expect(bridge).toContainText("Managed by Kandev");
+      await expect(bridge).toContainText("Configured: 1.10.0");
+      await expect(bridge).not.toContainText("Observed:");
+      await expect(testPage.getByTestId("profile-runtime-update-status")).toHaveCount(0);
+
+      const manage = runtimeDetails.getByRole("link", { name: "Manage bridge version" });
+      await expect(manage).toBeVisible();
+      await manage.scrollIntoViewIfNeeded();
+      expect((await manage.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+      expect(
+        await testPage.evaluate(
+          () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+        ),
+      ).toBe(true);
+    } finally {
+      await apiClient.deleteAgentProfile(profile.id, true);
+    }
+  });
+
   test("keeps runtime recovery touch-safe and refreshes the open draft after a second-tab update", async ({
     testPage,
     apiClient,
