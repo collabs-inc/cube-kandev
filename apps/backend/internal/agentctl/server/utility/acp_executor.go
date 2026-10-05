@@ -1339,7 +1339,7 @@ func resolveProbeCommand(name string) string {
 	if resolved, ok := allowedProbeCommands[base]; ok {
 		return resolved
 	}
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == windowsGOOS {
 		if ext := filepath.Ext(base); strings.EqualFold(ext, ".exe") {
 			return allowedProbeCommands[strings.TrimSuffix(base, ext)]
 		}

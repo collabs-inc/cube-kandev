@@ -74,6 +74,25 @@ func TestBuildProbeRequestAttributesOpenCodeFromResolvedCommand(t *testing.T) {
 	}
 }
 
+func TestBuildProbeRequestAttributesManualReleaseAgent(t *testing.T) {
+	agent := agents.NewCursorACP()
+	inst := &instance{agentType: agent.ID()}
+	request := buildProbeRequest(inst, agent, true, agents.Command{})
+	bridge := request.RuntimeObservation.Bridge
+	if bridge.Source != agents.RuntimeComponentExternal || bridge.Owner != agents.RuntimeComponentOwnerExternal {
+		t.Fatalf("manual runtime descriptor = %#v, want external ownership", bridge)
+	}
+	if bridge.GuidanceURL != "https://docs.cursor.com/en/cli/installation" {
+		t.Fatalf("manual runtime guidance = %q", bridge.GuidanceURL)
+	}
+
+	custom := agents.NewCommand("cursor-wrapper", "cursor-agent", "acp")
+	customBridge := buildProbeRequest(inst, agent, true, custom).RuntimeObservation.Bridge
+	if customBridge.Source != agents.RuntimeComponentUnknown || customBridge.Owner != agents.RuntimeComponentOwnerUnknown || customBridge.GuidanceURL != "" {
+		t.Fatalf("custom runtime command was attributed: %#v", customBridge)
+	}
+}
+
 func TestStampConfiguredRuntimeVersionForUnknownBridgeWithTrustedManagedTarget(t *testing.T) {
 	agent := agents.NewCodexACP()
 	caps := AgentCapabilities{RuntimeInfo: &agents.RuntimeInfo{

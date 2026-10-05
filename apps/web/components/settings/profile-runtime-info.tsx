@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { Button } from "@kandev/ui/button";
 import Link from "@/components/routing/app-link";
 import { useAppStore } from "@/components/state-provider";
+import { useIsAdmin } from "@/hooks/domains/auth/use-is-admin";
 import { useAgentRuntimeUpdateStatuses } from "@/hooks/domains/settings/use-agent-runtime-update-statuses";
 import type { ProfileRuntimeComponent, ProfileRuntimeInfo as RuntimeInfo } from "@/lib/types/http";
 import type { ProfileDiscoveryStatus } from "@/hooks/domains/settings/use-profile-model-capabilities";
@@ -23,13 +24,13 @@ const sourceKeys: Record<ProfileRuntimeComponent["source"], string> = {
 };
 
 const ownerKeys: Record<ProfileRuntimeComponent["owner"], string> = {
-  kandev: "agents:profileRuntimeOwnerKandev",
-  external: "agents:profileRuntimeOwnerExternal",
+  kandev: "agents:runtimeManaged",
+  external: "agents:runtimeManual",
   unknown: "agents:profileRuntimeOwnerUnknown",
 };
 
 const runtimeGuidanceKeys: Record<ProfileRuntimeComponent["role"], string> = {
-  bridge: "agents:profileRuntimeManualGuidance",
+  bridge: "agents:runtimeManualGuidance",
   provider: "agents:profileRuntimeProviderGuidance",
 };
 
@@ -49,7 +50,7 @@ function runtimeVersionCopy(
 ) {
   const versions: string[] = [];
   if (component.observed_version) {
-    versions.push(t("agents:profileRuntimeObserved", { version: component.observed_version }));
+    versions.push(t("agents:runtimeObserved", { version: component.observed_version }));
   }
   if (component.effective_version) {
     versions.push(t("agents:profileRuntimeConfigured", { version: component.effective_version }));
@@ -146,6 +147,7 @@ function ProfileRuntimeActions({
   components: ProfileRuntimeComponent[];
   t: ReturnType<typeof useTranslation>["t"];
 }) {
+  const canManage = useIsAdmin();
   const bridge = components.find((component) => component.role === "bridge");
   const bridgeManaged = bridge?.source === "managed" && bridge.owner === "kandev";
   const bridgeHasManagedTarget =
@@ -153,7 +155,7 @@ function ProfileRuntimeActions({
     (bridge?.source === "unknown" && bridge.owner === "kandev" && Boolean(bridge.package));
   return (
     <div className="flex flex-col gap-2 md:flex-row md:flex-wrap">
-      {bridgeHasManagedTarget && (
+      {canManage && bridgeHasManagedTarget && (
         <Button
           asChild
           variant="outline"

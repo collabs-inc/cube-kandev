@@ -963,34 +963,76 @@ func runtimeObservationDescriptor(
 	if !ok {
 		return nil
 	}
-	bridge := agents.RuntimeComponentDescriptor{
-		Name:   registered.DisplayName(),
-		Source: agents.RuntimeComponentUnknown,
-		Owner:  agents.RuntimeComponentOwnerUnknown,
-	}
-	if managed, ok := ia.(agents.ManagedNPMRuntimeAgent); ok {
-		spec := managed.ManagedNPMRuntime()
-		switch {
-		case spec.NativeBinary != "" && slices.Equal(command.Args(), spec.NativeCommand().Args()):
-			bridge.Source = agents.RuntimeComponentExternal
-			bridge.Owner = agents.RuntimeComponentOwnerExternal
-			if releaseAgent, ok := registered.(agents.RuntimeReleaseAgent); ok {
-				bridge.GuidanceURL = releaseAgent.RuntimeReleaseSource().GuidanceURL
-			} else if capability := agents.RuntimeUpdateCapabilities(registered); capability.Management == "manual" {
-				bridge.GuidanceURL = capability.Source.GuidanceURL
-			}
-		case managedRuntimeCommandVersion(command, spec) != "":
-			bridge.Package = spec.Package
-			bridge.Source = agents.RuntimeComponentManaged
-			bridge.Owner = agents.RuntimeComponentOwnerKandev
-		}
-	}
+	bridge := runtimeObservationBridgeDescriptor(ia, registered, cfg, command)
 	descriptor := &agents.RuntimeObservationDescriptor{Bridge: bridge}
 	if provider, ok := ia.(agents.RuntimeObservationAgent); ok {
 		component := provider.RuntimeProviderObservation()
 		descriptor.Provider = &component
 	}
 	return descriptor
+}
+
+func runtimeObservationBridgeDescriptor(
+	ia agents.InferenceAgent,
+	registered agents.Agent,
+	cfg *agents.InferenceConfig,
+	command agents.Command,
+) agents.RuntimeComponentDescriptor {
+	bridge := agents.RuntimeComponentDescriptor{
+		Name:   registered.DisplayName(),
+		Source: agents.RuntimeComponentUnknown,
+		Owner:  agents.RuntimeComponentOwnerUnknown,
+	}
+	if managed, ok := ia.(agents.ManagedNPMRuntimeAgent); ok {
+		return managedRuntimeObservationBridge(bridge, managed, registered, command)
+	}
+	if cfg.OperatorDefined || !slices.Equal(command.Args(), cfg.Command.Args()) {
+		return bridge
+	}
+	if _, ok := registered.(agents.RuntimeReleaseAgent); !ok {
+		return bridge
+	}
+	capability := agents.RuntimeUpdateCapabilities(registered)
+	if capability.Management != "manual" || capability.Owner != "external" {
+		return bridge
+	}
+	bridge.Source = agents.RuntimeComponentExternal
+	bridge.Owner = agents.RuntimeComponentOwnerExternal
+	bridge.GuidanceURL = capability.Source.GuidanceURL
+	return bridge
+}
+
+func managedRuntimeObservationBridge(
+	bridge agents.RuntimeComponentDescriptor,
+	managed agents.ManagedNPMRuntimeAgent,
+	registered agents.Agent,
+	command agents.Command,
+) agents.RuntimeComponentDescriptor {
+	spec := managed.ManagedNPMRuntime()
+	if spec.NativeBinary != "" && slices.Equal(command.Args(), spec.NativeCommand().Args()) {
+		bridge.Source = agents.RuntimeComponentExternal
+		bridge.Owner = agents.RuntimeComponentOwnerExternal
+		bridge.GuidanceURL = runtimeManualGuidanceURL(registered)
+		return bridge
+	}
+	if managedRuntimeCommandVersion(command, spec) == "" {
+		return bridge
+	}
+	bridge.Package = spec.Package
+	bridge.Source = agents.RuntimeComponentManaged
+	bridge.Owner = agents.RuntimeComponentOwnerKandev
+	return bridge
+}
+
+func runtimeManualGuidanceURL(registered agents.Agent) string {
+	if releaseAgent, ok := registered.(agents.RuntimeReleaseAgent); ok {
+		return releaseAgent.RuntimeReleaseSource().GuidanceURL
+	}
+	capability := agents.RuntimeUpdateCapabilities(registered)
+	if capability.Management == "manual" {
+		return capability.Source.GuidanceURL
+	}
+	return ""
 }
 
 func managedRuntimeCommandVersion(command agents.Command, spec agents.ManagedNPMRuntimeSpec) string {

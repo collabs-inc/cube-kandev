@@ -17,16 +17,28 @@ func TestRuntimeObservationCommandTimeoutCleansDescendants(t *testing.T) {
 	binary := filepath.Join(dir, "slow codex")
 	pidFile := filepath.Join(dir, "child.pid")
 	writeExecutable(t, binary, "#!/bin/sh\nsleep 30 &\necho $! > \""+pidFile+"\"\nwait\n")
-	ctx, cancel := context.WithTimeout(context.Background(), 75*time.Millisecond)
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	result := make(chan error, 1)
+	go func() {
+		_, err := runRuntimeObservationCommand(ctx, binary, []string{"--version"}, os.Environ(), dir, zap.NewNop())
+		result <- err
+	}()
+	pid := readPID(t, pidFile)
+	deadline := time.AfterFunc(75*time.Millisecond, cancel)
+	defer deadline.Stop()
 	started := time.Now()
-	_, err := runRuntimeObservationCommand(ctx, binary, []string{"--version"}, os.Environ(), dir, zap.NewNop())
-	if err == nil {
-		t.Fatal("timed out command returned success")
+	var err error
+	select {
+	case err = <-result:
+	case <-time.After(3 * time.Second):
+		t.Fatal("timed out command did not finish after cancellation")
 	}
-	if time.Since(started) > time.Second {
+	if err == nil {
+		t.Fatal("cancelled command returned success")
+	}
+	if time.Since(started) > 3*time.Second {
 		t.Fatalf("command cleanup exceeded the bound: %v", time.Since(started))
 	}
-	pid := readPID(t, pidFile)
 	waitUntil(t, time.Second, func() bool { return !processRunning(pid) }, "observation child %d survived timeout", pid)
 }

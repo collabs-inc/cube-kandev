@@ -139,7 +139,7 @@ func TestRuntimeManifestSnapshotDetectsReplacement(t *testing.T) {
 }
 
 func TestRuntimeObservationMarksExternalProviderUnknownUnderPrefix(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == windowsGOOS {
 		t.Skip("uses a Unix executable fixture")
 	}
 	marker := filepath.Join(t.TempDir(), "executed")
@@ -168,7 +168,7 @@ func TestRuntimeObservationMarksExternalProviderUnknownUnderPrefix(t *testing.T)
 }
 
 func TestRuntimeObservationUsesCapturedExternalCodexAndSanitizesOutput(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == windowsGOOS {
 		t.Skip("uses a Unix executable fixture")
 	}
 	dir := filepath.Join(t.TempDir(), "provider binaries with spaces")
@@ -202,7 +202,7 @@ func TestRuntimeObservationUsesCapturedExternalCodexAndSanitizesOutput(t *testin
 }
 
 func TestRuntimeObservationResolvesRelativeExecutableInputsAgainstCapturedWorkDir(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == windowsGOOS {
 		t.Skip("uses Unix executable fixtures")
 	}
 
@@ -267,7 +267,7 @@ func TestRuntimeObservationResolvesRelativeExecutableInputsAgainstCapturedWorkDi
 }
 
 func TestRuntimeObservationRefreshReadsReplacementAtSameExternalPath(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == windowsGOOS {
 		t.Skip("uses a Unix executable fixture")
 	}
 	binary := filepath.Join(t.TempDir(), "codex")
@@ -289,7 +289,7 @@ func TestRuntimeObservationRefreshReadsReplacementAtSameExternalPath(t *testing.
 }
 
 func TestRuntimeObservationUsesInheritedCodexPathWhenProfileHasNoOverride(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == windowsGOOS {
 		t.Skip("uses a Unix executable fixture")
 	}
 	binary := filepath.Join(t.TempDir(), "inherited codex")
@@ -310,7 +310,7 @@ func TestRuntimeObservationUsesInheritedCodexPathWhenProfileHasNoOverride(t *tes
 }
 
 func TestRuntimeObservationUsesBundledClaudeSDKManifest(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == windowsGOOS {
 		t.Skip("uses Unix process fixtures")
 	}
 	cacheRoot := t.TempDir()
@@ -392,7 +392,7 @@ func TestRuntimeObservationUsesBundledClaudeSDKManifest(t *testing.T) {
 }
 
 func TestRuntimeObservationKeepsExternalIdentityAfterVersionFailure(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == windowsGOOS {
 		t.Skip("uses a Unix executable fixture")
 	}
 	binary := filepath.Join(t.TempDir(), "broken codex")
@@ -408,7 +408,7 @@ func TestRuntimeObservationKeepsExternalIdentityAfterVersionFailure(t *testing.T
 }
 
 func TestRuntimeObservationRejectsOversizedVersionOutput(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == windowsGOOS {
 		t.Skip("uses a Unix executable fixture")
 	}
 	binary := filepath.Join(t.TempDir(), "large codex")
@@ -428,7 +428,7 @@ func TestRuntimeObservationRejectsOversizedVersionOutput(t *testing.T) {
 }
 
 func TestRuntimeObservationCommandRejectsOversizedOutput(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == windowsGOOS {
 		t.Skip("uses a Unix executable fixture")
 	}
 	binary := filepath.Join(t.TempDir(), "large output")

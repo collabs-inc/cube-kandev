@@ -65,9 +65,9 @@ Code-review regressions also cover native OpenCode attribution from the captured
 Run from the repository root. The regression test name can be narrowed during RED, then run the package commands after GREEN.
 
 ```bash
-(cd apps/backend && go test ./internal/agent/settings/controller -run '^TestFetchProfileDynamicModelsPreservesRuntimeInfo$' -count=1)
-(cd apps/backend && go test ./internal/agent/agents ./internal/agent/managedruntime ./internal/agent/hostutility ./internal/agent/settings/controller ./internal/agent/settings/dto ./internal/agentctl/server/utility -count=1)
-(cd apps/backend && go test -race ./internal/agent/hostutility -run 'Profile.*(Runtime|Activation|Generation)' -count=1)
+(cd apps/backend && go test -tags fts5 ./internal/agent/settings/controller -run '^TestFetchProfileDynamicModelsPreservesRuntimeInfo$' -count=1)
+(cd apps/backend && go test -tags fts5 ./internal/agent/agents ./internal/agent/managedruntime ./internal/agent/hostutility ./internal/agent/settings/controller ./internal/agent/settings/dto ./internal/agentctl/server/utility -count=1)
+(cd apps/backend && go test -tags fts5 -race ./internal/agent/hostutility -run 'Profile.*(Runtime|Activation|Generation)' -count=1)
 python3 scripts/list-docs.py validate
 python3 scripts/lint-spec-files.py --all
 git diff --check
@@ -122,4 +122,6 @@ Completed 2026-10-04.
 - Windows-native test execution was unavailable on Linux. `GOOS=windows GOARCH=amd64 go test -c` passed for both `internal/agentctl/server/utility` and `internal/agent/hostutility`.
 - The managed E2E runner built the backend successfully. Specification catalog validation, spec lint, and `git diff --check` passed.
 - Follow-up review regressions passed: native OpenCode reports external ownership with trusted CLI guidance, while its exact managed npm fallback remains Kandev-managed and custom wrappers remain unknown. Relative PATH and executable values resolve under the captured work directory; empty PATH entries retain work-directory semantics. The complete agentctl utility suite passed after these additions.
+- Additional review fixes attribute trusted manual runtimes without managed npm fallback, retain conservative unknown results for custom commands, and correct the Task 01 commands to include the required `fts5` build tag.
 - PR follow-up preserves trusted configured bridge ownership and package identity for a command-prefixed launch while clearing its unverified observed version; the provider remains unknown. Bundled dependency inspection now uses the npm executable beside the captured launched npx, ignores a conflicting child-PATH npm, and accepts the final nonempty cache output line. Utility and hostutility tests passed normally and with the race detector. Windows `.cmd` and `.bat` shim tests are included in the native Windows CI suite; the package cross-compiled locally on Linux.
+- Review follow-up replaced the vacuous empty-Codex-path test with a fixture that supplies a configured `CODEX_PATH`, and made the Linux descendant-cleanup test wait for its child PID before starting the timeout.

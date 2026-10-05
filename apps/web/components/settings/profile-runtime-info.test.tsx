@@ -12,6 +12,7 @@ const CLAUDE_PACKAGE = "@agentclientprotocol/claude-agent-acp";
 const MANAGE_BRIDGE_VERSION_LABEL = "Manage bridge version";
 const OPENCODE_GUIDANCE_URL = "https://opencode.ai/docs/cli/";
 const RUNTIME_STATUS_TEST_ID = "profile-runtime-update-status";
+const FINISH_UPDATE_LABEL = "Finish update";
 
 vi.mock("@/lib/api/domains/agent-update-api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/api/domains/agent-update-api")>()),
@@ -94,7 +95,7 @@ function FinishAgentUpdate({
         })
       }
     >
-      Finish update
+      {FINISH_UPDATE_LABEL}
     </button>
   );
 }
@@ -183,6 +184,35 @@ it("shows trusted manual recovery for native OpenCode without managed-release wo
     OPENCODE_GUIDANCE_URL,
   );
   expect(screen.queryByTestId(RUNTIME_STATUS_TEST_ID)).toBeNull();
+});
+
+it("hides managed runtime controls from non-admins while keeping provider guidance", () => {
+  render(
+    <StateProvider
+      initialState={{
+        auth: {
+          mode: "enabled",
+          authenticated: true,
+          user: {
+            id: "member-1",
+            email: "member@example.com",
+            display_name: "Member",
+            role: "member",
+            status: "active",
+          },
+        },
+      }}
+    >
+      <ProfileRuntimeInfo
+        agentName={CLAUDE_AGENT}
+        discoveryState="ready"
+        runtimeInfo={runtimeInfo}
+      />
+    </StateProvider>,
+  );
+
+  expect(screen.queryByRole("link", { name: MANAGE_BRIDGE_VERSION_LABEL })).toBeNull();
+  expect(screen.getByRole("link", { name: "Provider guidance" })).toBeTruthy();
 });
 
 it("keeps trusted manual guidance for an external runtime behind an unverified prefix", () => {
@@ -308,14 +338,14 @@ it("refreshes shared release status when the subscribed agent update finishes", 
   expect(screen.getByTestId(RUNTIME_STATUS_TEST_ID).textContent).toBe(
     "A managed runtime update is available.",
   );
-  fireEvent.click(screen.getByRole("button", { name: "Finish update" }));
+  fireEvent.click(screen.getByRole("button", { name: FINISH_UPDATE_LABEL }));
 
   await waitFor(() =>
     expect(screen.getByTestId(RUNTIME_STATUS_TEST_ID).textContent).toBe(
       "The managed runtime is up to date.",
     ),
   );
-  fireEvent.click(screen.getByRole("button", { name: "Finish update" }));
+  fireEvent.click(screen.getByRole("button", { name: FINISH_UPDATE_LABEL }));
   expect(listStatusesMock).toHaveBeenCalledTimes(1);
   expect(listStatusesMock).toHaveBeenCalledWith({ cache: "no-store" });
 });
@@ -353,12 +383,58 @@ it("refreshes after a failed update without clearing the available update status
       </SeedRuntimeStatuses>
     </StateProvider>,
   );
-  fireEvent.click(screen.getByRole("button", { name: "Finish update" }));
+  fireEvent.click(screen.getByRole("button", { name: FINISH_UPDATE_LABEL }));
 
   await waitFor(() => expect(listStatusesMock).toHaveBeenCalledTimes(1));
   expect(screen.getByTestId(RUNTIME_STATUS_TEST_ID).textContent).toBe(
     "A managed runtime update is available.",
   );
+});
+
+it("applies the refreshed release status after a failed update", async () => {
+  const initialStatus: AgentUpdateStatus = {
+    agent_name: CLAUDE_AGENT,
+    display_name: "Claude",
+    runtime_id: `managed:${CLAUDE_AGENT}`,
+    owner: "kandev",
+    mechanism: "npm",
+    management: "managed",
+    available: true,
+    enabled: true,
+    auto_update_supported: false,
+    auto_update: false,
+    package: CLAUDE_PACKAGE,
+    default_version: "1.2.0",
+    effective_version: "1.1.0",
+    check_state: "update_available",
+  };
+  render(
+    <StateProvider>
+      <SeedRuntimeStatuses statuses={{ [CLAUDE_AGENT]: initialStatus }}>
+        <ProfileRuntimeInfo
+          agentName={CLAUDE_AGENT}
+          discoveryState="ready"
+          runtimeInfo={runtimeInfo}
+        />
+        <FinishAgentUpdate agentName={CLAUDE_AGENT} status="failed" />
+      </SeedRuntimeStatuses>
+    </StateProvider>,
+  );
+  expect(screen.getByTestId(RUNTIME_STATUS_TEST_ID).textContent).toBe(
+    "A managed runtime update is available.",
+  );
+
+  listStatusesMock.mockResolvedValueOnce({
+    statuses: [{ ...initialStatus, check_state: "up_to_date", effective_version: "1.2.0" }],
+  });
+  fireEvent.click(screen.getByRole("button", { name: FINISH_UPDATE_LABEL }));
+
+  await waitFor(() =>
+    expect(screen.getByTestId(RUNTIME_STATUS_TEST_ID).textContent).toBe(
+      "The managed runtime is up to date.",
+    ),
+  );
+  expect(listStatusesMock).toHaveBeenCalledWith({ cache: "no-store" });
 });
 
 it("shows an explicit unknown state when a profile probe is unavailable", () => {

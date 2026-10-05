@@ -107,6 +107,13 @@ async function expectNarrowFinePointerRuntimeAction(
     storageState: await page.context().storageState(),
   });
   try {
+    const backendPort = await page.evaluate(() => window.__KANDEV_API_PORT);
+    await fineContext.addInitScript(
+      ({ backendPort: apiPort }: { backendPort: string }) => {
+        window.__KANDEV_API_PORT = apiPort;
+      },
+      { backendPort },
+    );
     const finePage = await fineContext.newPage();
     await installProfileRuntimeObservationFixture(finePage);
     await finePage.goto(

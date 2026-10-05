@@ -80,6 +80,10 @@ test.describe("Profile capability discovery", () => {
       await expect(testPage.getByTestId("profile-runtime-component-bridge")).toContainText(
         "Observed: 0.63.0",
       );
+      await expect(testPage.getByTestId("profile-runtime-update-status")).toHaveText(
+        "The managed runtime is up to date.",
+        { timeout: 20_000 },
+      );
       await expect(selector).toHaveText(selectedBefore ?? "");
       const savedProfile = await apiClient.getAgentProfile(profile.id);
       expect(savedProfile.model).toBe("mock-fast");

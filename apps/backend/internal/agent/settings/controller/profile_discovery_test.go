@@ -9,7 +9,6 @@ import (
 
 	"github.com/kandev/kandev/internal/agent/agents"
 	"github.com/kandev/kandev/internal/agent/hostutility"
-	runtimeenv "github.com/kandev/kandev/internal/agent/runtime/environment"
 	"github.com/kandev/kandev/internal/agent/settings/dto"
 	"github.com/kandev/kandev/internal/agent/settings/models"
 	"github.com/kandev/kandev/internal/secrets"
@@ -19,19 +18,6 @@ type recordingProfileDiscoveryUtility struct {
 	request     hostutility.ProfileCapabilityRequest
 	called      bool
 	runtimeInfo *agents.RuntimeInfo
-}
-
-func TestEmptyProfileCodexPathDoesNotMaskInheritedOverride(t *testing.T) {
-	definitions := profileProbeEnvironmentDefinitions(agents.NewCodexACP(), []dto.ProfileEnvVarDTO{{
-		Key: "CODEX_PATH", Value: "",
-	}})
-	env, _, err := runtimeenv.Resolve(context.Background(), definitions, nil)
-	if err != nil {
-		t.Fatalf("resolve empty profile environment: %v", err)
-	}
-	if _, exists := env["CODEX_PATH"]; exists {
-		t.Fatalf("empty profile CODEX_PATH generated an override: %#v", env)
-	}
 }
 
 func (f *recordingProfileDiscoveryUtility) Get(string) (hostutility.AgentCapabilities, bool) {

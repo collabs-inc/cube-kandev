@@ -25,6 +25,7 @@ const (
 	runtimeObservationTimeout = 2 * time.Second
 	runtimeManifestMaxBytes   = 64 << 10
 	runtimeCommandMaxBytes    = 4 << 10
+	windowsGOOS               = "windows"
 )
 
 var (
@@ -305,7 +306,7 @@ func resolveNPMCacheRoot(
 	}
 	args := []string{}
 	if prefix := managedNPMProjectPrefix(preparedArgs); prefix != "" {
-		args = append(args, "--prefix", prefix)
+		args = append(args, codexNpmPrefixFlag, prefix)
 	}
 	args = append(args, "config", "get", "cache")
 	output, err := runRuntimeObservationCommand(ctx, npm, args, env, workDir, logger)
@@ -352,7 +353,7 @@ func resolveSiblingNPMExecutable(launchedExecutable string, env []string, workDi
 
 func managedNPMProjectPrefix(args []string) string {
 	for index := 0; index+1 < len(args); index++ {
-		if args[index] == "--prefix" && args[index+1] != managedruntime.NPMProjectPrefix {
+		if args[index] == codexNpmPrefixFlag && args[index+1] != managedruntime.NPMProjectPrefix {
 			return args[index+1]
 		}
 	}
@@ -542,7 +543,7 @@ func executableCandidates(path string, env []string) []string {
 	if filepath.Ext(path) != "" {
 		return []string{path}
 	}
-	if runtime.GOOS != "windows" {
+	if runtime.GOOS != windowsGOOS {
 		return []string{path}
 	}
 	pathExt := environmentValue(env, "PATHEXT")
@@ -565,7 +566,7 @@ func executableFile(path string) (string, bool) {
 	if err != nil || !info.Mode().IsRegular() {
 		return "", false
 	}
-	if runtime.GOOS != "windows" && info.Mode().Perm()&0o111 == 0 {
+	if runtime.GOOS != windowsGOOS && info.Mode().Perm()&0o111 == 0 {
 		return "", false
 	}
 	abs, err := filepath.Abs(path)
@@ -580,7 +581,7 @@ func hasExecutableSeparator(value string) bool {
 }
 
 func environmentKeyEqual(left, right string) bool {
-	if runtime.GOOS == "windows" {
+	if runtime.GOOS == windowsGOOS {
 		return strings.EqualFold(left, right)
 	}
 	return left == right

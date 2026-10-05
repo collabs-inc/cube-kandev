@@ -272,8 +272,10 @@ uses the expected npm installation and configured registry. Run `npm config get 
 ### Inspect profile runtime details
 
 Open **Settings > Agents**, then open a profile. The model settings show
-**Host runtime** after profile discovery returns runtime details. These details
-describe the host where the Kandev backend runs.
+**Host runtime** after profile discovery returns runtime details for a profile
+that supports dynamic model discovery. It is hidden for OpenAI-compatible
+profiles and profiles without dynamic model discovery. These details describe
+the host where the Kandev backend runs.
 
 Each component can show its observed version, configured version, source, and
 owner. The observed version comes from the running bridge or provider. The
