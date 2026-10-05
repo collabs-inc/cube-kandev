@@ -1,0 +1,8 @@
+{
+  "name": "Kandev",
+  "description": "Kanban tasks, parallel coding agents, worktrees, terminals and code review using this machine's agent sign-ins.",
+  "icon": "apps/web/public/icon.svg",
+  "platforms": ["linux"],
+  "install": "sh cube/install.sh",
+  "start": "sh cube/start.sh"
+}
