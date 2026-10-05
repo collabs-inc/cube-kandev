@@ -1,5 +1,6 @@
 #!/bin/sh
 set -eu
+script_dir=$(CDPATH= cd -- "$(dirname "$0")" && pwd)
 case "${PORT:-}" in ''|*[!0-9]*) echo 'PORT must be an integer.' >&2; exit 1 ;; esac
 [ "$PORT" -ge 1 ] && [ "$PORT" -le 65535 ] || { echo 'PORT is out of range.' >&2; exit 1; }
 case "$(uname -s)-$(uname -m)" in
@@ -21,4 +22,4 @@ umask 077
 mkdir -p "$KANDEV_HOME_DIR"
 cd "$KANDEV_HOME_DIR"
 # The native launcher requires --port; SERVER_PORT alone is only a child handoff.
-exec "$KANDEV_BUNDLE_DIR/bin/kandev" --headless --port "$PORT"
+exec node "$script_dir/supervise.mjs" "$KANDEV_BUNDLE_DIR/bin/kandev" --headless --port "$PORT"
